@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "verbatimModuleSyntax": false,
+    "outDir": "./dist-cjs",
+    "tsBuildInfoFile": "./dist-cjs/.tsbuildinfo",
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false
+  },
+  "references": []
+}

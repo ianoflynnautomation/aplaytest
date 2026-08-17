@@ -1,0 +1,34 @@
+{
+  "name": "@atest/mcp",
+  "version": "0.0.0",
+  "description": "MCP server: the same engine calls the CLI makes, exposed to IDE agents",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atest/core": "0.0.0",
+    "@atest/flaky": "0.0.0",
+    "@atest/heal": "0.0.0",
+    "@atest/impact": "0.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.3.6",
+    "@atest/author": "0.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "atest-mcp": "./dist/bin.js"
+  }
+}

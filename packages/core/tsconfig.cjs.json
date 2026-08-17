@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Playwright resolves reporters with require.resolve, so the reporter entry
+    // must be loadable from CommonJS on ANY supported Node — not only on
+    // versions new enough for require(esm).
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "verbatimModuleSyntax": false,
+    "outDir": "./dist-cjs",
+    "tsBuildInfoFile": "./dist-cjs/.tsbuildinfo",
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false
+  },
+  "references": []
+}

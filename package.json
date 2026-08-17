@@ -1,0 +1,33 @@
+{
+  "name": "atest-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agentic test framework \u2014 a control plane around Playwright",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:clean": "tsc --build --clean && tsc --build tsconfig.cjs.json --clean",
+    "typecheck": "tsc --build && tsc --noEmit -p tsconfig.scripts.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "build:esm": "tsc --build",
+    "build:cjs": "tsc --build tsconfig.cjs.json && node scripts/finalize-cjs.ts",
+    "flaky:report": "node scripts/flaky-report.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10",
+    "@playwright/test": "^1.56.0"
+  }
+}

@@ -1,0 +1,260 @@
+/**
+ * The falsifiability gate.
+ *
+ * A generated test earns trust in exactly one way: it passes reliably AND it
+ * fails when the world breaks. Neither half is sufficient. A test that always
+ * passes is indistinguishable from a test that asserts nothing, and that is
+ * the failure mode LLM-authored tests actually exhibit — not syntax errors,
+ * not hallucinated selectors, but confident, green, empty assertions.
+ *
+ * Wholly deterministic. No model is consulted here, and none can overrule it:
+ * the model proposes a test, Playwright decides whether it means anything.
+ */
+
+import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import { runPlaywright, type PlaywrightRunResult } from '@atest/runner-playwright';
+
+import {
+  MEANINGFUL_CLASSES,
+  applyMutant,
+  buildMutants,
+  type Mutant,
+  type MutantClass,
+  type MutantName,
+} from './mutants.js';
+
+export type CheckName = 'stability' | 'falsifiability';
+
+export interface GateCheck {
+  readonly name: CheckName;
+  readonly ok: boolean;
+  readonly detail: string;
+}
+
+export interface MutantOutcome {
+  readonly name: MutantName;
+  readonly class: MutantClass;
+  /** True when the mutant made the test fail — the outcome we want. */
+  readonly killed: boolean;
+  readonly kills: string;
+  /** Set when the run could not be interpreted; never counted as a kill. */
+  readonly inconclusive: boolean;
+}
+
+export interface GateResult {
+  readonly passed: boolean;
+  readonly checks: readonly GateCheck[];
+  readonly mutants: readonly MutantOutcome[];
+  readonly stabilityRuns: number;
+  readonly stabilityPassed: number;
+  /** One-line verdict suitable for a CLI or a PR comment. */
+  readonly summary: string;
+}
+
+export interface GateOptions {
+  readonly cwd: string;
+  /** Spec file holding the candidate test. */
+  readonly specFile: string;
+  readonly testTitle: string;
+  readonly config?: string | undefined;
+  readonly project?: string | undefined;
+  /** Consecutive passing runs required. */
+  readonly stabilityRuns?: number | undefined;
+  readonly apiPattern?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+  /** Restrict which mutants run; defaults to all of them. */
+  readonly only?: readonly MutantName[] | undefined;
+}
+
+const BACKUP_SUFFIX = '.atest-gate-backup';
+const DEFAULT_STABILITY_RUNS = 3;
+
+interface Tally {
+  readonly passed: number;
+  readonly failed: number;
+  readonly found: boolean;
+}
+
+/**
+ * Total one test's outcomes across every entry that names it.
+ *
+ * `repeatEach: N` emits N SEPARATE outcome entries for the same title, each
+ * with `passed: 1` — not one entry with `passed: N`. Taking the first match
+ * caps stability at 1, so a three-run gate reports "passed 1/3" for a test
+ * that passed three times and rejects every candidate as flaky. The gate
+ * would have looked like it was working, and it would have been rejecting
+ * good tests.
+ *
+ * Filtering by title also judges the CANDIDATE rather than the file: a spec
+ * file usually holds neighbours, and aggregate counts would let a neighbour's
+ * failure read as the candidate being killed.
+ */
+function tally(result: PlaywrightRunResult, title: string): Tally {
+  const matching = result.specs.filter(s => s.title === title);
+  if (matching.length === 0) return { passed: 0, failed: 0, found: false };
+  return {
+    passed: matching.reduce((sum, s) => sum + s.passed, 0),
+    failed: matching.reduce((sum, s) => sum + s.failed, 0),
+    found: true,
+  };
+}
+
+function passedOnce(result: PlaywrightRunResult, title: string): boolean {
+  const counts = tally(result, title);
+  if (!counts.found) return result.ok;
+  return counts.failed === 0 && counts.passed > 0;
+}
+
+export async function falsifiabilityGate(options: GateOptions): Promise<GateResult> {
+  const stabilityRuns = options.stabilityRuns ?? DEFAULT_STABILITY_RUNS;
+
+  // `specFile` is interpreted relative to `cwd`, because that is how Playwright
+  // will interpret it. Filesystem calls here run relative to process.cwd(), so
+  // they need the resolved form — reading the spec with the unresolved path
+  // fails with ENOENT whenever the gate is driven from anywhere but the target
+  // repository's own directory, which is the normal case.
+  const specPath = resolve(options.cwd, options.specFile);
+  const backupPath = `${specPath}${BACKUP_SUFFIX}`;
+  const original = await readFile(specPath, 'utf8');
+
+  const baseRun = {
+    cwd: options.cwd,
+    file: options.specFile,
+    grepTitle: options.testTitle,
+    ...(options.config === undefined ? {} : { config: options.config }),
+    ...(options.project === undefined ? {} : { project: options.project }),
+    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+  };
+
+  // ── Stability, before any mutation ─────────────────────────────────────
+  // Runs first because a candidate that cannot pass unmutated makes every
+  // mutant result meaningless: it would be "killed" by all of them, and a
+  // broken test would score a perfect falsifiability result.
+  const stability = await runPlaywright({ ...baseRun, repeatEach: stabilityRuns, workers: 1 });
+  const counts = tally(stability, options.testTitle);
+  const stabilityPassed = counts.found ? counts.passed : stability.ok ? stabilityRuns : 0;
+  const stable = !stability.inconclusive && counts.failed === 0 && stabilityPassed >= stabilityRuns;
+
+  const checks: GateCheck[] = [
+    {
+      name: 'stability',
+      ok: stable,
+      detail: stability.inconclusive
+        ? 'run could not be interpreted'
+        : `passed ${stabilityPassed}/${stabilityRuns}`,
+    },
+  ];
+
+  if (!stable) {
+    return {
+      passed: false,
+      checks,
+      mutants: [],
+      stabilityRuns,
+      stabilityPassed,
+      summary: stability.inconclusive
+        ? 'gate inconclusive — the candidate run could not be interpreted'
+        : `candidate is not stable (${stabilityPassed}/${stabilityRuns}); mutants not run`,
+    };
+  }
+
+  // ── Falsifiability ─────────────────────────────────────────────────────
+  const all = buildMutants(options.apiPattern === undefined ? {} : { apiPattern: options.apiPattern });
+  const mutants =
+    options.only === undefined ? all : all.filter(m => options.only?.includes(m.name) === true);
+
+  const outcomes: MutantOutcome[] = [];
+
+  // The original is moved aside rather than held only in memory, so a crash
+  // mid-gate leaves a recoverable file instead of a mutated spec.
+  await rename(specPath, backupPath);
+  try {
+    for (const mutant of mutants) {
+      await writeFile(specPath, applyMutant(original, mutant), 'utf8');
+      // Mutants run sequentially and single-worker: concurrent route
+      // interception across workers is a source of noise that would show up
+      // as a flaky kill.
+      const result = await runPlaywright({ ...baseRun, workers: 1 });
+      outcomes.push({
+        name: mutant.name,
+        class: mutant.class,
+        killed: !result.inconclusive && !passedOnce(result, options.testTitle),
+        kills: mutant.kills,
+        inconclusive: result.inconclusive,
+      });
+    }
+  } finally {
+    // Atomic restore first: renaming the backup over the mutated file leaves
+    // no window in which the spec is missing or half-written. Rewriting from
+    // memory is the fallback for the cross-device case where rename fails.
+    await rename(backupPath, specPath).catch(async () => {
+      await writeFile(specPath, original, 'utf8');
+      await unlink(backupPath).catch(() => undefined);
+    });
+  }
+
+  return evaluateGate({
+    checks,
+    outcomes,
+    stabilityRuns,
+    stabilityPassed,
+  });
+}
+
+export interface EvaluateInput {
+  readonly checks: readonly GateCheck[];
+  readonly outcomes: readonly MutantOutcome[];
+  readonly stabilityRuns: number;
+  readonly stabilityPassed: number;
+}
+
+/**
+ * The verdict, as a pure function.
+ *
+ * Separated from the run loop so the decision that actually matters can be
+ * tested without a browser. A gate whose rule is only reachable through a live
+ * Playwright run is a gate whose rule nobody re-checks.
+ */
+export function evaluateGate(input: EvaluateInput): GateResult {
+  const { checks, outcomes, stabilityRuns, stabilityPassed } = input;
+
+  const killed = outcomes.filter(o => o.killed);
+  // Liveness kills do not count towards the verdict. A test killed only by
+  // http-500 has proved it loads a page, which is not what it claims to test.
+  const meaningful = killed.filter(o => MEANINGFUL_CLASSES.has(o.class));
+  const falsifiable = meaningful.length > 0;
+
+  const all = [
+    ...checks,
+    {
+      name: 'falsifiability' as const,
+      ok: falsifiable,
+      detail: falsifiable
+        ? `killed ${meaningful.length} data mutant(s): ${meaningful.map(m => m.name).join(', ')}`
+        : killed.length > 0
+          ? `killed only ${killed.map(k => k.name).join(', ')} — proves the page loads, not that anything is asserted about the data`
+          : 'survived every mutant — the test asserts nothing meaningful',
+    },
+  ];
+
+  const survived = outcomes.filter(o => !o.killed && MEANINGFUL_CLASSES.has(o.class));
+
+  return {
+    passed: all.every(c => c.ok),
+    checks: all,
+    mutants: outcomes,
+    stabilityRuns,
+    stabilityPassed,
+    summary: falsifiable
+      ? `stable ${stabilityPassed}/${stabilityRuns} \u00b7 killed ${killed.length}/${outcomes.length} mutants (${killed.map(k => k.name).join(', ')})` +
+        (survived.length > 0
+          ? ` \u00b7 note: survived ${survived.map(s => s.name).join(', ')}`
+          : '')
+      : `REJECTED \u2014 stable, but survived every data mutant, so it asserts nothing about what the app returned`,
+  };
+}
+
+export { buildMutants, applyMutant };
+export type { Mutant, MutantName };

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "id": "ev_014b4f830de2",
+  "runId": "smoke-run",
+  "traceId": "trace-4219922fea2e2bd3c691-8affb055089f253eeba4-0",
+  "capturedAt": "2026-08-17T06:30:16.180Z",
+  "test": {
+    "id": "4219922fea2e2bd3c691-8affb055089f253eeba4",
+    "title": "fails: strict mode violation",
+    "titlePath": [
+      "",
+      "",
+      "smoke.spec.ts",
+      "fails: strict mode violation"
+    ],
+    "file": "/Users/ianoflynn/Sources/atest/examples/smoke/tests/smoke.spec.ts",
+    "line": 23,
+    "project": "default",
+    "tags": [],
+    "retry": 0,
+    "workerIndex": 1,
+    "shard": null
+  },
+  "failure": {
+    "kind": "locator_ambiguous",
+    "message": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByTestId('gyms-list-item')\nExpected: visible\nError: strict mode violation: getByTestId('gyms-list-item') resolved to 2 elements:\n    1) <li data-testid=\"gyms-list-item\">…</li> aka getByRole('listitem').filter({ hasText: 'Blackwater Valley BJJ' })\n    2) <li data-testid=\"gyms-list-item\">…</li> aka getByRole('listitem').filter({ hasText: 'Harbour City Jiu-Jitsu' })\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 1000ms\n  - waiting for getByTestId('gyms-list-item')\n",
+    "stack": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByTestId('gyms-list-item')\nExpected: visible\nError: strict mode violation: getByTestId('gyms-list-item') resolved to 2 elements:\n    1) <li data-testid=\"gyms-list-item\">…</li> aka getByRole('listitem').filter({ hasText: 'Blackwater Valley BJJ' })\n    2) <li data-testid=\"gyms-list-item\">…</li> aka getByRole('listitem').filter({ hasText: 'Harbour City Jiu-Jitsu' })\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 1000ms\n  - waiting for getByTestId('gyms-list-item')\n\n    at /Users/ianoflynn/Sources/atest/examples/smoke/tests/smoke.spec.ts:25:52",
+    "matcher": "toBeVisible",
+    "expected": "visible",
+    "actual": "strict mode violation: getByTestId('gyms-list-item') resolved to 2 elements:",
+    "timedOut": false
+  },
+  "intent": {
+    "steps": [],
+    "failingStep": null,
+    "selector": "getByTestId('gyms-list-item')",
+    "selectorSource": null
+  },
+  "page": {
+    "url": "",
+    "title": "",
+    "ariaSnapshot": "",
+    "candidates": [],
+    "htmlDigest": null,
+    "testIdsPresent": []
+  },
+  "visual": {
+    "screenshotPath": null,
+    "diffPath": null,
+    "diffPixelRatio": null
+  },
+  "network": {
+    "failed": [],
+    "slow": [],
+    "statusCounts": {}
+  },
+  "console": {
+    "errors": [],
+    "warnings": []
+  },
+  "timing": {
+    "testMs": 61,
+    "failingActionMs": null,
+    "navigationMs": null,
+    "budgetUsedRatio": 0.0061
+  },
+  "env": {
+    "appEnv": "unknown",
+    "baseUrl": "",
+    "browser": "default",
+    "platform": "darwin",
+    "workers": 7,
+    "commit": "",
+    "changedPaths": []
+  },
+  "appSpans": null,
+  "artifacts": {
+    "tracePath": null,
+    "videoPath": null
+  }
+}

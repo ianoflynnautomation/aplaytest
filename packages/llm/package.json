@@ -1,0 +1,26 @@
+{
+  "name": "@atest/llm",
+  "version": "0.0.0",
+  "description": "LLM provider abstraction: structured output, prompt caching, budget accounting",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "zod": "^4.3.6"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}

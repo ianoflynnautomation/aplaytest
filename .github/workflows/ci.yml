@@ -1,0 +1,234 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build + Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # `--ignore-scripts` deliberately: nothing here needs a postinstall, and
+      # a supply-chain payload most often arrives as one.
+      - run: npm ci --ignore-scripts
+
+      # Both outputs. `tsc --build` alone leaves dist-cjs stale, and Playwright
+      # resolves the reporter through require — so an ESM-only build ships a
+      # reporter that consumers silently cannot load.
+      - name: Build (ESM + CJS)
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # The reporter is loaded by `require` from a CommonJS context. Asserting
+      # that here is cheaper than discovering it in a consumer's CI.
+      - name: Both entry points load
+        run: |
+          node --input-type=commonjs -e "
+            const r = require('@atest/runner-playwright/reporter');
+            if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load'); }
+          "
+          node --input-type=module -e "
+            import R from '@atest/runner-playwright/reporter';
+            if (typeof R !== 'function') { throw new Error('ESM reporter did not load'); }
+          "
+
+      - name: No JavaScript in source
+        run: |
+          found=$(find packages scripts -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \
+            | grep -v '/dist' || true)
+          if [ -n "$found" ]; then
+            echo "Source must be TypeScript. Found:"; echo "$found"; exit 1
+          fi
+
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=moderate
+
+  integration:
+    name: Integration (smoke example)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      # The smoke example fails two tests ON PURPOSE. What is asserted is that
+      # atest observed them: unit tests written from clean prose missed two
+      # real defects that only a live Playwright run exposed.
+      - name: Reporter captures real failures
+        working-directory: examples/smoke
+        run: |
+          npx playwright test || true
+          count=$(find .atest/evidence -name '*.json' | wc -l | tr -d ' ')
+          if [ "$count" -ne 2 ]; then
+            echo "Expected 2 evidence bundles, found $count"; exit 1
+          fi
+
+      - name: Reporter never changes the verdict
+        working-directory: examples/smoke
+        run: |
+          rm -rf .atest
+          set +e
+          npx playwright test >/dev/null 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "Playwright must still exit 1 on failure; got $code"; exit 1
+          fi
+
+      # The report is a CI artifact: downloaded, unzipped, opened from file://
+      # on a laptop that may be offline. One CDN reference makes it a blank
+      # page for whoever is debugging a failed release.
+      - name: Report is self-contained and keeps stdout clean
+        working-directory: examples/smoke
+        run: |
+          node ../../packages/cli/dist/bin.js report \
+            --runs .atest/runs --evidence .atest/evidence \
+            --out report.html > comment.md
+
+          if grep -qiE '<script[^>]+src=|<link[^>]+stylesheet' report.html; then
+            echo "Report must reference no external assets"; exit 1
+          fi
+
+          # stdout is the comment; the human summary belongs on stderr. If it
+          # leaks, the words "report / N tests" land in a PR comment.
+          if grep -q '^report$' comment.md; then
+            echo "Human summary leaked into the comment"; exit 1
+          fi
+          if ! head -1 comment.md | grep -q 'atest-report'; then
+            echo "Comment must start with the update marker"; exit 1
+          fi
+          rm -f report.html comment.md
+
+      # The gate's ACTUAL CLAIM, which examples/smoke cannot test: that mutants
+      # kill tests. Smoke uses page.setContent and never touches the network,
+      # so every mutant is a no-op there and "survived all three" proves
+      # nothing. The fixture app serves a real /api/gyms and filters
+      # SERVER-side, so `unfiltered` has something to break.
+      - name: Gate kills a meaningful test and rejects a vacuous one
+        working-directory: examples/fixture-app
+        run: |
+          set +e
+          node ../../packages/cli/dist/bin.js gate --json --validate 2 \
+            --spec tests/gyms.spec.ts \
+            --test 'MEANINGFUL: filtering by county narrows the list to that county' > meaningful.json
+          meaningful=$?
+          node ../../packages/cli/dist/bin.js gate --json --validate 2 \
+            --spec tests/gyms.spec.ts \
+            --test 'VACUOUS: asserts only that the page rendered' > vacuous.json
+          vacuous=$?
+          set -e
+
+          if [ "$meaningful" -ne 0 ]; then
+            echo "A test that asserts on filtered data must pass the gate"; cat meaningful.json; exit 1
+          fi
+          if [ "$vacuous" -ne 4 ]; then
+            echo "A test asserting only page chrome must be rejected with exit 4; got $vacuous"; exit 1
+          fi
+
+          # The discriminating mutant specifically. `http-500` kills almost
+          # anything that loads a page, so a kill count alone would pass even
+          # if `unfiltered` were silently broken.
+          node -e '
+            const r = require("./meaningful.json");
+            const m = r.mutants.find(x => x.name === "unfiltered");
+            if (!m || !m.killed) {
+              console.error("The unfiltered mutant did not kill a filtering test:", m);
+              process.exit(1);
+            }
+            const v = require("./vacuous.json");
+            if (v.mutants.some(x => x.class !== "liveness" && x.killed)) {
+              console.error("A vacuous test was killed by a data mutant:", v.mutants);
+              process.exit(1);
+            }
+          '
+          rm -f meaningful.json vacuous.json
+
+      # The gate rewrites the spec under test, so the property that matters
+      # more than the verdict is that it always puts the file back. A crash
+      # here would leave a mutated test in someone's working tree.
+      - name: Falsifiability gate restores the spec byte-for-byte
+        working-directory: examples/smoke
+        run: |
+          before=$(sha256sum tests/smoke.spec.ts | cut -d' ' -f1)
+
+          # `passes` asserts only that a header rendered, so it survives every
+          # data mutant. Exit 4 (policy) is the correct verdict, not a failure.
+          set +e
+          node ../../packages/cli/dist/bin.js gate \
+            --spec tests/smoke.spec.ts --test 'passes' --validate 2
+          code=$?
+          set -e
+          if [ "$code" -ne 4 ]; then
+            echo "A test asserting nothing must be rejected with exit 4; got $code"; exit 1
+          fi
+
+          after=$(sha256sum tests/smoke.spec.ts | cut -d' ' -f1)
+          if [ "$before" != "$after" ]; then
+            echo "Gate did not restore the spec"; exit 1
+          fi
+          if ls tests/*.atest-gate-backup >/dev/null 2>&1; then
+            echo "Gate left a backup file behind"; exit 1
+          fi
+
+      - name: ATEST=0 is a complete kill switch
+        working-directory: examples/smoke
+        env:
+          ATEST: '0'
+        run: |
+          rm -rf .atest
+          npx playwright test >/dev/null 2>&1 || true
+          if [ -d .atest ]; then
+            echo "ATEST=0 must write nothing"; exit 1
+          fi

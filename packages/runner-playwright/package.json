@@ -1,0 +1,39 @@
+{
+  "name": "@atest/runner-playwright",
+  "version": "0.0.0",
+  "description": "Playwright adapter: reporter plugin, error parsing, step extraction, evidence assembly",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist-cjs/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js"
+    },
+    "./reporter": {
+      "types": "./dist/reporter.d.ts",
+      "import": "./dist/reporter.js",
+      "require": "./dist-cjs/reporter.js"
+    }
+  },
+  "files": [
+    "dist",
+    "dist-cjs"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atest/core": "0.0.0",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.55.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

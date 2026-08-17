@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+coverage/
+.env
+.env.*
+!.env.example
+
+# atest's own working data, when dogfooding on a consumer repo
+.atest/history.sqlite
+.atest/evidence/
+.atest/agent/
+test-results/
+playwright-report/
+.atest/runs/

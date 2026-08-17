@@ -1,0 +1,34 @@
+{
+  "name": "atest",
+  "version": "0.0.0",
+  "description": "The atest binary: flaky analysis, quarantine policy, and diagnostics",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "atest": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@atest/core": "0.0.0",
+    "@atest/flaky": "0.0.0",
+    "@atest/heal": "0.0.0",
+    "@atest/impact": "0.0.0",
+    "@atest/llm": "0.0.0",
+    "@atest/agent": "0.0.0",
+    "@atest/report": "0.0.0",
+    "@atest/author": "0.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}

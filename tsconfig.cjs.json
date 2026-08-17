@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core/tsconfig.cjs.json" },
+    { "path": "./packages/runner-playwright/tsconfig.cjs.json" }
+  ]
+}

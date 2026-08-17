@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "runId": "live-run",
+  "startedAt": "2026-08-17T18:46:58.070Z",
+  "finishedAt": "2026-08-17T18:47:00.088Z",
+  "commit": null,
+  "branch": null,
+  "appEnv": null,
+  "ci": false,
+  "workers": 7,
+  "shard": null,
+  "atestVersion": "0.0.0",
+  "playwrightVersion": "1.62.1",
+  "attempts": [
+    {
+      "testId": "01a095e0a7d5702ffdfa-b20ec32a10f20aa3938e",
+      "title": "searching by name narrows the gyms directory to only that gym",
+      "titlePath": [
+        "",
+        "",
+        "generated.spec.ts",
+        "searching by name narrows the gyms directory to only that gym"
+      ],
+      "file": "/Users/ianoflynn/Sources/atest/examples/bjjeire-live/tests/generated.spec.ts",
+      "line": 3,
+      "project": "default",
+      "tags": [],
+      "retry": 0,
+      "outcome": "passed",
+      "failureKind": null,
+      "durationMs": 1714,
+      "workerIndex": 0,
+      "shard": null,
+      "traceId": null,
+      "evidenceId": null,
+      "coScheduled": [],
+      "routes": [
+        "/gyms"
+      ]
+    }
+  ]
+}

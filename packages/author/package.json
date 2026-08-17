@@ -1,0 +1,26 @@
+{
+  "name": "@atest/author",
+  "version": "0.0.0",
+  "description": "Grounding retrieval and the falsifiability gate for generated tests",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atest/core": "0.0.0",
+    "@atest/runner-playwright": "0.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}

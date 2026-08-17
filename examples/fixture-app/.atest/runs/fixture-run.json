@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-run",
+  "startedAt": "2026-08-17T19:37:14.534Z",
+  "finishedAt": "2026-08-17T19:37:14.881Z",
+  "commit": null,
+  "branch": null,
+  "appEnv": null,
+  "ci": false,
+  "workers": 7,
+  "shard": null,
+  "atestVersion": "0.0.0",
+  "playwrightVersion": "1.62.1",
+  "attempts": [
+    {
+      "testId": "1ea1b1599cbc08f16936-ee35a8479feb4e4148fb",
+      "title": "API: gyms endpoint filters by county",
+      "titlePath": [
+        "",
+        "",
+        "api.spec.ts",
+        "API: gyms endpoint filters by county"
+      ],
+      "file": "/Users/ianoflynn/Sources/atest/examples/fixture-app/tests/api.spec.ts",
+      "line": 5,
+      "project": "default",
+      "tags": [],
+      "retry": 0,
+      "outcome": "passed",
+      "failureKind": null,
+      "durationMs": 56,
+      "workerIndex": 0,
+      "shard": null,
+      "traceId": null,
+      "evidenceId": null,
+      "coScheduled": [],
+      "routes": []
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+/**
+ * Configuration: one file, fully typed, Zod-validated at load, every field
+ * optional with a documented default.
+ *
+ * The defaults encode the project's core stance — `mode: 'strict'`,
+ * `heal.apply: 'propose'`, quarantine expiry ON — so that a consumer who
+ * writes `export default defineAtestConfig({})` gets the safe system rather
+ * than an unconfigured one.
+ */
+
+import { z } from 'zod';
+import { LOCATOR_STRATEGIES, MAX_STABILITY_RANK } from '../locator/stability.js';
+
+export const ExecutionModeSchema = z.enum(['strict', 'assisted', 'agentic']);
+export type ExecutionMode = z.infer<typeof ExecutionModeSchema>;
+
+export const AggressivenessSchema = z.enum(['off', 'conservative', 'balanced', 'aggressive']);
+export type Aggressiveness = z.infer<typeof AggressivenessSchema>;
+
+const PlaywrightSchema = z.object({
+  /** Named Playwright configs this project can drive. */
+  configs: z.record(z.string(), z.string()).prefault({}),
+  defaultConfig: z.string().default('playwright.config.ts'),
+});
+
+const HistorySchema = z.object({
+  driver: z.enum(['sqlite', 'postgres']).default('sqlite'),
+  url: z.string().default('.atest/history.sqlite'),
+  /** Attempts older than this are pruned by `atest history prune`. */
+  retainDays: z.number().int().positive().default(90),
+});
+
+const EvidenceSchema = z.object({
+  dir: z.string().default('.atest/evidence'),
+  retainRuns: z.number().int().positive().default(50),
+  /**
+   * Header/body/console keys scrubbed before anything is written to disk or
+   * sent to a model. A suite with MSAL auth WILL capture bearer tokens.
+   */
+  redact: z
+    .array(z.string())
+    .default(['password', 'token', 'authorization', 'cookie', 'secret', 'api-key']),
+  /** Token ceiling for the ARIA snapshot before truncation (marked explicitly). */
+  ariaMaxTokens: z.number().int().positive().default(6_000),
+});
+
+const LlmSchema = z.object({
+  provider: z.enum(['anthropic', 'openai', 'ollama', 'none']).default('anthropic'),
+  models: z
+    .object({
+      classify: z.string().default('claude-haiku-4-5'),
+      heal: z.string().default('claude-sonnet-5'),
+      author: z.string().default('claude-opus-5'),
+      vision: z.string().default('claude-sonnet-5'),
+    })
+    .prefault({}),
+  /**
+   * Effort replaces temperature: sampling parameters are rejected outright by
+   * current Opus/Sonnet models. See docs/10-recommendations.md.
+   */
+  effort: z
+    .object({
+      classify: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('low'),
+      heal: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('medium'),
+      author: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('xhigh'),
+    })
+    .prefault({}),
+  budget: z
+    .object({
+      perFailureUsd: z.number().positive().default(0.05),
+      perRunUsd: z.number().positive().default(2.0),
+    })
+    .prefault({}),
+});
+
+const HealSchema = z.object({
+  aggressiveness: AggressivenessSchema.default('balanced'),
+  strategies: z.array(z.enum(['selector', 'assertion', 'flow'])).default(['selector']),
+  /** Re-runs required before a proposal is considered validated. */
+  validationRuns: z.number().int().min(1).default(3),
+  /** Also re-run the rest of the spec file, to catch collateral damage. */
+  validateCollateral: z.boolean().default(true),
+  /** Reject candidates weaker than this rank. 4 = text; excludes css/xpath. */
+  minStabilityRank: z.number().int().min(0).max(MAX_STABILITY_RANK).default(4),
+  allowedStrategies: z.array(z.enum(LOCATOR_STRATEGIES)).default(['testid', 'role', 'label', 'text']),
+  apply: z.enum(['propose', 'pr', 'local']).default('propose'),
+  /** Glob patterns a heal patch is permitted to touch. */
+  targets: z.array(z.string()).default(['src/**/*.constants.ts', 'src/**/*.page.ts']),
+});
+
+const FlakySchema = z.object({
+  window: z
+    .object({
+      runs: z.number().int().positive().default(50),
+      days: z.number().int().positive().default(14),
+    })
+    .prefault({}),
+  /** Recency weighting: a failure this old counts half as much as one today. */
+  halfLifeDays: z.number().positive().default(7),
+  threshold: z.number().min(0).max(1).default(0.15),
+  minRuns: z.number().int().positive().default(10),
+  quarantine: z
+    .object({
+      policy: z.enum(['off', 'propose', 'auto']).default('propose'),
+      expiryDays: z.number().int().positive().default(14),
+      maxTests: z.number().int().nonnegative().default(5),
+      maxRatio: z.number().min(0).max(1).default(0.02),
+      tag: z.string().default('@quarantine'),
+    })
+    .prefault({}),
+});
+
+const ImpactSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** Changing any of these runs the whole suite, no questions asked. */
+  fullSuiteTriggers: z
+    .array(z.string())
+    .default([
+      'package.json',
+      'package-lock.json',
+      'pnpm-lock.yaml',
+      'playwright*.config.ts',
+      'src/shared/**',
+      'atest.config.ts',
+      '.github/workflows/**',
+      'Dockerfile',
+    ]),
+  /** Tags that always run regardless of impact selection. */
+  alwaysRunTags: z.array(z.string()).default(['@smoke']),
+  /** Above this share of the suite, just run everything. */
+  fullSuiteThreshold: z.number().min(0).max(1).default(0.6),
+});
+
+const ConventionsSchema = z.object({
+  titlePattern: z.string().default('^Given .+, when .+, then .+$'),
+  requiredTags: z.array(z.string()).default([]),
+  seededDataDir: z.string().default('tests/testdata/seeded'),
+  /**
+   * Paths no agent may write to, ever. The seeded data is the oracle: an
+   * agent that can edit expected values can make any test pass.
+   */
+  forbidWriteTo: z
+    .array(z.string())
+    .default([
+      'tests/testdata/seeded/**',
+      '**/__screenshots__/**',
+      '**/__aria__/**',
+      '.env*',
+      '.github/workflows/**',
+      'atest.config.ts',
+    ]),
+  pageObjectDir: z.string().default('src/ui/pages'),
+  /** Run against generated code before it is ever proposed. */
+  verifyCommands: z.array(z.string()).default(['npm run typecheck', 'npm run lint']),
+});
+
+const IntegrationsSchema = z.object({
+  github: z
+    .object({
+      autoComment: z.boolean().default(true),
+      autoIssue: z.boolean().default(false),
+      healBranchPrefix: z.string().default('atest/heal/'),
+    })
+    .prefault({}),
+  otel: z
+    .object({
+      endpoint: z.string().nullable().default(null),
+      queryUrl: z.string().nullable().default(null),
+    })
+    .prefault({}),
+});
+
+export const AtestConfigSchema = z.object({
+  mode: ExecutionModeSchema.default('strict'),
+  playwright: PlaywrightSchema.prefault({}),
+  history: HistorySchema.prefault({}),
+  evidence: EvidenceSchema.prefault({}),
+  llm: LlmSchema.prefault({}),
+  heal: HealSchema.prefault({}),
+  flaky: FlakySchema.prefault({}),
+  impact: ImpactSchema.prefault({}),
+  conventions: ConventionsSchema.prefault({}),
+  integrations: IntegrationsSchema.prefault({}),
+});
+
+export type AtestConfig = z.infer<typeof AtestConfigSchema>;
+export type AtestConfigInput = z.input<typeof AtestConfigSchema>;
+
+/**
+ * Identity hooks. A consumer that already mints deterministic trace ids (an
+ * OpenTelemetry reporter, for instance) passes them in here so history rows
+ * join to existing app spans instead of inventing a parallel id space.
+ */
+export interface AtestIdentity {
+  readonly runId?: () => string;
+  readonly traceId?: (test: { id: string }, retry: number) => string;
+}
+
+export interface AtestUserConfig extends AtestConfigInput {
+  readonly identity?: AtestIdentity;
+}
+
+export interface ResolvedAtestConfig extends AtestConfig {
+  readonly identity: AtestIdentity;
+}
+
+/**
+ * Validate and apply defaults. Throws with a readable message on invalid
+ * config — a misconfigured run must fail at startup, not halfway through.
+ */
+export function defineAtestConfig(input: AtestUserConfig = {}): ResolvedAtestConfig {
+  const { identity, ...rest } = input;
+  const parsed = AtestConfigSchema.safeParse(rest);
+
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map(i => `  • ${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Invalid atest.config.ts:\n${issues}`);
+  }
+
+  return { ...parsed.data, identity: identity ?? {} };
+}
+
+/**
+ * Aggressiveness presets. Explicit fields in `heal` always win — the preset
+ * only fills what the user did not state.
+ */
+export const AGGRESSIVENESS_PRESETS: Readonly<
+  Record<Aggressiveness, Partial<z.infer<typeof HealSchema>>>
+> = {
+  off: { strategies: [], apply: 'propose' },
+  conservative: {
+    strategies: ['selector'],
+    allowedStrategies: ['testid', 'role'],
+    minStabilityRank: 1,
+    validationRuns: 5,
+    apply: 'propose',
+  },
+  balanced: {
+    strategies: ['selector'],
+    allowedStrategies: ['testid', 'role', 'label', 'text'],
+    minStabilityRank: 4,
+    validationRuns: 3,
+    apply: 'pr',
+  },
+  aggressive: {
+    strategies: ['selector', 'flow'],
+    allowedStrategies: ['testid', 'role', 'label', 'text'],
+    minStabilityRank: 4,
+    validationRuns: 3,
+    apply: 'local',
+  },
+};

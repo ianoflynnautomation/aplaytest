@@ -1,0 +1,12 @@
+{
+  "name": "atest-example-fixture-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "setup": "playwright install chromium"
+  },
+  "dependencies": {
+    "@atest/runner-playwright": "0.0.0"
+  }
+}

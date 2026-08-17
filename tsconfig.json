@@ -1,0 +1,38 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/llm"
+    },
+    {
+      "path": "./packages/agent"
+    },
+    {
+      "path": "./packages/runner-playwright"
+    },
+    {
+      "path": "./packages/flaky"
+    },
+    {
+      "path": "./packages/heal"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/impact"
+    },
+    {
+      "path": "./packages/mcp"
+    },
+    {
+      "path": "./packages/report"
+    },
+    {
+      "path": "./packages/author"
+    }
+  ]
+}

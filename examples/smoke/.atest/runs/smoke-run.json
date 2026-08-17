@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "runId": "smoke-run",
+  "startedAt": "2026-08-17T06:30:14.268Z",
+  "finishedAt": "2026-08-17T06:30:16.181Z",
+  "commit": null,
+  "branch": null,
+  "appEnv": null,
+  "ci": false,
+  "workers": 7,
+  "shard": null,
+  "atestVersion": "0.0.0",
+  "playwrightVersion": "1.62.1",
+  "attempts": [
+    {
+      "testId": "4219922fea2e2bd3c691-b63c04aa8b5d9c2d4c06",
+      "title": "passes",
+      "titlePath": [
+        "",
+        "",
+        "smoke.spec.ts",
+        "passes"
+      ],
+      "file": "/Users/ianoflynn/Sources/atest/examples/smoke/tests/smoke.spec.ts",
+      "line": 11,
+      "project": "default",
+      "tags": [],
+      "retry": 0,
+      "outcome": "passed",
+      "failureKind": null,
+      "durationMs": 159,
+      "workerIndex": 0,
+      "shard": null,
+      "traceId": "trace-4219922fea2e2bd3c691-b63c04aa8b5d9c2d4c06-0",
+      "evidenceId": null,
+      "coScheduled": [
+        "4219922fea2e2bd3c691-d704683ea1f3e1ac6556"
+      ],
+      "routes": []
+    },
+    {
+      "testId": "4219922fea2e2bd3c691-d704683ea1f3e1ac6556",
+      "title": "fails: the testid was renamed",
+      "titlePath": [
+        "",
+        "",
+        "smoke.spec.ts",
+        "fails: the testid was renamed"
+      ],
+      "file": "/Users/ianoflynn/Sources/atest/examples/smoke/tests/smoke.spec.ts",
+      "line": 16,
+      "project": "default",
+      "tags": [],
+      "retry": 0,
+      "outcome": "failed",
+      "failureKind": "locator_not_found",
+      "durationMs": 1038,
+      "workerIndex": 0,
+      "shard": null,
+      "traceId": "trace-4219922fea2e2bd3c691-d704683ea1f3e1ac6556-0",
+      "evidenceId": "ev_a577e1b2c694",
+      "coScheduled": [
+        "4219922fea2e2bd3c691-b63c04aa8b5d9c2d4c06"
+      ],
+      "routes": []
+    },
+    {
+      "testId": "4219922fea2e2bd3c691-8affb055089f253eeba4",
+      "title": "fails: strict mode violation",
+      "titlePath": [
+        "",
+        "",
+        "smoke.spec.ts",
+        "fails: strict mode violation"
+      ],
+      "file": "/Users/ianoflynn/Sources/atest/examples/smoke/tests/smoke.spec.ts",
+      "line": 23,
+      "project": "default",
+      "tags": [],
+      "retry": 0,
+      "outcome": "failed",
+      "failureKind": "locator_ambiguous",
+      "durationMs": 61,
+      "workerIndex": 1,
+      "shard": null,
+      "traceId": "trace-4219922fea2e2bd3c691-8affb055089f253eeba4-0",
+      "evidenceId": "ev_014b4f830de2",
+      "coScheduled": [],
+      "routes": []
+    }
+  ]
+}

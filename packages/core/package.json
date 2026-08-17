@@ -1,0 +1,27 @@
+{
+  "name": "@atest/core",
+  "version": "0.0.0",
+  "description": "Core types, failure taxonomy, and configuration for atest. No Playwright, no network, no LLM.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist-cjs/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "dist-cjs"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

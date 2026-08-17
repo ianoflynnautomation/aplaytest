@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "id": "ev_15579d2d7c0b",
+  "runId": "live-run",
+  "traceId": "",
+  "capturedAt": "2026-08-17T06:24:36.936Z",
+  "test": {
+    "id": "db32d907018322b3fb84-e7ccd1e57e4c0f6089e4",
+    "title": "FAILS ON PURPOSE: a stale test id, as if the app renamed it",
+    "titlePath": [
+      "",
+      "",
+      "gyms.spec.ts",
+      "FAILS ON PURPOSE: a stale test id, as if the app renamed it"
+    ],
+    "file": "/Users/ianoflynn/Sources/atest/examples/bjjeire-live/tests/gyms.spec.ts",
+    "line": 14,
+    "project": "default",
+    "tags": [],
+    "retry": 0,
+    "workerIndex": 0,
+    "shard": null
+  },
+  "failure": {
+    "kind": "locator_not_found",
+    "message": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByTestId('gym-card-name-v1').filter({ hasText: '011 Grappling' })\nExpected: visible\nTimeout: 4000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 4000ms\n  - waiting for getByTestId('gym-card-name-v1').filter({ hasText: '011 Grappling' })\n",
+    "stack": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByTestId('gym-card-name-v1').filter({ hasText: '011 Grappling' })\nExpected: visible\nTimeout: 4000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 4000ms\n  - waiting for getByTestId('gym-card-name-v1').filter({ hasText: '011 Grappling' })\n\n    at fn (/Users/ianoflynn/Sources/atest/examples/bjjeire-live/pages/gyms.page.ts:43:22)\n    at /Users/ianoflynn/Sources/atest/packages/runner-playwright/src/bind.ts:128:57\n    at /Users/ianoflynn/Sources/atest/examples/bjjeire-live/tests/gyms.spec.ts:17:3",
+    "matcher": "toBeVisible",
+    "expected": "visible",
+    "actual": "element(s) not found",
+    "timedOut": true
+  },
+  "intent": {
+    "steps": [
+      {
+        "pageObject": "gymsPage",
+        "method": "goTo",
+        "args": [],
+        "startedAt": "2026-08-17T06:24:32.047Z",
+        "durationMs": 40,
+        "failed": false
+      },
+      {
+        "pageObject": "gymsPage",
+        "method": "searchFor",
+        "args": [
+          "011 Grappling"
+        ],
+        "startedAt": "2026-08-17T06:24:32.087Z",
+        "durationMs": 804,
+        "failed": false
+      },
+      {
+        "pageObject": "gymsPage",
+        "method": "expectCardDataStale",
+        "args": [
+          "011 Grappling"
+        ],
+        "startedAt": "2026-08-17T06:24:32.892Z",
+        "durationMs": 4001,
+        "failed": true
+      }
+    ],
+    "failingStep": {
+      "pageObject": "gymsPage",
+      "method": "expectCardDataStale",
+      "args": [
+        "011 Grappling"
+      ],
+      "startedAt": "2026-08-17T06:24:32.892Z",
+      "durationMs": 4001,
+      "failed": true
+    },
+    "selector": "getByTestId('gym-card-name-v1').filter({ hasText: '011 Grappling' })",
+    "selectorSource": null
+  },
+  "page": {
+    "url": "http://localhost:8080/gyms?q=011+Grappling",
+    "title": "BJJ Éire — Find BJJ Events & Gyms Across Ireland",
+    "ariaSnapshot": "- navigation:\n  - link \"BJJ Éire\":\n    - /url: /\n  - link \"Events\":\n    - /url: /events\n  - link \"Gyms\":\n    - /url: /gyms\n  - link \"Competitions\":\n    - /url: /competitions\n  - link \"Stores\":\n    - /url: /stores\n  - link \"About\":\n    - /url: /about\n  - button \"Switch to dark mode\"\n  - button \"Support\"\n- main:\n  - region \"BJJ Éire — Find gyms across Ireland\":\n    - heading \"Find BJJ Gyms Across Ireland\" [level=1]\n    - paragraph: Browse clubs, academies, and training centres near you.\n  - heading \"All BJJ Gyms\" [level=2]\n  - paragraph: Found 1 gym.\n  - text: Select County\n  - combobox \"Select County\":\n    - option \"All Counties\" [selected]\n    - option \"Dublin\"\n    - option \"Cork\"\n    - option \"Galway\"\n    - option \"Limerick\"\n    - option \"Waterford\"\n    - option \"Kilkenny\"\n    - option \"Wexford\"\n    - option \"Kerry\"\n    - option \"Tipperary\"\n    - option \"Clare\"\n    - option \"Mayo\"\n    - option \"Donegal\"\n    - option \"Sligo\"\n    - option \"Louth\"\n    - option \"Meath\"\n    - option \"Kildare\"\n    - option \"Wicklow\"\n    - option \"Laois\"\n    - option \"Offaly\"\n    - option \"Westmeath\"\n    - option \"Carlow\"\n    - option \"Leitrim\"\n    - option \"Roscommon\"\n    - option \"Longford\"\n    - option \"Cavan\"\n    - option \"Monaghan\"\n  - search:\n    - text: Search gyms\n    - searchbox \"Search gyms\": 011 Grappling\n    - button \"Clear search\"\n  - paragraph: Showing 1 gyms\n  - list \"Brazilian Jiu-Jitsu gyms\":\n    - listitem:\n      - article \"011 Grappling\":\n        - img \"Exterior or interior of 011 Grappling\"\n        - heading \"011 Grappling\" [level=3]\n        - text: Active Dublin County\n        - region \"Details for 011 Grappling\":\n          - heading \"Details for 011 Grappling\" [level=4]\n          - link \"Basement, Castleview, 25 Clontarf East, Dublin, D05 X9F8, Ireland (011 Grappling)\":\n            - /url: https://www.google.com/maps/search/?api=1&query=53.3810878,-6.2081893\n          - text: BJJ Gi (All Levels) BJJ No-Gi (All Levels) Wrestling\n        - link \"Visit website for 011 Grappling\":\n          - /url: http://www.011grpl.com/\n          - text: Visit Website\n- contentinfo:\n  - heading \"Quick Links\" [level=3]\n  - list:\n    - listitem:\n      - link \"Events\":\n        - /url: /events\n    - listitem:\n      - link \"Gyms\":\n        - /url: /gyms\n    - listitem:\n      - link \"Competitions\":\n        - /url: /competitions\n    - listitem:\n      - link \"Stores\":\n        - /url: /stores\n    - listitem:\n      - link \"About\":\n        - /url: /about\n  - paragraph: © 2026 BJJ Éire. All rights reserved.",
+    "candidates": [
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-name')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.1,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-address')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-address-link')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-classes')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-classes-item')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-county')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-image')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-status-badge')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      },
+      {
+        "strategy": "testid",
+        "expression": "getByTestId('gym-card-website-link')",
+        "matchCount": -1,
+        "visible": false,
+        "enabled": false,
+        "accessibleName": null,
+        "boundingBox": null,
+        "semanticDistance": 0.3,
+        "stabilityRank": 0
+      }
+    ],
+    "htmlDigest": null,
+    "testIdsPresent": [
+      "detail-item",
+      "footer",
+      "footer-copyright",
+      "footer-quick-link",
+      "footer-quick-links-heading",
+      "gym-card-address",
+      "gym-card-address-link",
+      "gym-card-classes",
+      "gym-card-classes-item",
+      "gym-card-county",
+      "gym-card-image",
+      "gym-card-name",
+      "gym-card-status-badge",
+      "gym-card-website-link",
+      "gyms-hero-banner",
+      "gyms-hero-banner-subtitle",
+      "gyms-hero-banner-tagline",
+      "gyms-list-item",
+      "gyms-page-header",
+      "gyms-page-header-title",
+      "gyms-page-header-total",
+      "gyms-page-list",
+      "gyms-page-search",
+      "navigation",
+      "navigation-desktop-link",
+      "navigation-desktop-links",
+      "navigation-logo-link",
+      "navigation-mobile-toggle",
+      "navigation-support-button",
+      "search-clear-button",
+      "search-input",
+      "select-filter",
+      "select-filter-icon",
+      "select-filter-label",
+      "select-filter-option",
+      "select-filter-select"
+    ]
+  },
+  "visual": {
+    "screenshotPath": null,
+    "diffPath": null,
+    "diffPixelRatio": null
+  },
+  "network": {
+    "failed": [],
+    "slow": [],
+    "statusCounts": {
+      "200": 39
+    }
+  },
+  "console": {
+    "errors": [],
+    "warnings": []
+  },
+  "timing": {
+    "testMs": 4886,
+    "failingActionMs": 4001,
+    "navigationMs": null,
+    "budgetUsedRatio": 0.2443
+  },
+  "env": {
+    "appEnv": "unknown",
+    "baseUrl": "",
+    "browser": "default",
+    "platform": "darwin",
+    "workers": 7,
+    "commit": "",
+    "changedPaths": []
+  },
+  "appSpans": null,
+  "artifacts": {
+    "tracePath": null,
+    "videoPath": null
+  }
+}
