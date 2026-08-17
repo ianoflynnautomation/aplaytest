@@ -54,3 +54,12 @@ export type {
 
 export { runPlaywright, escapeForGrep } from './spawn.js';
 export type { PlaywrightRunOptions, PlaywrightRunResult } from './spawn.js';
+
+export {
+  atestApiFixtures,
+  createApiCaptureFixture,
+  recordingContext,
+} from './api-fixtures.js';
+export type { ApiCaptureOptions } from './api-fixtures.js';
+
+export { runFileName } from './reporter.js';

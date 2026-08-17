@@ -16,6 +16,11 @@
  *      sweep) runs only when a test has actually failed.
  *   3. Need no spec changes. Registered with `auto: true`, so adding it is a
  *      one-line change in the fixture composition and nothing else.
+ *
+ * UI PROJECTS ONLY. `auto: true` plus a `{ page }` dependency means Playwright
+ * launches a browser for every test in the project, including tests that only
+ * use `request`. API projects must compose `atestApiFixtures` from
+ * ./api-fixtures.js instead — see the note there.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.expect = exports.test = exports.atestFixtures = void 0;

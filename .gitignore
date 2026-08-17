@@ -1,5 +1,9 @@
 node_modules/
 dist/
+# The CommonJS build. Separate from dist/ because Playwright resolves the
+# reporter with require(), so it is a second output directory — and it was
+# missed by `dist/`, which is how 44 build artifacts reached the first commit.
+dist-cjs/
 *.tsbuildinfo
 .DS_Store
 coverage/
@@ -7,10 +11,21 @@ coverage/
 .env.*
 !.env.example
 
-# atest's own working data, when dogfooding on a consumer repo
-.atest/history.sqlite
-.atest/evidence/
-.atest/agent/
-test-results/
-playwright-report/
-.atest/runs/
+# atest's own working data, wherever it is generated.
+#
+# `**/` matters: a gitignore pattern containing a slash is anchored to the repo
+# root, so a bare `.atest/runs/` matched only the root and never
+# examples/*/.atest/runs/ — which is the only place these are actually written.
+# That is how generated run records and evidence bundles reached the first
+# commit.
+# Excluded per-subdirectory rather than as `**/.atest/`, because git cannot
+# re-include a file whose parent directory is excluded — and the quarantine
+# ledger IS source. It records which tests are quarantined, why, and when the
+# waiver expires; that is reviewed policy, not generated output.
+**/.atest/runs/
+**/.atest/evidence/
+**/.atest/agent/
+**/.atest/heals/
+**/.atest/history.sqlite
+**/test-results/
+**/playwright-report/

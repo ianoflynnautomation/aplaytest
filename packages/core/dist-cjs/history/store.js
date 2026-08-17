@@ -128,12 +128,41 @@ class SqliteHistoryStore {
      */
     async ingest(run) {
         const insertRun = this.db.prepare(`
-      INSERT OR REPLACE INTO runs
+      -- UPSERT, never INSERT OR REPLACE.
+      --
+      -- SQLite implements OR REPLACE as DELETE-then-INSERT, so replacing a run
+      -- row fires the attempts table's ON DELETE CASCADE. Under sharding every
+      -- shard shares one run id, so ingesting shard 2 deleted shard 1's
+      -- attempts before writing its own — the shard-scoped delete below cannot
+      -- help, because the rows are already gone by the time it runs. Measured:
+      -- three shard files carrying four attempts ingested as zero.
+      --
+      -- DO UPDATE mutates the row in place. No delete, no cascade.
+      INSERT INTO runs
         (run_id, started_at, finished_at, commit_sha, branch, app_env, ci, workers,
          shard_current, shard_total, atest_version, playwright_version)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id) DO UPDATE SET
+        finished_at        = excluded.finished_at,
+        commit_sha         = excluded.commit_sha,
+        branch             = excluded.branch,
+        app_env            = excluded.app_env,
+        ci                 = excluded.ci,
+        workers            = excluded.workers,
+        atest_version      = excluded.atest_version,
+        playwright_version = excluded.playwright_version
+      -- started_at keeps the EARLIEST shard's value, and shard_* are left
+      -- alone: a run spanning shards has no single shard number, and letting
+      -- the last writer stamp one would misreport the run.
     `);
-        const deleteAttempts = this.db.prepare('DELETE FROM attempts WHERE run_id = ?');
+        // Scoped to THIS shard, not the whole run.
+        //
+        // `DELETE FROM attempts WHERE run_id = ?` is correct for an unsharded run
+        // and catastrophic for a sharded one: every shard shares the run id, so
+        // ingesting six shard files left only the sixth shard's attempts — one
+        // sixth of the data, with no error anywhere. `IS` rather than `=` because
+        // an unsharded record carries NULL, and NULL = NULL is never true.
+        const deleteAttempts = this.db.prepare('DELETE FROM attempts WHERE run_id = ? AND shard_current IS ? AND shard_total IS ?');
         const insertAttempt = this.db.prepare(`
       INSERT INTO attempts
         (run_id, test_id, project, retry, title, title_path, file, line, tags, outcome,
@@ -144,9 +173,16 @@ class SqliteHistoryStore {
         this.db.exec('BEGIN');
         try {
             insertRun.run(run.runId, run.startedAt, nullable(run.finishedAt), nullable(run.commit), nullable(run.branch), nullable(run.appEnv), run.ci ? 1 : 0, run.workers ?? 0, run.shard?.current ?? null, run.shard?.total ?? null, run.atestVersion ?? '', nullable(run.playwrightVersion));
-            deleteAttempts.run(run.runId);
+            deleteAttempts.run(run.runId, run.shard?.current ?? null, run.shard?.total ?? null);
             for (const attempt of run.attempts) {
-                insertAttempt.run(run.runId, attempt.testId, attempt.project, attempt.retry, attempt.title, JSON.stringify(attempt.titlePath ?? []), attempt.file, attempt.line, JSON.stringify(attempt.tags ?? []), attempt.outcome, nullable(attempt.failureKind), attempt.durationMs ?? 0, attempt.workerIndex ?? 0, attempt.shard?.current ?? null, attempt.shard?.total ?? null, nullable(attempt.traceId), nullable(attempt.evidenceId), JSON.stringify(attempt.coScheduled ?? []), JSON.stringify(attempt.routes ?? []));
+                insertAttempt.run(run.runId, attempt.testId, attempt.project, attempt.retry, attempt.title, JSON.stringify(attempt.titlePath ?? []), attempt.file, attempt.line, JSON.stringify(attempt.tags ?? []), attempt.outcome, nullable(attempt.failureKind), attempt.durationMs ?? 0, attempt.workerIndex ?? 0, 
+                // Fall back to the RUN's shard. The scoped delete above matches on
+                // these columns, so an attempt that omits its shard while the run
+                // declares one would never be cleaned up — a re-run of that shard
+                // would leave the previous attempt rows behind and inflate every
+                // statistic derived from them. An attempt executed during shard 1
+                // of 3 belongs to shard 1 of 3; recording anything else is wrong.
+                attempt.shard?.current ?? run.shard?.current ?? null, attempt.shard?.total ?? run.shard?.total ?? null, nullable(attempt.traceId), nullable(attempt.evidenceId), JSON.stringify(attempt.coScheduled ?? []), JSON.stringify(attempt.routes ?? []));
             }
             this.db.exec('COMMIT');
         }

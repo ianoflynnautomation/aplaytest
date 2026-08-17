@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.escapeForGrep = exports.runPlaywright = exports.IntentSidecarSchema = exports.ConsoleSidecarSchema = exports.NetworkSidecarSchema = exports.PageSidecarSchema = exports.SidecarParseError = exports.parseSidecar = exports.SIDECAR = exports.domainStringArgs = exports.parseStepTitle = exports.findFailingStep = exports.extractSteps = exports.previewValue = exports.previewArgs = exports.bindPage = exports.createCaptureFixture = exports.atestFixtures = exports.stripAnsi = exports.splitCallLog = exports.parsePlaywrightError = exports.classifyResult = exports.toClassifiable = exports.assembleBundle = exports.ATEST_VERSION = exports.AtestReporter = void 0;
+exports.runFileName = exports.recordingContext = exports.createApiCaptureFixture = exports.atestApiFixtures = exports.escapeForGrep = exports.runPlaywright = exports.IntentSidecarSchema = exports.ConsoleSidecarSchema = exports.NetworkSidecarSchema = exports.PageSidecarSchema = exports.SidecarParseError = exports.parseSidecar = exports.SIDECAR = exports.domainStringArgs = exports.parseStepTitle = exports.findFailingStep = exports.extractSteps = exports.previewValue = exports.previewArgs = exports.bindPage = exports.createCaptureFixture = exports.atestFixtures = exports.stripAnsi = exports.splitCallLog = exports.parsePlaywrightError = exports.classifyResult = exports.toClassifiable = exports.assembleBundle = exports.ATEST_VERSION = exports.AtestReporter = void 0;
 var reporter_js_1 = require("./reporter.js");
 Object.defineProperty(exports, "AtestReporter", { enumerable: true, get: function () { return __importDefault(reporter_js_1).default; } });
 Object.defineProperty(exports, "ATEST_VERSION", { enumerable: true, get: function () { return reporter_js_1.ATEST_VERSION; } });
@@ -49,4 +49,10 @@ Object.defineProperty(exports, "IntentSidecarSchema", { enumerable: true, get: f
 var spawn_js_1 = require("./spawn.js");
 Object.defineProperty(exports, "runPlaywright", { enumerable: true, get: function () { return spawn_js_1.runPlaywright; } });
 Object.defineProperty(exports, "escapeForGrep", { enumerable: true, get: function () { return spawn_js_1.escapeForGrep; } });
+var api_fixtures_js_1 = require("./api-fixtures.js");
+Object.defineProperty(exports, "atestApiFixtures", { enumerable: true, get: function () { return api_fixtures_js_1.atestApiFixtures; } });
+Object.defineProperty(exports, "createApiCaptureFixture", { enumerable: true, get: function () { return api_fixtures_js_1.createApiCaptureFixture; } });
+Object.defineProperty(exports, "recordingContext", { enumerable: true, get: function () { return api_fixtures_js_1.recordingContext; } });
+var reporter_js_2 = require("./reporter.js");
+Object.defineProperty(exports, "runFileName", { enumerable: true, get: function () { return reporter_js_2.runFileName; } });
 //# sourceMappingURL=index.js.map

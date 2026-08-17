@@ -29,13 +29,8 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # `--ignore-scripts` deliberately: nothing here needs a postinstall, and
-      # a supply-chain payload most often arrives as one.
       - run: npm ci --ignore-scripts
 
-      # Both outputs. `tsc --build` alone leaves dist-cjs stale, and Playwright
-      # resolves the reporter through require — so an ESM-only build ships a
-      # reporter that consumers silently cannot load.
       - name: Build (ESM + CJS)
         run: npm run build
 
@@ -194,6 +189,45 @@ jobs:
             }
           '
           rm -f meaningful.json vacuous.json
+
+      - name: Sharded runs merge instead of overwriting
+        working-directory: examples/fixture-app
+        run: |
+          rm -rf .atest
+          for s in 1 2 3; do
+            ATEST_RUN_ID=ci-shard-check npx playwright test --shard="$s/3" >/dev/null 2>&1
+          done
+
+          files=$(find .atest/runs -name '*.json' | wc -l | tr -d ' ')
+          if [ "$files" -ne 3 ]; then
+            echo "Expected one run record per shard, found $files"; ls -1 .atest/runs; exit 1
+          fi
+
+          node ../../packages/cli/dist/bin.js history ingest \
+            --db ci-history.sqlite --runs .atest/runs >/dev/null
+
+          # The suite has four tests. Anything less means shards clobbered
+          # each other — which is exactly what used to happen, reporting zero.
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const out = execFileSync("node",
+              ["../../packages/cli/dist/bin.js", "history", "stats",
+               "--db", "ci-history.sqlite", "--json"], { encoding: "utf8" });
+            const s = JSON.parse(out);
+            // Concatenation rather than JS template literals: shellcheck reads
+            // a dollar-brace inside this single-quoted argument as a shell
+            // expansion that was meant to interpolate, and reports SC2016.
+            if (s.attempts !== 4) {
+              console.error("Expected 4 attempts across shards, stored " + s.attempts);
+              process.exit(1);
+            }
+            if (s.runs !== 1) {
+              console.error("Shards of one run must be one run, got " + s.runs);
+              process.exit(1);
+            }
+          '
+          rm -f ci-history.sqlite
+          rm -rf .atest
 
       # The gate rewrites the spec under test, so the property that matters
       # more than the verdict is that it always puts the file back. A crash

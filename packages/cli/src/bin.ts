@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from './exit.js';
 import { doctor } from './commands/doctor.js';
+import { init, type InitFlags } from './commands/init.js';
 import { flakyBisect, type BisectFlags } from './commands/bisect.js';
 import { heal, healList, healRevert, type HealFlags } from './commands/heal.js';
 import { impact, type ImpactFlags } from './commands/impact.js';
@@ -40,6 +41,7 @@ ${style.bold('USAGE')}
   atest <command> [options]
 
 ${style.bold('COMMANDS')}
+  init                      Wire atest into an existing Playwright repo
   flaky report              Score and classify every test from run history
   flaky quarantine          Tag a test @quarantine, with expiry and a reason
   flaky release             Remove the tag again
@@ -91,6 +93,7 @@ ${style.bold('OPTIONS')}
   --plan-only               Stop after the plan, before any code
   --keep-rejected           Keep a candidate the gate rejected
   --keep-days <n>           Retention for history prune            [90]
+  --undo                    Remove what init added (with --apply)
   --to <ref>                Diff head                     [HEAD]
   --tsconfig <path>         tsconfig used to resolve imports
   --changed <list>          Explicit changed files, comma-separated
@@ -153,6 +156,7 @@ const OPTIONS = {
   'plan-only': { type: 'boolean', default: false },
   'keep-rejected': { type: 'boolean', default: false },
   'keep-days': { type: 'string' },
+  undo: { type: 'boolean', default: false },
   'dry-run': { type: 'boolean', default: false },
   json: { type: 'boolean', default: false },
   ci: { type: 'boolean', default: false },
@@ -283,6 +287,14 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
     ...(values['api-pattern'] === undefined ? {} : { apiPattern: values['api-pattern'] }),
   };
 
+  const initFlags: InitFlags = {
+    apply: values.apply,
+    undo: values.undo,
+    json: flags.json,
+    ...(values.cwd === undefined ? {} : { cwd: values.cwd }),
+    ...(values.config === undefined ? {} : { config: values.config }),
+  };
+
   const historyFlags: HistoryFlags = {
     db: flags.db,
     runs: flags.runs,
@@ -344,6 +356,9 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
             `Unknown subcommand "agent ${subcommand ?? ''}". Supported: author.`,
           );
       }
+
+    case 'init':
+      return init(initFlags);
 
     case 'history':
       switch (subcommand) {

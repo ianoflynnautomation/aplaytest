@@ -239,3 +239,67 @@ describe('ingest robustness', () => {
     await store.close();
   });
 });
+
+describe('sharded ingest', () => {
+  /**
+   * REGRESSION GUARD, measured end to end.
+   *
+   * Two independent bugs collapsed a sharded run to a fraction of its data,
+   * and both were silent:
+   *
+   *   1. `DELETE FROM attempts WHERE run_id = ?` — every shard shares the run
+   *      id, so ingesting shard 2 wiped shard 1.
+   *   2. `INSERT OR REPLACE INTO runs` — SQLite implements that as
+   *      DELETE-then-INSERT, which fires the attempts table's ON DELETE
+   *      CASCADE. Even with (1) fixed, replacing the run row deleted the
+   *      previous shard's attempts before the scoped delete could run.
+   *
+   * Three shard files carrying four attempts ingested as zero.
+   */
+  const shardOf = (current: number, total: number) => ({ current, total });
+
+  it('accumulates attempts across shards of one run', async () => {
+    const store = new SqliteHistoryStore(':memory:');
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(1, 3), attempts: [attempt({ testId: 'a' })] }),
+    );
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(2, 3), attempts: [attempt({ testId: 'b' })] }),
+    );
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(3, 3), attempts: [attempt({ testId: 'c' })] }),
+    );
+
+    expect(await store.runCount()).toBe(1);
+    expect(await store.attempts()).toHaveLength(3);
+    await store.close();
+  });
+
+  it('re-ingesting ONE shard replaces only that shard', async () => {
+    const store = new SqliteHistoryStore(':memory:');
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(1, 2), attempts: [attempt({ testId: 'a' })] }),
+    );
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(2, 2), attempts: [attempt({ testId: 'b' })] }),
+    );
+    // Shard 1 re-runs and now reports a different test.
+    await store.ingest(
+      run({ runId: 'r', shard: shardOf(1, 2), attempts: [attempt({ testId: 'a2' })] }),
+    );
+
+    const ids = (await store.attempts()).map(a => a.testId).sort();
+    expect(ids).toEqual(['a2', 'b']);
+    await store.close();
+  });
+
+  it('still replaces wholesale when the run is not sharded', async () => {
+    const store = new SqliteHistoryStore(':memory:');
+    await store.ingest(run({ runId: 'r', shard: null, attempts: [attempt({ testId: 'a' })] }));
+    await store.ingest(run({ runId: 'r', shard: null, attempts: [attempt({ testId: 'b' })] }));
+
+    const ids = (await store.attempts()).map(a => a.testId);
+    expect(ids).toEqual(['b']);
+    await store.close();
+  });
+});

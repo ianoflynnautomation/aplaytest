@@ -47,6 +47,15 @@ function githubWorkflow(options: TemplateOptions): string {
       ? `\n        project: [${options.projects.map(p => `'${p}'`).join(', ')}]`
       : '';
 
+  // Artifact names must vary with EVERY matrix axis. With a project matrix,
+  // `atest-<shard>` collides across projects: two jobs upload the same name,
+  // and the download step merges them into one directory where identical run
+  // records overwrite each other.
+  const artifactSuffix =
+    options.projects.length > 0
+      ? `\${{ matrix.project }}-\${{ matrix.shard }}`
+      : `\${{ matrix.shard }}`;
+
   return `name: Acceptance (atest)
 
 on:
@@ -102,7 +111,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: \${{ !cancelled() }}
         with:
-          name: atest-\${{ matrix.shard }}
+          name: atest-${artifactSuffix}
           path: |
             .atest/runs/
             .atest/evidence/

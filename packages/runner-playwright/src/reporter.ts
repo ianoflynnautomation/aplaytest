@@ -254,7 +254,10 @@ export default class AtestReporter implements Reporter {
       attempts,
     };
 
-    const runPath = join(this.options.runsDir ?? DEFAULTS.runsDir, `${this.runId}.json`);
+    const runPath = join(
+      this.options.runsDir ?? DEFAULTS.runsDir,
+      runFileName(this.runId, run.shard, attempts.map(a => a.project)),
+    );
     await mkdir(dirname(runPath), { recursive: true });
     await writeFile(runPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8');
     await evidenceStore.prune();
@@ -297,3 +300,43 @@ export default class AtestReporter implements Reporter {
 }
 
 const EMPTY: Sidecars = { page: null, network: null, console: null, intent: null };
+
+/**
+ * One file per INVOCATION, not per run.
+ *
+ * Naming the file `<runId>.json` looks right until the suite is sharded, and
+ * then it silently destroys almost all of the data. Every shard shares one run
+ * id on purpose — that is how they get merged — so every shard wrote the same
+ * filename. Measured on a three-shard run: shards 1 and 2 recorded their
+ * attempts, shard 3 had no tests to run, and its empty record overwrote both.
+ * The surviving file reported `attempts: 0` for a run that passed four tests.
+ *
+ * It survives the upload too. CI downloads shard artifacts with
+ * `merge-multiple: true`, which flattens them into one directory — identical
+ * names collide there as well, so a 6-shard × 9-project matrix would keep one
+ * file in fifty-four.
+ *
+ * Shard and project both go in the name because their matrix varies both, and
+ * two jobs differing only by project would otherwise still collide.
+ */
+export function runFileName(
+  runId: string,
+  shard: { readonly current: number; readonly total: number } | null,
+  projects: readonly string[],
+): string {
+  const parts = [runId];
+  if (shard !== null) parts.push(`shard-${shard.current}of${shard.total}`);
+
+  const distinct = [...new Set(projects)].sort();
+  if (distinct.length === 1 && distinct[0] !== undefined) parts.push(distinct[0]);
+  else if (distinct.length > 1) parts.push(shortHash(distinct.join(',')));
+
+  return `${parts.join('-').replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
+}
+
+/** djb2, base36. Deterministic — re-ingesting the same file must be idempotent. */
+function shortHash(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i += 1) hash = ((hash * 33) ^ input.charCodeAt(i)) >>> 0;
+  return hash.toString(36).padStart(7, '0').slice(0, 7);
+}
