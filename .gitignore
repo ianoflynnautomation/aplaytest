@@ -29,3 +29,4 @@ coverage/
 **/.atest/history.sqlite
 **/test-results/
 **/playwright-report/
+dist-pack/

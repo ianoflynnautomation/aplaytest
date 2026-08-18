@@ -53,6 +53,26 @@ jobs:
             if (typeof R !== 'function') { throw new Error('ESM reporter did not load'); }
           "
 
+      - name: Packages are installable
+        run: |
+          npm run pack
+
+          work=$(mktemp -d)
+          cp dist-pack/*.tgz "$work/"
+          cd "$work"
+          npm init -y >/dev/null
+
+          # All of them in one command: core is on no registry, so the reporter
+          # tarball cannot resolve it alone.
+          npm install ./*.tgz --no-audit --no-fund >/dev/null
+
+          node --input-type=commonjs -e "
+            const r = require('@atest/runner-playwright/reporter');
+            if (typeof r.default !== 'function') { throw new Error('reporter did not load from the tarball'); }
+          "
+          npx atest --help > /dev/null
+          echo "Installed from tarballs and the CLI runs."
+
       - name: No JavaScript in source
         run: |
           found=$(find packages scripts -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \

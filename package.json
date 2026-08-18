@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Agentic test framework \u2014 a control plane around Playwright",
+  "description": "Agentic test framework — a control plane around Playwright",
   "license": "MIT",
   "engines": {
     "node": ">=22"
@@ -22,7 +22,8 @@
     "format": "prettier --write .",
     "build:esm": "tsc --build",
     "build:cjs": "tsc --build tsconfig.cjs.json && node scripts/finalize-cjs.ts",
-    "flaky:report": "node scripts/flaky-report.ts"
+    "flaky:report": "node scripts/flaky-report.ts",
+    "pack": "npm run build && node scripts/pack.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.18",
