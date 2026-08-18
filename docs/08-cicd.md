@@ -1,4 +1,15 @@
-# 08 — CI/CD & observability
+# 08 — CI/CD
+
+> **`atest run` does not exist, and deliberately.** Tests are invoked with
+> `playwright test` exactly as before; atest attaches through the reporter.
+> A wrapper would contradict the design's own claim that removing the reporter
+> line removes the framework, and would owe permanent exit-code parity for no
+> capability. Earlier drafts of this document showed `atest run`; those have
+> been corrected.
+>
+> Persisting history across runs needs a durable store — see
+> [12 — Azure history](./12-azure-history.md). `--db :memory:` (the default)
+> reports "insufficient data" forever. & observability
 
 ## The central constraint: split execute from analyze
 
@@ -10,7 +21,7 @@ analyze job holds a model API key. **These must not be the same job.**
 │  plan            no secrets · computes impact + shard plan          │
 ├─────────────────────────────────────────────────────────────────────┤
 │  test  (matrix)  no model key · APP_ENV creds only                  │
-│                  atest run --mode strict                            │
+│                  playwright test                                    │
 │                  ↳ uploads blob-report + .atest/evidence            │
 ├─────────────────────────────────────────────────────────────────────┤
 │  analyze         model key · runs NO application code               │
@@ -108,7 +119,7 @@ jobs:
 
       - name: Run acceptance tests
         run: |
-          npx atest run --mode strict \
+          npx playwright test \
             --project ${{ matrix.project }} \
             --shard ${{ matrix.shard }} \
             --grep '${{ needs.plan.outputs.grep }}' \
@@ -147,7 +158,7 @@ jobs:
         with: { pattern: atest-*, path: artifacts, merge-multiple: true }
 
       - name: Restore history
-        run: npx atest history import --from-branch atest-history
+        run: npx atest history ingest --db .atest/history.sqlite --runs .atest-artifacts/runs
 
       - name: Merge run data
         run: npx atest analyze ingest --from artifacts
@@ -191,7 +202,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: 'npm' }
       - run: npm ci --ignore-scripts
-      - run: npx atest history import --from-branch atest-history
+      - run: npx atest history ingest --db .atest/history.sqlite --runs .atest-artifacts/runs
       - run: npx atest flaky expire --ci     # exit 4 on expired quarantine or budget breach
 ```
 
@@ -260,7 +271,7 @@ test:
   parallel: 4
   script:
     - npm ci
-    - npx atest run --mode strict --shard $CI_NODE_INDEX/$CI_NODE_TOTAL --grep "$ATEST_GREP"
+    - npx playwright test --shard $CI_NODE_INDEX/$CI_NODE_TOTAL --grep "$ATEST_GREP"
   artifacts:
     when: always
     paths: [blob-report/, .atest/evidence/]

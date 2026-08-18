@@ -6,8 +6,7 @@
  * tree, and even then a human still reviews the diff in the normal way.
  */
 
-import { readFile, readdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
 
 import {
   DEFAULT_HEAL_OPTIONS,
@@ -17,9 +16,15 @@ import {
   revertHeal,
   writeRecord,
   type HealProposal,
+  type ProposeOptions,
 } from '@atest/heal';
-import { EVIDENCE_SCHEMA_VERSION, type EvidenceBundle } from '@atest/core';
-import { BudgetGuard, createLlmClient } from '@atest/llm';
+import {
+  ATEST_VERSION,
+  formatFailingStep,
+  loadRunBundles,
+  type EvidenceBundle,
+} from '@atest/core';
+import { BudgetGuard, createLlmClient, type LlmClient } from '@atest/llm';
 import { runRepairAgent } from '@atest/agent';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
@@ -44,34 +49,52 @@ export interface HealFlags {
   readonly noLlm: boolean;
 }
 
-export const ATEST_VERSION = '0.0.0';
-
-async function latestRunDir(evidenceDir: string): Promise<string | null> {
-  const entries = await readdir(evidenceDir, { withFileTypes: true }).catch(() => []);
-  const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
-  return dirs[dirs.length - 1] ?? null;
-}
+export { ATEST_VERSION };
 
 async function loadBundles(evidenceDir: string, run: string | undefined): Promise<EvidenceBundle[]> {
-  const runDir = run ?? (await latestRunDir(evidenceDir));
-  if (runDir === null) return [];
+  const { bundles, skipped } = await loadRunBundles(evidenceDir, run);
+  for (const skip of skipped) warn(`${skip.file}: ${skip.reason}`);
+  return [...bundles];
+}
 
-  const dir = join(evidenceDir, runDir);
-  const files = (await readdir(dir).catch(() => [])).filter(f => f.endsWith('.json'));
+function rankWithRepairAgent(
+  llm: LlmClient,
+  budget: BudgetGuard,
+  bundle: EvidenceBundle,
+): NonNullable<ProposeOptions['rankCandidates']> {
+  return async ({ candidates, missingTestId }) => {
+    const outcome = await runRepairAgent(
+      llm,
+      {
+        testTitle: bundle.test.title,
+        intent: formatFailingStep(bundle.intent.failingStep),
+        missingTestId,
+        failureKind: bundle.failure.kind,
+        expected: bundle.failure.expected,
+        actual: bundle.failure.actual,
+        ariaSnapshot: bundle.page.ariaSnapshot,
+        candidates: candidates.map(candidate => ({
+          value: candidate.value,
+          expression: candidate.expression,
+          semanticDistance: candidate.semanticDistance,
+        })),
+      },
+      { budget },
+    );
 
-  const bundles: EvidenceBundle[] = [];
-  for (const file of files) {
-    const raw = await readFile(join(dir, file), 'utf8').catch(() => null);
-    if (raw === null) continue;
-    try {
-      const parsed = JSON.parse(raw) as EvidenceBundle;
-      if (parsed.schemaVersion === EVIDENCE_SCHEMA_VERSION) bundles.push(parsed);
-      else warn(`${file}: schemaVersion ${parsed.schemaVersion}, this build reads ${EVIDENCE_SCHEMA_VERSION}`);
-    } catch {
-      warn(`${file}: unreadable`);
-    }
-  }
-  return bundles;
+    const chosen = outcome.status === 'chose' ? outcome.choice.chosen : null;
+    return {
+      used: outcome.status !== 'unavailable',
+      model: llm.modelFor('heal'),
+      outcome: outcome.status,
+      reasoning: 'choice' in outcome ? outcome.choice.reasoning : null,
+      confidence: 'choice' in outcome ? outcome.choice.confidence : null,
+      usd: 'usd' in outcome ? outcome.usd : 0,
+      changedChoice: false,
+      chosen,
+      realBug: outcome.status === 'real-bug',
+    };
+  };
 }
 
 function renderProposal(proposal: HealProposal): void {
@@ -173,44 +196,7 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
         checkCollateral: !flags.noCollateral,
         // A dry run must never produce a record that reads as verified.
         skipValidation: flags.dryRun,
-        rankCandidates: llm.available
-          ? async ({ candidates, missingTestId }) => {
-              const outcome = await runRepairAgent(
-                llm,
-                {
-                  testTitle: bundle.test.title,
-                  intent:
-                    bundle.intent.failingStep === null
-                      ? null
-                      : `${bundle.intent.failingStep.pageObject}.${bundle.intent.failingStep.method}(${bundle.intent.failingStep.args.join(', ')})`,
-                  missingTestId,
-                  failureKind: bundle.failure.kind,
-                  expected: bundle.failure.expected,
-                  actual: bundle.failure.actual,
-                  ariaSnapshot: bundle.page.ariaSnapshot,
-                  candidates: candidates.map(c => ({
-                    value: c.value,
-                    expression: c.expression,
-                    semanticDistance: c.semanticDistance,
-                  })),
-                },
-                { budget },
-              );
-
-              const chosen = outcome.status === 'chose' ? outcome.choice.chosen : null;
-              return {
-                used: outcome.status !== 'unavailable',
-                model: llm.modelFor('heal'),
-                outcome: outcome.status,
-                reasoning: 'choice' in outcome ? outcome.choice.reasoning : null,
-                confidence: 'choice' in outcome ? outcome.choice.confidence : null,
-                usd: 'usd' in outcome ? outcome.usd : 0,
-                changedChoice: false,
-                chosen,
-                realBug: outcome.status === 'real-bug',
-              };
-            }
-          : undefined,
+        rankCandidates: llm.available ? rankWithRepairAgent(llm, budget, bundle) : undefined,
       }),
     );
   }

@@ -85,32 +85,38 @@ interface JsonReport {
   };
 }
 
-/** Walk the (recursively nested) suite tree and total each spec's results. */
+const RESULT_PASSED = 'passed';
+const RESULT_FAILED = 'failed';
+const RESULT_TIMED_OUT = 'timedOut';
+const PLAYWRIGHT_JSON_OUTPUT = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
+
+function countResults(spec: JsonSpec): Pick<SpecOutcome, 'passed' | 'failed'> {
+  let passed = 0;
+  let failed = 0;
+  for (const test of spec.tests ?? []) {
+    for (const result of test.results ?? []) {
+      if (result.status === RESULT_PASSED) passed += 1;
+      else if (result.status === RESULT_FAILED || result.status === RESULT_TIMED_OUT) failed += 1;
+    }
+  }
+  return { passed, failed };
+}
+
 function collectSpecs(suites: readonly JsonSuite[] | undefined, file = ''): SpecOutcome[] {
   const out: SpecOutcome[] = [];
 
   for (const suite of suites ?? []) {
     const suiteFile = suite.file ?? file;
-
     for (const spec of suite.specs ?? []) {
-      let passed = 0;
-      let failed = 0;
-      for (const test of spec.tests ?? []) {
-        for (const result of test.results ?? []) {
-          if (result.status === 'passed') passed += 1;
-          else if (result.status === 'failed' || result.status === 'timedOut') failed += 1;
-        }
-      }
-      out.push({ title: spec.title ?? '', file: suiteFile, passed, failed });
+      out.push({ title: spec.title ?? '', file: suiteFile, ...countResults(spec) });
     }
-
     out.push(...collectSpecs(suite.suites, suiteFile));
   }
 
   return out;
 }
 
-function buildArgs(options: PlaywrightRunOptions, jsonPath: string): string[] {
+function buildArgs(options: PlaywrightRunOptions): string[] {
   const args = ['playwright', 'test'];
 
   if (options.config !== undefined) args.push('--config', options.config);
@@ -125,8 +131,35 @@ function buildArgs(options: PlaywrightRunOptions, jsonPath: string): string[] {
   // and validation want counts, and inheriting a consumer's HTML or blob
   // reporter would write artifacts nobody asked for on every probe.
   args.push('--reporter=json');
-  void jsonPath;
   return args;
+}
+
+function isJsonReport(value: unknown): value is JsonReport {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseJsonReport(raw: string): JsonReport | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isJsonReport(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function inconclusiveResult(exitCode: number, stderr: string): PlaywrightRunResult {
+  return {
+    ok: false,
+    passed: 0,
+    failed: 0,
+    flaky: 0,
+    skipped: 0,
+    durationMs: 0,
+    exitCode,
+    inconclusive: true,
+    stderr,
+    specs: [],
+  };
 }
 
 export async function runPlaywright(options: PlaywrightRunOptions): Promise<PlaywrightRunResult> {
@@ -134,14 +167,14 @@ export async function runPlaywright(options: PlaywrightRunOptions): Promise<Play
   const jsonPath = join(dir, 'report.json');
 
   try {
-    const args = buildArgs(options, jsonPath);
+    const args = buildArgs(options);
     const result = await new Promise<{ code: number; stderr: string }>(resolve => {
       const child = spawn('npx', args, {
         cwd: options.cwd,
         env: {
           ...process.env,
           ...options.env,
-          PLAYWRIGHT_JSON_OUTPUT_NAME: jsonPath,
+          [PLAYWRIGHT_JSON_OUTPUT]: jsonPath,
           // The reporter is not wanted during a probe: bisect runs the same
           // test dozens of times, and each run would otherwise write evidence
           // bundles that pollute the history the analysis is reading.
@@ -177,36 +210,12 @@ export async function runPlaywright(options: PlaywrightRunOptions): Promise<Play
       // error, a missing browser. That is INCONCLUSIVE, not a failing test;
       // counting it as a failure would make bisect blame the code under test
       // for a broken environment.
-      return {
-        ok: false,
-        passed: 0,
-        failed: 0,
-        flaky: 0,
-        skipped: 0,
-        durationMs: 0,
-        exitCode: result.code,
-        inconclusive: true,
-        stderr: result.stderr,
-        specs: [],
-      };
+      return inconclusiveResult(result.code, result.stderr);
     }
 
-    let report: JsonReport = {};
-    try {
-      report = JSON.parse(raw) as JsonReport;
-    } catch {
-      return {
-        ok: false,
-        passed: 0,
-        failed: 0,
-        flaky: 0,
-        skipped: 0,
-        durationMs: 0,
-        exitCode: result.code,
-        inconclusive: true,
-        stderr: `unparseable JSON report\n${result.stderr}`,
-        specs: [],
-      };
+    const report = parseJsonReport(raw);
+    if (report === null) {
+      return inconclusiveResult(result.code, `unparseable JSON report\n${result.stderr}`);
     }
 
     const stats = report.stats ?? {};

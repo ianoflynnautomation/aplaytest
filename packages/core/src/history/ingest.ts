@@ -22,17 +22,25 @@ export interface IngestResult {
   readonly skipped: readonly { readonly file: string; readonly reason: string }[];
 }
 
-function validate(parsed: unknown, file: string): RunRecord | string {
-  if (typeof parsed !== 'object' || parsed === null) return 'not an object';
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
-  const candidate = parsed as Partial<RunRecord>;
-  if (candidate.schemaVersion !== RUN_SCHEMA_VERSION) {
-    return `schemaVersion ${String(candidate.schemaVersion)} — this build reads ${RUN_SCHEMA_VERSION}`;
+function isRunRecord(value: unknown): value is RunRecord {
+  if (!isRecord(value)) return false;
+  if (value['schemaVersion'] !== RUN_SCHEMA_VERSION) return false;
+  if (typeof value['runId'] !== 'string' || value['runId'] === '') return false;
+  return Array.isArray(value['attempts']);
+}
+
+function validate(parsed: unknown): RunRecord | string {
+  if (!isRecord(parsed)) return 'not an object';
+  if (parsed['schemaVersion'] !== RUN_SCHEMA_VERSION) {
+    return `schemaVersion ${String(parsed['schemaVersion'])} — this build reads ${RUN_SCHEMA_VERSION}`;
   }
-  if (typeof candidate.runId !== 'string' || candidate.runId === '') return 'missing runId';
-  if (!Array.isArray(candidate.attempts)) return 'missing attempts';
-  void file;
-  return candidate as RunRecord;
+  if (typeof parsed['runId'] !== 'string' || parsed['runId'] === '') return 'missing runId';
+  if (!Array.isArray(parsed['attempts'])) return 'missing attempts';
+  return isRunRecord(parsed) ? parsed : 'not an object';
 }
 
 /**
@@ -46,7 +54,7 @@ export async function ingestDirectory(
   store: HistoryStore,
   dir: string,
 ): Promise<IngestResult> {
-  const entries = await readdir(dir).catch(() => [] as string[]);
+  const entries = await readdir(dir).catch((): string[] => []);
   const files = entries.filter(name => name.endsWith('.json'));
 
   const skipped: { file: string; reason: string }[] = [];
@@ -63,7 +71,7 @@ export async function ingestDirectory(
       continue;
     }
 
-    const validated = validate(parsed, name);
+    const validated = validate(parsed);
     if (typeof validated === 'string') {
       skipped.push({ file: name, reason: validated });
       continue;

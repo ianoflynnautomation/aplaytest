@@ -31,9 +31,18 @@ export {
   daysUntilExpiry,
   expiryFor,
   renderQuarantineComment,
+  buildQuarantineEntry,
   DEFAULT_QUARANTINE_POLICY,
+  DEFAULT_QUARANTINE_REASON,
+  UNCLASSIFIED_CAUSE,
 } from './quarantine.js';
-export type { QuarantineEntry, QuarantinePolicy, PolicyResult, PolicyViolation } from './quarantine.js';
+export type {
+  QuarantineEntry,
+  QuarantinePolicy,
+  PolicyResult,
+  PolicyViolation,
+  BuildQuarantineEntryInput,
+} from './quarantine.js';
 
 export { quarantineCodemod, releaseCodemod, QUARANTINE_TAG } from './codemod.js';
 export type { CodemodResult, CodemodStatus, QuarantineCodemodInput } from './codemod.js';

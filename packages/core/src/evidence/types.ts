@@ -41,6 +41,11 @@ export interface StepRecord {
   readonly failed: boolean;
 }
 
+export function formatFailingStep(step: StepRecord | null): string | null {
+  if (step === null) return null;
+  return `${step.pageObject}.${step.method}(${step.args.join(', ')})`;
+}
+
 /** Where a selector literal lives in source — the target of a heal patch. */
 export interface SelectorSource {
   readonly file: string;

@@ -12,5 +12,13 @@ export type { ServerOptions } from './server.js';
 export { ALL_TOOLS, listFailures, getFailure, flakyQuery, impact, proposeHealTool } from './tools.js';
 export type { ToolContext, ToolDefinition } from './tools.js';
 
-export { gate, sanitise, safetyFromEnv, WRITE_TOOLS, DEFAULT_SAFETY } from './safety.js';
+export {
+  gate,
+  sanitise,
+  safetyFromEnv,
+  WRITE_TOOLS,
+  DEFAULT_SAFETY,
+  MCP_WRITE_ENV,
+  MCP_WRITE_ENABLED,
+} from './safety.js';
 export type { SafetyConfig, GateResult } from './safety.js';

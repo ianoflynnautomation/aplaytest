@@ -39,14 +39,21 @@ export const DEFAULT_SAFETY: SafetyConfig = {
   redactKeys: ['password', 'token', 'authorization', 'cookie', 'secret', 'api-key'],
 };
 
+export const MCP_WRITE_ENV = 'ATEST_MCP_WRITE';
+export const MCP_WRITE_ENABLED = '1';
+
 export function safetyFromEnv(env: Readonly<Record<string, string | undefined>> = process.env): SafetyConfig {
-  return { ...DEFAULT_SAFETY, writeEnabled: env['ATEST_MCP_WRITE'] === '1' };
+  return { ...DEFAULT_SAFETY, writeEnabled: env[MCP_WRITE_ENV] === MCP_WRITE_ENABLED };
 }
 
 export interface GateResult {
   readonly ok: boolean;
   readonly error?: string;
   readonly message?: string;
+}
+
+function hasExplicitConfirm(input: unknown): boolean {
+  return typeof input === 'object' && input !== null && 'confirm' in input && input.confirm === true;
 }
 
 export function gate(toolName: string, input: unknown, config: SafetyConfig): GateResult {
@@ -57,12 +64,12 @@ export function gate(toolName: string, input: unknown, config: SafetyConfig): Ga
       ok: false,
       error: 'write_disabled',
       message:
-        `${toolName} modifies the working tree. Set ATEST_MCP_WRITE=1 to enable mutating ` +
+        `${toolName} modifies the working tree. Set ${MCP_WRITE_ENV}=${MCP_WRITE_ENABLED} to enable mutating ` +
         'tools; this server is read-only by default.',
     };
   }
 
-  if ((input as { confirm?: unknown } | null)?.confirm !== true) {
+  if (!hasExplicitConfirm(input)) {
     return {
       ok: false,
       error: 'confirmation_required',

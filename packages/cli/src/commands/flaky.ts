@@ -13,15 +13,14 @@ import {
   DEFAULT_ANALYZE_CONFIG,
   DEFAULT_QUARANTINE_POLICY,
   analyzeAll,
+  buildQuarantineEntry,
   evaluateQuarantinePolicy,
-  expiryFor,
   quarantineCodemod,
   releaseCodemod,
   renderQuarantineComment,
   type FlakyVerdict,
-  type QuarantineEntry,
 } from '@atest/flaky';
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { ATEST_VERSION, SqliteHistoryStore, ingestDirectory } from '@atest/core';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, renderDiff, style, table, warn } from '../ui/output.js';
@@ -49,6 +48,25 @@ async function loadReport(flags: FlakyFlags) {
   const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
   await store.close();
   return { ingest, report };
+}
+
+async function loadOptionalReport(flags: FlakyFlags) {
+  try {
+    return (await loadReport(flags)).report;
+  } catch {
+    // Quarantine is valid without history: a test the user just watched flake
+    // can still be tagged. A missing runs dir must not block that.
+    return null;
+  }
+}
+
+function parseNonNegativeNumber(raw: string | undefined, fallback: number, flag: string): number {
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new UsageError(`${flag} must be a non-negative number`);
+  }
+  return parsed;
 }
 
 const verdictLabel = (v: FlakyVerdict): string =>
@@ -129,26 +147,23 @@ export async function flakyQuarantine(flags: FlakyFlags): Promise<ExitCode> {
   const source = await readFile(flags.file, 'utf8').catch(() => null);
   if (source === null) throw new UsageError(`Cannot read ${flags.file}`);
 
-  const { report } = await loadReport(flags).catch(() => ({ report: null }));
+  const report = await loadOptionalReport(flags);
   const verdict = report?.verdicts.find(v => v.title === flags.test);
 
-  const entry: QuarantineEntry = {
-    testId: verdict?.testId ?? flags.test,
-    project: flags.project ?? null,
+  const entry = buildQuarantineEntry({
     title: flags.test,
-    reason: flags.reason ?? 'flaky',
-    flakeScore: verdict?.score.score ?? 0,
-    rootCause: verdict?.classification.class ?? 'unclassified',
-    issueUrl: flags.issue ?? null,
-    createdAt: new Date().toISOString(),
-    expiresAt: expiryFor(DEFAULT_QUARANTINE_POLICY),
-    justification: null,
-  };
+    testId: verdict?.testId,
+    project: flags.project,
+    reason: flags.reason,
+    flakeScore: verdict?.score.score,
+    rootCause: verdict?.classification.class,
+    issueUrl: flags.issue,
+  });
 
   // The budget is checked BEFORE writing, not after: the point of a cap is to
   // stop the list growing, which means refusing the addition rather than
   // reporting it next time CI runs.
-  const suiteSize = Number(flags.suiteSize ?? report?.analyzed ?? 0);
+  const suiteSize = parseNonNegativeNumber(flags.suiteSize, report?.analyzed ?? 0, '--suite-size');
   const projected = evaluateQuarantinePolicy(
     upsertEntry(ledger, entry),
     suiteSize,
@@ -162,7 +177,7 @@ export async function flakyQuarantine(flags: FlakyFlags): Promise<ExitCode> {
   const result = quarantineCodemod(source, {
     file: flags.file,
     testTitle: flags.test,
-    comment: renderQuarantineComment(entry, '0.0.0'),
+    comment: renderQuarantineComment(entry, ATEST_VERSION),
   });
 
   if (result.status !== 'applied') {
@@ -222,7 +237,7 @@ export async function flakyRelease(flags: FlakyFlags): Promise<ExitCode> {
 
 export async function flakyExpire(flags: FlakyFlags): Promise<ExitCode> {
   const ledger = await readLedger(flags.ledger);
-  const suiteSize = Number(flags.suiteSize ?? 0);
+  const suiteSize = parseNonNegativeNumber(flags.suiteSize, 0, '--suite-size');
   const result = evaluateQuarantinePolicy(ledger, suiteSize, DEFAULT_QUARANTINE_POLICY);
 
   if (flags.json) {

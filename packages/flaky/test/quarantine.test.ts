@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_QUARANTINE_POLICY,
+  DEFAULT_QUARANTINE_REASON,
+  UNCLASSIFIED_CAUSE,
+  buildQuarantineEntry,
   daysUntilExpiry,
   effectiveBudget,
   evaluateQuarantinePolicy,
@@ -91,6 +94,18 @@ describe('evaluateQuarantinePolicy', () => {
 
     expect(result.ok).toBe(true);
     expect(result.expiringSoon.map(e => e.testId)).toEqual(['sooner', 'later']);
+  });
+});
+
+describe('buildQuarantineEntry', () => {
+  it('fills defaults so adapters do not re-encode the same policy', () => {
+    const built = buildQuarantineEntry({ title: 'a gym can be found by name', now: NOW });
+    expect(built.testId).toBe('a gym can be found by name');
+    expect(built.project).toBeNull();
+    expect(built.reason).toBe(DEFAULT_QUARANTINE_REASON);
+    expect(built.rootCause).toBe(UNCLASSIFIED_CAUSE);
+    expect(built.flakeScore).toBe(0);
+    expect(built.expiresAt).toBe(expiryFor(DEFAULT_QUARANTINE_POLICY, NOW));
   });
 });
 

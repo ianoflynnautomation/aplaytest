@@ -110,6 +110,10 @@ ${style.bold('OPTIONS')}
 
 ${style.bold('EXIT CODES')}
   0 ok · 1 test failures · 2 usage · 3 model unavailable · 4 policy · 5 internal
+
+  For \`gate\`, 1 and 4 mean different things: 4 is a verdict (the test asserts
+  nothing), 1 means the gate could not decide because a mutant run never
+  executed the test. Treat 1 as an environment problem, not a test problem.
 `;
 
 const OPTIONS = {

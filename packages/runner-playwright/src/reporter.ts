@@ -27,6 +27,7 @@ import type {
 } from '@playwright/test/reporter';
 
 import {
+  ATEST_VERSION,
   EvidenceStore,
   RUN_SCHEMA_VERSION,
   isFailure,
@@ -40,7 +41,7 @@ import {
 import { assembleBundle, classifyResult, type Sidecars, type TestResultLike } from './assemble.js';
 import { SIDECAR, SidecarParseError, parseSidecar } from './sidecar.js';
 
-export const ATEST_VERSION = '0.0.0';
+export { ATEST_VERSION };
 
 export interface AtestReporterOptions {
   /** Directory for evidence bundles. */

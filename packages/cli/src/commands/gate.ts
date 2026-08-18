@@ -54,9 +54,18 @@ export async function gate(flags: GateFlags): Promise<ExitCode> {
     ...(only === undefined ? {} : { only }),
   });
 
+  // Three outcomes, three exit codes. Collapsing "could not decide" into the
+  // rejection code would tell CI a test asserts nothing when the truth is that
+  // the mutant run never executed it.
+  const code = result.passed
+    ? EXIT.OK
+    : result.undecidable
+      ? EXIT.TEST_FAILURES
+      : EXIT.POLICY_VIOLATION;
+
   if (flags.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return result.passed ? EXIT.OK : EXIT.POLICY_VIOLATION;
+    return code;
   }
 
   heading(flags.test);
@@ -71,16 +80,24 @@ export async function gate(flags: GateFlags): Promise<ExitCode> {
     for (const mutant of result.mutants) {
       // "survived" is the interesting word, so it is the one that gets colour.
       const verdict = mutant.inconclusive
-        ? style.yellow('inconclusive')
+        ? style.red('UNREADABLE  ')
         : mutant.killed
           ? style.dim('killed      ')
           : style.yellow('SURVIVED    ');
-      line(`  ${verdict} ${mutant.name.padEnd(12)} ${style.dim(mutant.kills)}`);
+      line(`  ${verdict} ${mutant.name.padEnd(12)} ${style.dim(mutant.detail ?? mutant.kills)}`);
     }
   }
 
   line();
   line(`  ${result.summary}`);
+
+  if (result.undecidable) {
+    line();
+    line(style.dim('  This is not a verdict about the test. One or more mutant runs never'));
+    line(style.dim('  executed it, so nothing was proved either way — look at the reason'));
+    line(style.dim('  above, fix the environment, and re-run.'));
+    return EXIT.TEST_FAILURES;
+  }
 
   if (!result.passed) {
     line();

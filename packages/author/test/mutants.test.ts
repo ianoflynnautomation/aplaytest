@@ -198,3 +198,105 @@ describe('evaluateGate — the verdict rule', () => {
     expect(result.passed).toBe(false);
   });
 });
+
+describe('evaluateGate — an unreadable mutant run is not evidence', () => {
+  const outcome = (
+    name: MutantName,
+    cls: MutantClass,
+    killed: boolean,
+    inconclusive = false,
+  ): MutantOutcome => ({ name, class: cls, killed, kills: '', inconclusive });
+
+  const stable = [{ name: 'stability' as const, ok: true, detail: 'passed 3/3' }];
+
+  /**
+   * REGRESSION GUARD, found by a CI failure that would not reproduce locally.
+   *
+   * A mutant "kill" used to fall back to the run's overall exit status when the
+   * candidate could not be found in the results. Every environmental failure —
+   * a crashed globalSetup, a port already bound, a dead worker — then produced
+   * a run with no matching spec and `ok: false`, which the gate recorded as
+   * the mutant killing the test.
+   *
+   * That is the worst direction for this error: a false kill makes a test that
+   * asserts nothing look falsifiable, which is the single thing the gate exists
+   * to catch.
+   */
+  it('does not treat an unreadable data mutant as a kill', () => {
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        outcome('empty-page', 'content', false, true),
+        outcome('unfiltered', 'discrimination', false, true),
+        outcome('http-500', 'liveness', true),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.passed).toBe(false);
+  });
+
+  it('reports UNDECIDABLE rather than blaming the test', () => {
+    // Rejecting on runs that never executed would say "this test asserts
+    // nothing" when the truth is "we did not find out".
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        outcome('empty-page', 'content', false, true),
+        outcome('unfiltered', 'discrimination', false),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.undecidable).toBe(true);
+    expect(result.summary).toContain('UNDECIDABLE');
+    expect(result.summary).not.toContain('REJECTED');
+  });
+
+  it('still REJECTS when every data mutant was read and none killed', () => {
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        outcome('empty-page', 'content', false),
+        outcome('unfiltered', 'discrimination', false),
+        outcome('http-500', 'liveness', true),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.undecidable).toBe(false);
+    expect(result.summary).toContain('REJECTED');
+  });
+
+  it('a positive kill stands even when another mutant was unreadable', () => {
+    // Evidence of falsifiability is evidence, whatever happened elsewhere.
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        outcome('empty-page', 'content', true),
+        outcome('unfiltered', 'discrimination', false, true),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.passed).toBe(true);
+    expect(result.undecidable).toBe(false);
+  });
+
+  it('an unreadable LIVENESS mutant does not make the gate undecidable', () => {
+    // http-500 never counts towards the verdict, so failing to read it
+    // changes nothing.
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        outcome('empty-page', 'content', false),
+        outcome('unfiltered', 'discrimination', false),
+        outcome('http-500', 'liveness', false, true),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.undecidable).toBe(false);
+    expect(result.summary).toContain('REJECTED');
+  });
+});

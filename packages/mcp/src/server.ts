@@ -12,6 +12,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
+import { ATEST_VERSION } from '@atest/core';
+
 import { ALL_TOOLS, type ToolContext } from './tools.js';
 import { gate, sanitise, safetyFromEnv, type SafetyConfig } from './safety.js';
 
@@ -25,7 +27,7 @@ export function createServer(options: ServerOptions): McpServer {
 
   const server = new McpServer({
     name: 'atest',
-    version: '0.0.0',
+    version: ATEST_VERSION,
   });
 
   for (const tool of ALL_TOOLS) {

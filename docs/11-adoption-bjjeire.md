@@ -1,274 +1,209 @@
-# 11 — Adoption plan for `bjjeire-tests`
+# 11 — Adoption runbook for `bjjeire-tests`
 
-How this lands on *this* repo, in order, with the actual files that change. Every phase is
-independently valuable and independently revertible.
+Written against the real repository and the real pipeline, and revised after
+every step below was actually run. Where something was measured rather than
+reasoned about, it says so — several things that looked obviously fine were
+not.
 
----
-
-## Phase 0 — Attach (one PR, ~30 lines, no spec changes)
-
-**Goal:** every failure gets captured. No model, no behaviour change, no risk.
-
-### Files that change
-
-```
-+ atest.config.ts
-+ .atest/.gitignore
-~ .gitignore                          (+2 lines)
-~ package.json                        (+1 devDependency, +4 scripts)
-~ src/shared/config/playwright.ts     (+3 lines in activeReporters)
-```
-
-### The reporter hook
-
-`activeReporters()` already has exactly the right shape for this — a conditional, env-gated
-reporter list. `atest` slots in beside the OTel reporter using the same pattern:
-
-```ts
-// src/shared/config/playwright.ts
-function activeReporters(): ReporterDescription[] {
-  const reporters: ReporterDescription[] = IS_CI ? [...CI_REPORTERS] : [...LOCAL_REPORTERS];
-  if (!IS_CI && process.env['ALLURE']) {
-    reporters.push(['allure-playwright', { resultsDir: 'allure-results' }]);
-  }
-  if (process.env['OTEL_EXPORTER_OTLP_ENDPOINT']) {
-    reporters.push([join(REPO_ROOT, 'src', 'shared', 'otel', 'otel-reporter.ts')]);
-  }
-  // NEW — opt-in exactly like the OTel reporter above it.
-  if (process.env['ATEST'] !== '0') {
-    reporters.push(['@atest/runner-playwright/reporter']);
-  }
-  return reporters;
-}
-```
-
-`ATEST=0` disables it completely, which is the escape hatch for "is atest causing this?"
-
-### The trace-id bridge
-
-The one integration worth doing properly on day one. `src/shared/otel/trace-context.ts` already
-derives deterministic ids from `(runId, testId, retry)`; `atest` consumes that function rather
-than minting its own, so history rows join to Tempo spans for free:
-
-```ts
-// atest.config.ts
-import { testTraceContext } from './src/shared/otel/trace-context';
-import { resolveRunId } from './src/shared/config/run-id';
-
-export default defineAtestConfig({
-  identity: {
-    runId: resolveRunId,
-    traceId: (test, retry) => testTraceContext(resolveRunId(), test.id, retry).traceId,
-  },
-  // …
-});
-```
-
-Skip this and the flaky engine loses `appSpanLatencyOutlierRate` — one of its strongest
-root-cause signals — for no good reason.
-
-### Verification
-
-```sh
-npm run test:smoke                       # 28 tests, must be unchanged: same result, ±2% duration
-ls .atest/evidence/                      # bundles for any failure
-npx atest doctor                         # config, versions, stores, reachability
-npx atest history query --last 5
-```
-
-**Exit criteria:** `atest run --grep @smoke` and `npm run test:smoke` produce identical exit codes
-and test results across 10 runs. If they don't, stop and fix before Phase 1.
-
-### New scripts
-
-```jsonc
-"atest": "atest run -c playwright.acceptance.config.ts",
-"atest:smoke": "atest run -c playwright.acceptance.config.ts -g @smoke",
-"atest:analyze": "atest analyze --run latest",
-"atest:flaky": "atest flaky report"
-```
+**Order matters here.** Each step is only useful once the previous one works,
+and step 6 is a wait no amount of engineering shortens.
 
 ---
 
-## Phase 1 — Flaky engine (the phase that pays for the project)
+## The shape of the integration
 
-**Goal:** turn the flake problem you already have documented into a measured, managed number.
+atest's footprint inside your test job is **one reporter line**. Everything
+else — flaky scoring, healing, reporting, the gate — runs afterwards, on
+artifacts, on a different runner. Nothing needs the cluster, and deleting that
+line removes the framework.
 
-You have one known flake recorded in `TODO.md`:
+That matters for your pipeline specifically, because you do not own the job
+that runs tests: `bjjeire-java`'s `ci-main.yml` calls
+`bjjeire-ci-templates/playwright-docker-tests.yml`, which builds a runner image
+from your `Dockerfile` and executes shards inside it. atest has to fit through
+that seam rather than replace it.
 
-> **Pre-existing flake**: `footer.ui` "Stores" quick link on firefox-desktop occasionally fails to
-> navigate under full-suite parallel load (passes in isolation).
+> **`atest ci generate` does not fit this repo.** It emits a self-contained
+> workflow that assumes it owns the pipeline. Yours delegates execution to a
+> shared template. Use it as a reference for the analyze job's shape — the
+> credential split, the history steps — not as a drop-in.
 
-That is the acceptance test for this phase. The engine must, with **no model involved**:
+---
 
-1. Score it (expect ~0.3 given "occasionally, under load, one browser").
-2. Classify it `resource-contention` — **not** as a selector problem.
-3. Prove it with `atest flaky bisect --workers-sweep`, showing failure probability rising
-   monotonically with worker count and confined to `firefox-desktop`.
-4. Prescribe the fix: await the navigation response before asserting the URL.
+## Step 1 — Evidence has to escape the container
 
-If it instead classifies as `timing` and suggests a retry, the rules need work before you trust
-this on anything else.
+**Status: unblocked** (`extra-output-paths`, merged).
 
-### Seeding history
+Tests run as `docker run --rm` with three bind mounts:
+`playwright-report`, `test-results`, `blob-report`. Anything written elsewhere
+is in the container's writable layer, which `--rm` deletes. Measured with a
+real container: a run record written to `.atest/runs/` left **zero files** on
+the host.
 
-The engine needs ~10 runs per (test, project) before it will score anything. Two ways to get there:
-
-```sh
-# Fast: replay the last 30 days of CI blob reports into the history store
-npx atest history import --from-artifacts ./downloaded-blob-reports
-
-# Or: nightly full-suite runs for two weeks, which you may want anyway
-```
-
-The import path is worth building first — it turns two weeks of waiting into an afternoon.
-
-### Quarantine hygiene, enforced
-
-`CLAUDE.md` says *"Fix or delete promptly — never let the list grow."* Phase 1 makes that a CI gate
-rather than a norm:
+In the caller (`ci-main.yml`):
 
 ```yaml
-- run: npx atest flaky expire --ci     # exit 4 on expired quarantine or budget breach
+extra-output-paths: |
+  .atest/runs
+  .atest/evidence
 ```
 
-The codemod writes `@quarantine` into the existing tag array; `grepInvert: QUARANTINE_TAG` in
-`src/shared/config/playwright.ts` already does the excluding. No new runtime machinery.
+Without this, everything downstream reads an empty directory and reports
+success on nothing.
 
 ---
 
-## Phase 2 — Healing, propose-only
+## Step 2 — Install atest
 
-**Goal:** selector drift stops costing an afternoon.
-
-Your repo is close to ideal for this, for one specific reason: **every selector is a string constant
-in `src/ui/pages/<feature>/<feature>.constants.ts`**. Five files, 71 test ids, no logic. A heal is a
-one-line diff in a file a reviewer can read in ten seconds.
-
-### Build the corpus first
-
-Before writing a prompt, generate ground truth. Inject renames into a scratch worktree and capture
-what happens:
+It is not on any registry. `npm run pack` in the atest repo emits a tarball per
+package; copy the two the test process needs into `bjjeire-tests` and install
+them **in one command** — `@atest/core` is on no registry, so the reporter
+tarball cannot resolve it alone.
 
 ```sh
-npx atest dev inject-rename --testid gym-card-name --to gym-card-title --project chromium-desktop
+# in atest
+npm run pack
+cp dist-pack/atest-core-0.0.0.tgz dist-pack/atest-runner-playwright-0.0.0.tgz \
+   ~/Sources/bjjeire-tests/vendor/
+
+# in bjjeire-tests
+npm i ./vendor/atest-core-0.0.0.tgz ./vendor/atest-runner-playwright-0.0.0.tgz
 ```
 
-Run that across ~40 real testids spanning all five features. Each produces an evidence bundle with a
-known-correct answer. That corpus is:
+`file:` specifiers survive `npm ci`, so the runner image needs no change beyond
+copying `vendor/` before the install — which the existing `COPY . .` already
+does.
 
-- The Tier-0 benchmark (target: ≥60% resolved with no model).
-- The Tier-1 benchmark (target: +20 points, **measured**).
-- The prompt regression suite — any prompt change runs against it before merging.
-
-Prompt engineering without this corpus is guesswork, and you will not be able to tell whether the
-model is earning its cost.
-
-### Watch out for shared literals
-
-`gyms.constants.ts` holds `'gym-card-name'` in **both** `TEST_IDS.cardName` and
-`GYM_CARD_TEST_IDS.name`, used by `gyms.page.ts` and `gyms.card.page.ts` respectively. A text-level
-patch fixes one and leaves the other, and the collateral check catches it as a failure rather than a
-partial heal. This is exactly why patching goes through ts-morph and why `validateCollateral`
-defaults on. Put a corpus case on it.
-
-### Guards to verify adversarially
-
-Prove these fail closed before enabling anything beyond propose-only:
-
-| Guard | Test |
-| --- | --- |
-| `schema_violation` never heals | Break a Zod schema; confirm zero proposals |
-| `app_error` never heals | Inject a console error; confirm zero proposals |
-| Assertion heals never auto-apply | Set `apply: 'local'`; confirm assertion proposals still only propose |
-| Flakes are not healed | Feed a bundle for a test above threshold; confirm it routes to flaky |
+**Verified inside your actual container**: the same base image
+(`mcr.microsoft.com/playwright:v1.61.0-noble`), the same `pwuser`, the same
+`--ignore-scripts` install. Node 24.16.0 there, `node:sqlite` present, and a
+failing test produced a full evidence bundle — 704-char ARIA snapshot, 10 test
+ids, a ranked candidate, the network ledger — which reached the host through
+the `extra-output-paths` mount.
 
 ---
 
-## Phase 3 — Impact analysis
+## Step 3 — Attach the reporter
 
-Your import graph is unusually clean — path aliases, feature slices, one fixture per feature — so
-this pays off immediately:
+Your reporter list is **computed**, not a literal:
+`src/shared/config/playwright.ts` builds it conditionally and all five configs
+share it. `atest init` deliberately declines to rewrite that — a regex that
+half-understands a config produces a file that still parses and no longer does
+what its author meant — and instead points at the file to edit.
 
-```
-gyms.ui.acceptance.spec.ts
-  → @ui/fixtures → gyms.fixture.ts → gyms.page.ts → gyms.constants.ts
-                                                  → gyms.mock.ts → json-response.mock.ts
-  → @ui/pages/gyms/gyms.card.mapper
-  → tests/testdata/seeded/gyms.ts → @api/features/gyms/gyms.types
+```ts
+// src/shared/config/playwright.ts, inside activeReporters()
+reporters.push(['@atest/runner-playwright/reporter']);
 ```
 
-A change to `gyms.constants.ts` selects ~38 of 271 tests. `src/shared/config/**` correctly triggers
-everything.
+Run `atest init --cwd . ` first to see what it would do; it also adds the
+`.gitignore` block, and `--undo --apply` removes both.
 
-The runtime coverage map earns its keep on one specific file:
-`tests/accessibility/routes.a11y.acceptance.spec.ts` iterates routes from an array and imports no
-page objects — the import graph cannot see that it covers `/gyms`. Coverage recording catches it.
-Without that, impact analysis would silently drop a11y coverage on UI changes. Make it a test case.
-
----
-
-## Phase 4+ — Authoring and MCP
-
-By now the author agent has what it needs: conventions in `CLAUDE.md`, exemplar specs in every
-feature, seeded DTOs with `partialNameOf` guards, and a lint config that already errors on
-`waitForTimeout` and floating promises.
-
-Two repo-specific rules must be encoded as gates, not prose:
-
-1. **Never assert a fixture card on page 1 of an unfiltered list.** Environments hold full datasets
-   (61 gyms locally). Enforced by the "unfiltered dataset" mutant in the falsifiability gate — a
-   test that passes against it is not testing filtering.
-2. **Mocks only for empty / error / pagination / snapshot determinism**, always parsed through
-   `parseMockBody`. Enforced by `check_conventions`.
-
-Start authoring against `stores` or `competitions` — real features, currently thinner coverage than
-gyms, and low blast radius.
+**Verify the property that matters before anything else:** the reporter must
+not change the verdict. Run the suite once with and once without the line and
+compare exit codes. atest's own CI asserts this, but asserting it in your repo
+costs one run and buys the argument for shadow mode.
 
 ---
 
-## What to update as you go
+## Step 4 — Capture fixtures, and the one that will bite you
 
-Per `CLAUDE.md`'s maintenance rule, these change in the same PR as the code:
+Optional, and **project-specific**. This is the step most likely to go wrong
+quietly:
 
-| Phase | Update |
-| --- | --- |
-| 0 | `CLAUDE.md` — reporter list, `.atest/` layout, new scripts |
-| 1 | `CLAUDE.md` — quarantine now has expiry + budget, enforced in CI. `TODO.md` — close the footer flake item with the bisect verdict |
-| 2 | `CLAUDE.md` — heal ledger in `.atest/heals/`, review expectations, the `NEVER_HEAL` guard |
-| 3 | `CLAUDE.md` — impact selection on PRs, full suite on `main` |
-| 4 | `tests/features/_template/README.md` — how `atest agent author` relates to `/add-feature` |
-
----
-
-## Risks, honestly
-
-| Risk | Likelihood | Mitigation |
+| Project | Import | Why |
 | --- | --- | --- |
-| Reporter overhead slows runs | Low | Exit criteria measures it; ARIA capture is on failure only. `ATEST=0` kills it. |
-| History branch write contention | Medium | Concurrency group with `cancel-in-progress: false`; only `main` writes |
-| Heal proposals waste review time | Medium | Propose-only until acceptance rate > 80% on the corpus; revert rate is the kill switch |
-| Impact analysis drops a test | Low | `main` runs everything; `@smoke` always runs; 60% threshold; validated against 50 replayed commits |
-| Playwright version drift | Medium | Peer dependency + startup assertion; Renovate already groups `@playwright/test`, the Dockerfile, and the workflow image — **add the `atest` package to that group** |
-| Model provider outage | Low | Analyze job is `continue-on-error`; every engine has a Tier-0 path |
+| `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `chromium-wide`, `mobile-*`, `snapshots`, `a11y` | `atestFixtures` | Needs a page |
+| **`api`** | **`atestApiFixtures`** | **Must not mention one** |
 
-The Renovate row is the one most likely to bite silently. Your `playwright` group already keeps
-`@playwright/test`, the devcontainer base image, and the workflow default image in lockstep because
-a mismatch changes snapshot rendering. `atest` declares a Playwright peer range and must move in
-that same grouped PR.
+`atestFixtures` is registered `auto: true` and declares `{ page }`. Playwright
+reads fixture dependencies from that destructuring pattern, so an auto fixture
+naming `page` **launches a browser for every test in the project** — including
+API tests that only touch `request`.
+
+Measured: an API-only spec given the UI fixtures still *passed*, and against an
+uninstalled browser failed with `browserType.launch: Executable doesn't exist`.
+Under `atestApiFixtures` it passed in 24ms. Across your three API shards the
+wrong choice is pure cost, and it is a behaviour change to a pipeline that
+previously launched nothing.
+
+The API variant is not a stub: it wraps `request` and records the HTTP calls
+the test made, which is usually the whole question on an API failure.
 
 ---
 
-## Sequencing summary
+## Step 5 — Persist history
 
-```
-Week 1–2    Phase 0    Evidence + history                    no LLM   fully revertible
-Week 3–5    Phase 1    Flaky engine + quarantine gates       no LLM   closes a known TODO item
-Week 6–8    Phase 2    Healing, propose-only                 LLM opt-in
-Week 9–10   Phase 3    Impact analysis                       no LLM   PR latency
-Week 11–14  Phase 4    Author agent                          LLM
-Week 15–16  Phase 5    MCP façade
-```
+See [12 — Persisting run history on Azure](./12-azure-history.md).
 
-Stop after any phase and keep everything before it. That is the property worth protecting —
-if Phase 2 disappoints, Phases 0–1 remain a net win, and nothing needs unwinding.
+**Main writes, pull requests read.** Not only concurrency control (though it
+removes the race for free): a flake baseline should describe trunk, and a PR
+that introduces an unstable test must not enter the baseline before anyone has
+decided to merge it. Your `gha_pr_env` identity already federates separately
+for `pull_request` and `refs/heads/main`, so the split falls out of
+infrastructure you have.
+
+Sharding is worth calling out here, because it was broken in a way that would
+have quietly discarded most of your data. Every shard shares one run id so they
+can be merged — which meant every shard wrote the same filename, and an empty
+shard's record overwrote a full one. Three fixes later a 3-shard run stores all
+four attempts and re-ingests idempotently, and atest's CI asserts it. Your
+matrix is up to 6 shards × 9 projects; the failure mode was keeping one file in
+fifty-four.
+
+---
+
+## Step 6 — Wait
+
+`minRuns: 10`. Until ten main-branch runs have accumulated, every flake verdict
+reads "insufficient data". `atest history stats` says so explicitly rather than
+returning an empty report.
+
+**Do not turn on the PR comment before this.** A flake engine that says
+"insufficient data" for a fortnight is how a tool loses credibility before it
+has had a chance to be useful.
+
+---
+
+## Step 7 — Then, in order of risk
+
+1. **PR comment** — read-only, informative, `continue-on-error`.
+2. **`atest gate`** on request, against a spec you are already suspicious of.
+   It answers "does this test assert anything?", and it applies to
+   human-written tests as readily as generated ones.
+3. **`atest heal --dry-run`** — proposals only. Never in the merge path.
+4. **`atest agent author`** — needs `ANTHROPIC_API_KEY`, and produces a
+   candidate that must pass the gate before it is kept.
+
+`atest flaky expire` is the only command intended to block a merge, and only on
+quarantine hygiene: a waiver that has outlived its expiry.
+
+---
+
+## What is still unproven
+
+Honesty about scope, because the defect rate on new surface has not flattened:
+
+- **Your project matrix.** `snapshots`, `a11y`, and both mobile projects have
+  never run with the reporter attached. Sharding is now tested; those are not.
+- ~~The runner image.~~ **Now proven.** Built against the same base image,
+  same `pwuser`, same `--ignore-scripts` install; a failing test produced a
+  complete evidence bundle that reached the host through the mount.
+- **Scale.** The largest run atest has processed is four tests. Yours is a full
+  acceptance suite across nine projects.
+- **`@atest/llm` at volume.** Live calls work — repair and authoring both
+  produced correct output against the real app — but only a handful of them.
+
+None of these are reasons not to start. They are reasons to start in shadow
+mode: reporter attached, nothing gating, and a look at whether the evidence
+matches what you would have written down yourself.
+
+---
+
+## Related
+
+| Doc | Covers |
+| --- | --- |
+| [08 — CI/CD](./08-cicd.md) | The credential split and why analyze holds the key |
+| [12 — Azure history](./12-azure-history.md) | The blob store, terraform, and the main/PR split |
+| [06 — Flaky](./06-flaky.md) | What the scores mean and why `minRuns` exists |

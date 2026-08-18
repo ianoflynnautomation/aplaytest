@@ -23,7 +23,8 @@ checked against "does this survive contact with that suite?"
 | 08  | [CI/CD](./08-cicd.md)                              | GitHub Actions, GitLab, history storage, secret split    |
 | 09  | [Roadmap](./09-roadmap.md)                         | Phase 0 → 6, with exit criteria                          |
 | 10  | [Recommendations](./10-recommendations.md)         | Models, prompting, trade-offs, anti-recommendations      |
-| 11  | [Adoption for this repo](./11-adoption-bjjeire.md) | Concrete first PRs against `bjjeire-tests`               |
+| 11  | [Adoption for this repo](./11-adoption-bjjeire.md) | Ordered runbook for `bjjeire-tests`, revised after running each step |
+| 12  | [Azure history](./12-azure-history.md)            | Persisting run history: blob store, terraform, main-writes/PRs-read |
 
 ---
 

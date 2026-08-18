@@ -16,7 +16,13 @@
 export { patchConstant, findConstant } from './patch.js';
 export type { PatchInput, PatchResult, PatchStatus, TouchedConstant } from './patch.js';
 
-export { generateCandidates, assessBundle, DEFAULT_CANDIDATE_OPTIONS } from './candidates.js';
+export {
+  generateCandidates,
+  assessBundle,
+  missingTestIds,
+  testIdsIn,
+  DEFAULT_CANDIDATE_OPTIONS,
+} from './candidates.js';
 export type { HealCandidate, CandidateOptions, HealEligibility } from './candidates.js';
 
 export { validateHeal } from './validate.js';

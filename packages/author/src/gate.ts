@@ -41,6 +41,8 @@ export interface MutantOutcome {
   readonly kills: string;
   /** Set when the run could not be interpreted; never counted as a kill. */
   readonly inconclusive: boolean;
+  /** Why it was inconclusive. Present only then, so a CI log can say. */
+  readonly detail?: string;
 }
 
 export interface GateResult {
@@ -49,6 +51,12 @@ export interface GateResult {
   readonly mutants: readonly MutantOutcome[];
   readonly stabilityRuns: number;
   readonly stabilityPassed: number;
+  /**
+   * True when the gate could not decide: no data mutant killed the candidate,
+   * and at least one data mutant run failed to execute it. Distinct from
+   * `passed: false`, which is a verdict about the test.
+   */
+  readonly undecidable: boolean;
   /** One-line verdict suitable for a CLI or a PR comment. */
   readonly summary: string;
 }
@@ -101,10 +109,44 @@ function tally(result: PlaywrightRunResult, title: string): Tally {
   };
 }
 
-function passedOnce(result: PlaywrightRunResult, title: string): boolean {
+/**
+ * What one mutant run actually established.
+ *
+ * `killed` REQUIRES the candidate to have run and failed. The earlier version
+ * fell back to the run's overall exit status when the test could not be found
+ * in the results, which quietly turned every environmental failure into
+ * evidence: a crashed globalSetup, a port already bound, a worker that died —
+ * each produced a run with no matching spec and `ok: false`, and the gate
+ * recorded "the mutant killed it".
+ *
+ * That is the worst possible direction for this particular error. A false kill
+ * makes a test that asserts nothing look falsifiable, which is exactly the
+ * thing the gate exists to catch.
+ */
+type MutantVerdict = 'killed' | 'survived' | 'inconclusive';
+
+function verdictOf(result: PlaywrightRunResult, title: string): MutantVerdict {
+  if (result.inconclusive) return 'inconclusive';
+
   const counts = tally(result, title);
-  if (!counts.found) return result.ok;
-  return counts.failed === 0 && counts.passed > 0;
+  // The candidate did not run. Says nothing about the mutant either way.
+  if (!counts.found) return 'inconclusive';
+
+  if (counts.failed > 0) return 'killed';
+  if (counts.passed > 0) return 'survived';
+  return 'inconclusive';
+}
+
+/** Why a mutant run could not be read — surfaced so it is diagnosable. */
+function inconclusiveReason(result: PlaywrightRunResult, title: string): string {
+  if (result.inconclusive) return 'the run output could not be parsed';
+  if (!tally(result, title).found) {
+    const ran = result.specs.length;
+    return ran === 0
+      ? 'no test ran at all — the suite failed before reaching it'
+      : `the candidate was not among the ${ran} test(s) that ran`;
+  }
+  return 'the candidate neither passed nor failed';
 }
 
 export async function falsifiabilityGate(options: GateOptions): Promise<GateResult> {
@@ -154,6 +196,7 @@ export async function falsifiabilityGate(options: GateOptions): Promise<GateResu
       mutants: [],
       stabilityRuns,
       stabilityPassed,
+      undecidable: true,
       summary: stability.inconclusive
         ? 'gate inconclusive — the candidate run could not be interpreted'
         : `candidate is not stable (${stabilityPassed}/${stabilityRuns}); mutants not run`,
@@ -177,12 +220,20 @@ export async function falsifiabilityGate(options: GateOptions): Promise<GateResu
       // interception across workers is a source of noise that would show up
       // as a flaky kill.
       const result = await runPlaywright({ ...baseRun, workers: 1 });
+      const verdict = verdictOf(result, options.testTitle);
       outcomes.push({
         name: mutant.name,
         class: mutant.class,
-        killed: !result.inconclusive && !passedOnce(result, options.testTitle),
+        killed: verdict === 'killed',
         kills: mutant.kills,
-        inconclusive: result.inconclusive,
+        inconclusive: verdict === 'inconclusive',
+        ...(verdict === 'inconclusive'
+          ? {
+              detail:
+                `${inconclusiveReason(result, options.testTitle)}` +
+                (result.stderr.trim() === '' ? '' : ` — ${result.stderr.trim().split('\n').slice(-3).join(' / ')}`),
+            }
+          : {}),
       });
     }
   } finally {
@@ -226,6 +277,16 @@ export function evaluateGate(input: EvaluateInput): GateResult {
   const meaningful = killed.filter(o => MEANINGFUL_CLASSES.has(o.class));
   const falsifiable = meaningful.length > 0;
 
+  // A data mutant that could not be read leaves the evidence incomplete.
+  //
+  // It only matters when nothing was killed: a positive kill is proof on its
+  // own, whatever happened to the other mutants. But rejecting a test as
+  // "asserts nothing" on the strength of runs that never executed would blame
+  // the test for the environment — so that case is reported as unknown rather
+  // than as a verdict.
+  const unreadable = outcomes.filter(o => o.inconclusive && MEANINGFUL_CLASSES.has(o.class));
+  const undecidable = !falsifiable && unreadable.length > 0;
+
   const all = [
     ...checks,
     {
@@ -233,9 +294,12 @@ export function evaluateGate(input: EvaluateInput): GateResult {
       ok: falsifiable,
       detail: falsifiable
         ? `killed ${meaningful.length} data mutant(s): ${meaningful.map(m => m.name).join(', ')}`
-        : killed.length > 0
-          ? `killed only ${killed.map(k => k.name).join(', ')} — proves the page loads, not that anything is asserted about the data`
-          : 'survived every mutant — the test asserts nothing meaningful',
+        : undecidable
+          ? `UNDECIDABLE — ${unreadable.length} data mutant(s) could not be read: ` +
+            unreadable.map(u => `${u.name} (${u.detail ?? 'no detail'})`).join('; ')
+          : killed.length > 0
+            ? `killed only ${killed.map(k => k.name).join(', ')} — proves the page loads, not that anything is asserted about the data`
+            : 'survived every mutant — the test asserts nothing meaningful',
     },
   ];
 
@@ -247,12 +311,15 @@ export function evaluateGate(input: EvaluateInput): GateResult {
     mutants: outcomes,
     stabilityRuns,
     stabilityPassed,
+    undecidable,
     summary: falsifiable
       ? `stable ${stabilityPassed}/${stabilityRuns} \u00b7 killed ${killed.length}/${outcomes.length} mutants (${killed.map(k => k.name).join(', ')})` +
         (survived.length > 0
           ? ` \u00b7 note: survived ${survived.map(s => s.name).join(', ')}`
           : '')
-      : `REJECTED \u2014 stable, but survived every data mutant, so it asserts nothing about what the app returned`,
+      : undecidable
+        ? `UNDECIDABLE \u2014 ${unreadable.length} data mutant run(s) did not execute the test, so nothing was proved either way`
+        : `REJECTED \u2014 stable, but survived every data mutant, so it asserts nothing about what the app returned`,
   };
 }
 

@@ -16,19 +16,34 @@ principles:
 ```
 atest <command> [options]
 
-  init                      Scaffold atest.config.ts, detect Playwright setup
-  run                       Run tests with evidence capture
-  analyze                   Post-process a run: heal proposals + flaky + insights
-  heal <sub>                Propose / apply / list / revert heals
-  flaky <sub>               analyze | report | bisect | quarantine | expire
-  agent <sub>               author | repair | explore   (LLM required)
-  impact                    Compute affected tests from a diff
-  report                    Build / open the HTML report
-  history <sub>             query | prune | export | import
-  ci <sub>                  generate | validate   (workflow scaffolding)
-  mcp serve                 Start the MCP server
-  doctor                    Verify config, versions, credentials, connectivity
+  BUILT
+  init                      Attach the reporter; --undo removes it
+  flaky <sub>               report | quarantine | release | bisect | expire
+  heal [list|revert]        Propose selector heals from captured evidence
+  impact                    Which specs a diff could affect
+  history <sub>             stats | ingest | prune
+  report                    Merge shards; HTML report + PR comment
+  gate                      Does a test actually assert anything?
+  agent author              Generate a test, then prove it asserts something
+  ci generate               Emit a CI workflow with the execute/analyze split
+  doctor                    Verify configuration, history, and versions
+  (atest-mcp)               MCP server — a SEPARATE binary from @atest/mcp,
+                            not an `atest` subcommand
+
+  DESIGN ONLY — described in this document, not implemented
+  run                       Dropped deliberately; see the section below
+  analyze                   Split into `report` and `flaky report`
+  agent repair              The engine exists; `atest heal` drives it
+  agent explore | chat      Roadmap phase 6
+  history export | import   Covered by `history ingest` and `--json` output
+  ci validate               Not built
+  mcp serve                 The server exists, but as the `atest-mcp` binary
 ```
+
+> Kept as one list rather than two documents so the gap between what was
+> designed and what exists stays visible. Anything under DESIGN ONLY will error
+> if you type it.
+
 
 ### Global flags
 
@@ -100,7 +115,18 @@ The `~` edits are shown as a real diff under `--verbose` and skipped entirely un
 
 ---
 
-## `atest run`
+## `atest run` — NOT BUILT, and dropped from the roadmap
+
+> Everything in this section is design, not documentation. There is no
+> `atest run`, and there will not be: a wrapper owes permanent exit-code and
+> behaviour parity with `playwright test` for no capability, and it contradicts
+> the principle the rest of the design rests on — that removing the reporter
+> line removes the framework. Invoke `playwright test` exactly as before.
+>
+> The features sketched below live elsewhere: `--analyze` is `atest report` and
+> `atest flaky report`, `--impact` is `atest impact`, `--heal` is `atest heal`.
+> The section is kept because the footer design it describes is still the
+> intended shape of the reporter's output.
 
 Wraps `playwright test`. In `strict` mode the child process is invoked with identical
 arguments to what you would have run — the only addition is the reporter.

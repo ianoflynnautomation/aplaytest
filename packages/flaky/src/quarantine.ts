@@ -36,6 +36,38 @@ export const DEFAULT_QUARANTINE_POLICY: QuarantinePolicy = {
   maxRatio: 0.02,
 };
 
+export const DEFAULT_QUARANTINE_REASON = 'flaky';
+export const UNCLASSIFIED_CAUSE = 'unclassified';
+
+export interface BuildQuarantineEntryInput {
+  readonly title: string;
+  readonly testId?: string | undefined;
+  readonly project?: string | null | undefined;
+  readonly reason?: string | undefined;
+  readonly flakeScore?: number | undefined;
+  readonly rootCause?: string | undefined;
+  readonly issueUrl?: string | null | undefined;
+  readonly policy?: QuarantinePolicy | undefined;
+  readonly now?: number | undefined;
+}
+
+export function buildQuarantineEntry(input: BuildQuarantineEntryInput): QuarantineEntry {
+  const now = input.now ?? Date.now();
+  const policy = input.policy ?? DEFAULT_QUARANTINE_POLICY;
+  return {
+    testId: input.testId ?? input.title,
+    project: input.project ?? null,
+    title: input.title,
+    reason: input.reason ?? DEFAULT_QUARANTINE_REASON,
+    flakeScore: input.flakeScore ?? 0,
+    rootCause: input.rootCause ?? UNCLASSIFIED_CAUSE,
+    issueUrl: input.issueUrl ?? null,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: expiryFor(policy, now),
+    justification: null,
+  };
+}
+
 export interface PolicyViolation {
   readonly kind: 'expired' | 'budget-exceeded';
   readonly message: string;

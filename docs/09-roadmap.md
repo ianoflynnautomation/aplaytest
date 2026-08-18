@@ -22,7 +22,13 @@ archive and run history with no API key, no prompt engineering, and no trust que
 | --- | --- |
 | `@atest/core` | `EvidenceBundle` types, evidence store, `HistoryStore` iface + SQLite driver, deterministic `classify()`, config loading |
 | `@atest/runner-playwright` | Reporter plugin (CJS + ESM), trace reader, fixture capture for ARIA/network/console |
-| `atest` CLI | `init`, `run`, `doctor`, `history query`, `report` |
+| `atest` CLI | `init`, `doctor`, `history stats\|ingest\|prune`, `report` |
+
+> `run` and `history query` were dropped rather than built. `atest run` would be
+> a wrapper owing permanent exit-code parity with `playwright test`, for no
+> capability — and it contradicts the principle that removing the reporter line
+> removes the framework. `history query` is covered by `flaky report --json`
+> and `history stats --json`.
 
 **Exit criteria**
 - `atest run` is byte-identical in behaviour to `playwright test` — same exit code, same

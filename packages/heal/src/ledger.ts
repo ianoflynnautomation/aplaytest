@@ -112,19 +112,48 @@ export async function writeRecord(record: HealRecord, dir = DEFAULT_LEDGER_DIR):
   return path;
 }
 
+const JSON_EXTENSION = '.json';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHealStatus(value: unknown): value is HealStatus {
+  return value === 'applied' || value === 'reverted';
+}
+
+function isHealRecord(value: unknown): value is HealRecord {
+  if (!isRecord(value)) return false;
+  return (
+    value['schemaVersion'] === HEAL_SCHEMA_VERSION &&
+    typeof value['healId'] === 'string' &&
+    typeof value['createdAt'] === 'string' &&
+    isHealStatus(value['status']) &&
+    isRecord(value['patch']) &&
+    typeof value['patch']['file'] === 'string' &&
+    typeof value['revertText'] === 'string'
+  );
+}
+
+function parseHealRecord(raw: string): HealRecord | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isHealRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function readRecords(dir = DEFAULT_LEDGER_DIR): Promise<HealRecord[]> {
-  const files = (await readdir(dir).catch(() => [])).filter(f => f.endsWith('.json'));
+  const files = (await readdir(dir).catch(() => [])).filter(file => file.endsWith(JSON_EXTENSION));
   const records: HealRecord[] = [];
 
   for (const file of files) {
     const raw = await readFile(join(dir, file), 'utf8').catch(() => null);
     if (raw === null) continue;
-    try {
-      const parsed = JSON.parse(raw) as HealRecord;
-      if (parsed.schemaVersion === HEAL_SCHEMA_VERSION) records.push(parsed);
-    } catch {
-      // A malformed ledger entry must not hide the rest of the ledger.
-    }
+    const record = parseHealRecord(raw);
+    // A malformed ledger entry must not hide the rest of the ledger.
+    if (record !== null) records.push(record);
   }
 
   return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));

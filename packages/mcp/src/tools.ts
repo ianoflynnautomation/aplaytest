@@ -11,19 +11,26 @@
  * single call. The agent picks one failure, then fetches its detail.
  */
 
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import { z } from 'zod';
 import { falsifiabilityGate, ground } from '@atest/author';
 import {
-  EVIDENCE_SCHEMA_VERSION,
   SqliteHistoryStore,
+  formatFailingStep,
   ingestDirectory,
+  loadRunBundles,
   type EvidenceBundle,
 } from '@atest/core';
 import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@atest/flaky';
-import { assessBundle, generateCandidates, patchConstant } from '@atest/heal';
+import {
+  DEFAULT_HEAL_OPTIONS,
+  assessBundle,
+  generateCandidates,
+  missingTestIds,
+  proposeHeal,
+} from '@atest/heal';
 import {
   DEFAULT_SELECTION_CONFIG,
   DEFAULT_SPEC_PATTERN,
@@ -66,31 +73,20 @@ export function defineTool<S extends ToolSchema>(definition: ToolDefinition<S>):
   return definition as unknown as ToolDefinition;
 }
 
-async function latestRunDir(evidenceDir: string): Promise<string | null> {
-  const entries = await readdir(evidenceDir, { withFileTypes: true }).catch(() => []);
-  const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
-  return dirs[dirs.length - 1] ?? null;
-}
+const DEFAULT_FAILURE_LIMIT = 50;
+const DEFAULT_FAILURE_INCLUDES = ['aria', 'candidates'] as const;
 
 async function loadBundles(context: ToolContext, run?: string): Promise<EvidenceBundle[]> {
-  const dir = run ?? (await latestRunDir(context.evidenceDir));
-  if (dir === null) return [];
+  const { bundles } = await loadRunBundles(context.evidenceDir, run);
+  return [...bundles];
+}
 
-  const path = join(context.evidenceDir, dir);
-  const files = (await readdir(path).catch(() => [])).filter(f => f.endsWith('.json'));
-
-  const bundles: EvidenceBundle[] = [];
-  for (const file of files) {
-    const raw = await readFile(join(path, file), 'utf8').catch(() => null);
-    if (raw === null) continue;
-    try {
-      const parsed = JSON.parse(raw) as EvidenceBundle;
-      if (parsed.schemaVersion === EVIDENCE_SCHEMA_VERSION) bundles.push(parsed);
-    } catch {
-      // A malformed bundle must not hide the readable ones.
-    }
-  }
-  return bundles;
+async function findBundle(
+  context: ToolContext,
+  evidenceId: string,
+): Promise<EvidenceBundle | undefined> {
+  const bundles = await loadBundles(context);
+  return bundles.find(bundle => bundle.id === evidenceId);
 }
 
 export const listFailures = defineTool({
@@ -111,17 +107,14 @@ export const listFailures = defineTool({
 
     return {
       count: filtered.length,
-      failures: filtered.slice(0, input.limit ?? 50).map(b => ({
+      failures: filtered.slice(0, input.limit ?? DEFAULT_FAILURE_LIMIT).map(b => ({
         evidenceId: b.id,
         title: b.test.title,
         file: relative(context.cwd, b.test.file),
         line: b.test.line,
         project: b.test.project,
         kind: b.failure.kind,
-        intent:
-          b.intent.failingStep === null
-            ? null
-            : `${b.intent.failingStep.pageObject}.${b.intent.failingStep.method}(${b.intent.failingStep.args.join(', ')})`,
+        intent: formatFailingStep(b.intent.failingStep),
         selector: b.intent.selector,
         healable: assessBundle(b).eligible,
       })),
@@ -141,11 +134,10 @@ export const getFailure = defineTool({
     include: z.array(z.enum(['aria', 'candidates', 'network', 'console', 'steps'])).optional(),
   }),
   async handler(input, context) {
-    const bundles = await loadBundles(context);
-    const bundle = bundles.find(b => b.id === input.evidenceId);
+    const bundle = await findBundle(context, input.evidenceId);
     if (bundle === undefined) return { error: 'not_found', evidenceId: input.evidenceId };
 
-    const include = new Set(input.include ?? ['aria', 'candidates']);
+    const include = new Set(input.include ?? DEFAULT_FAILURE_INCLUDES);
     const eligibility = assessBundle(bundle);
 
     return {
@@ -270,40 +262,33 @@ export const proposeHealTool = defineTool({
     'which requires explicit confirmation.',
   schema: z.object({ evidenceId: z.string(), constantsFile: z.string() }),
   async handler(input, context) {
-    const bundles = await loadBundles(context);
-    const bundle = bundles.find(b => b.id === input.evidenceId);
+    const bundle = await findBundle(context, input.evidenceId);
     if (bundle === undefined) return { error: 'not_found', evidenceId: input.evidenceId };
 
-    const eligibility = assessBundle(bundle);
-    if (!eligibility.eligible) {
-      return { status: 'refused', reason: eligibility.reason };
-    }
-
-    const candidates = generateCandidates(bundle);
-    const chosen = candidates[0];
-    if (chosen === undefined) {
-      return { status: 'no-candidates', reason: 'nothing on the page resembles the missing id' };
-    }
-
-    const missing = /getByTestId\(\s*['"`]([^'"`]+)/.exec(bundle.intent.selector ?? '');
     const source = await readFile(join(context.cwd, input.constantsFile), 'utf8').catch(() => null);
     if (source === null) return { error: 'cannot_read', file: input.constantsFile };
 
-    const from = bundle.page.testIdsPresent.includes(missing?.[1] ?? '')
-      ? null
-      : (missing?.[1] ?? null);
-    if (from === null) return { status: 'refused', reason: 'could not identify the missing id' };
+    const proposal = await proposeHeal(bundle, {
+      cwd: context.cwd,
+      constantsFile: input.constantsFile,
+      constantsText: source,
+      specFile: bundle.test.file,
+      validationRuns: DEFAULT_HEAL_OPTIONS.validationRuns,
+      checkCollateral: false,
+      skipValidation: true,
+    });
 
-    const patch = patchConstant(source, { file: input.constantsFile, from, to: chosen.value });
+    if (proposal.status !== 'proposed' || proposal.chosen === null || proposal.patch === null) {
+      return { status: proposal.status, reason: proposal.reason };
+    }
 
     return {
-      status: patch.status,
-      from,
-      to: chosen.value,
-      constantsTouched: patch.touched,
-      diffPreview: patch.after,
-      candidates,
-      // Stated explicitly so a client agent never presents this as verified.
+      status: proposal.patch.status,
+      from: missingTestIds(bundle.intent.selector, bundle.page.testIdsPresent)[0] ?? null,
+      to: proposal.chosen.value,
+      constantsTouched: proposal.patch.touched,
+      diffPreview: proposal.patch.after,
+      candidates: proposal.candidates,
       validated: false,
       note: 'Not validated. Run `atest heal --apply` to validate by re-running the test.',
     };

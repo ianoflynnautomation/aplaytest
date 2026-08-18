@@ -37,13 +37,22 @@ export {
 } from './locator/stability.js';
 export type { LocatorStrategy, ParsedLocator } from './locator/stability.js';
 
+// Identity
+export { ATEST_VERSION } from './version.js';
+
 // Evidence
-export { EVIDENCE_SCHEMA_VERSION } from './evidence/types.js';
+export { EVIDENCE_SCHEMA_VERSION, formatFailingStep } from './evidence/types.js';
 export { evidenceId, isEvidenceId } from './evidence/id.js';
 export type { EvidenceIdParts } from './evidence/id.js';
 export { redact, redactString, redactUrl, REDACTED } from './evidence/redact.js';
-export { EvidenceStore, SchemaVersionError } from './evidence/store.js';
-export type { EvidenceStoreOptions } from './evidence/store.js';
+export {
+  EvidenceStore,
+  SchemaVersionError,
+  loadRunBundles,
+  parseEvidenceBundle,
+  isEvidenceBundle,
+} from './evidence/store.js';
+export type { EvidenceStoreOptions, LoadRunBundlesResult, SkippedBundle } from './evidence/store.js';
 export type {
   EvidenceBundle,
   EvidenceId,

@@ -15,10 +15,96 @@ import { dirname, join } from 'node:path';
 import { redact } from './redact.js';
 import { EVIDENCE_SCHEMA_VERSION, type EvidenceBundle, type EvidenceId } from './types.js';
 
+const JSON_EXTENSION = '.json';
+
 export interface EvidenceStoreOptions {
   readonly dir: string;
   readonly redactKeys: readonly string[];
   readonly retainRuns: number;
+}
+
+export interface SkippedBundle {
+  readonly file: string;
+  readonly reason: string;
+}
+
+export interface LoadRunBundlesResult {
+  readonly runId: string | null;
+  readonly bundles: readonly EvidenceBundle[];
+  readonly skipped: readonly SkippedBundle[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function isEvidenceBundle(value: unknown): value is EvidenceBundle {
+  if (!isRecord(value)) return false;
+  if (value['schemaVersion'] !== EVIDENCE_SCHEMA_VERSION) return false;
+  if (typeof value['id'] !== 'string') return false;
+  if (!isRecord(value['test']) || typeof value['test']['title'] !== 'string') return false;
+  if (!isRecord(value['failure']) || typeof value['failure']['kind'] !== 'string') return false;
+  return true;
+}
+
+export function parseEvidenceBundle(value: unknown): EvidenceBundle | null {
+  return isEvidenceBundle(value) ? value : null;
+}
+
+function schemaVersionOf(value: unknown): unknown {
+  return isRecord(value) ? value['schemaVersion'] : undefined;
+}
+
+async function latestRunDirectory(evidenceDir: string): Promise<string | null> {
+  const entries = await readdir(evidenceDir, { withFileTypes: true }).catch(() => []);
+  const dirs = entries.filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+  return dirs[dirs.length - 1] ?? null;
+}
+
+export async function loadRunBundles(
+  evidenceDir: string,
+  runId?: string | undefined,
+): Promise<LoadRunBundlesResult> {
+  const resolvedRunId = runId ?? (await latestRunDirectory(evidenceDir));
+  if (resolvedRunId === null) return { runId: null, bundles: [], skipped: [] };
+
+  const dir = join(evidenceDir, resolvedRunId);
+  const files = (await readdir(dir).catch(() => [])).filter(file => file.endsWith(JSON_EXTENSION));
+  const bundles: EvidenceBundle[] = [];
+  const skipped: SkippedBundle[] = [];
+
+  for (const file of files) {
+    const raw = await readFile(join(dir, file), 'utf8').catch(() => null);
+    if (raw === null) {
+      skipped.push({ file, reason: 'unreadable' });
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      skipped.push({ file, reason: 'unreadable' });
+      continue;
+    }
+
+    const bundle = parseEvidenceBundle(parsed);
+    if (bundle === null) {
+      const version = schemaVersionOf(parsed);
+      skipped.push({
+        file,
+        reason:
+          typeof version === 'number'
+            ? `schemaVersion ${version}, this build reads ${EVIDENCE_SCHEMA_VERSION}`
+            : 'malformed',
+      });
+      continue;
+    }
+
+    bundles.push(bundle);
+  }
+
+  return { runId: resolvedRunId, bundles, skipped };
 }
 
 export class SchemaVersionError extends Error {
@@ -58,16 +144,11 @@ export class EvidenceStore {
     const path = this.bundlePath(runId, id);
     const raw = await readFile(path, 'utf8');
     const parsed: unknown = JSON.parse(raw);
-
-    const version =
-      typeof parsed === 'object' && parsed !== null && 'schemaVersion' in parsed
-        ? (parsed as { schemaVersion: unknown }).schemaVersion
-        : undefined;
-
-    if (version !== EVIDENCE_SCHEMA_VERSION) {
-      throw new SchemaVersionError(Number(version), EVIDENCE_SCHEMA_VERSION, path);
+    const bundle = parseEvidenceBundle(parsed);
+    if (bundle === null) {
+      throw new SchemaVersionError(Number(schemaVersionOf(parsed)), EVIDENCE_SCHEMA_VERSION, path);
     }
-    return parsed as EvidenceBundle;
+    return bundle;
   }
 
   /** Run ids, newest first by directory mtime. */
@@ -87,7 +168,9 @@ export class EvidenceStore {
 
   async listBundles(runId: string): Promise<EvidenceId[]> {
     const entries = await readdir(join(this.options.dir, runId)).catch(() => []);
-    return entries.filter(f => f.endsWith('.json')).map(f => f.slice(0, -5) as EvidenceId);
+    return entries
+      .filter(file => file.endsWith(JSON_EXTENSION))
+      .map(file => file.slice(0, -JSON_EXTENSION.length) as EvidenceId);
   }
 
   /** Drop the oldest runs beyond the retention limit. Returns what it removed. */
