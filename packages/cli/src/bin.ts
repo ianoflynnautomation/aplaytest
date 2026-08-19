@@ -75,7 +75,7 @@ ${style.bold('OPTIONS')}
   --config <path>           Playwright config to drive
   --cwd <dir>               Directory to run Playwright in
   --evidence <dir>          Evidence bundles              [.atest/evidence]
-  --constants <path>        File where selectors are defined (heal)
+  --constants <path>        Selector file (heal). Optional — defaults to heal.targets
   --spec <path>             Spec file to validate against (heal)
   --validate <n>            Validation re-runs before accepting a heal  [3]
   --apply                   Write the heal to the working tree
@@ -93,6 +93,7 @@ ${style.bold('OPTIONS')}
   --plan-only               Stop after the plan, before any code
   --keep-rejected           Keep a candidate the gate rejected
   --keep-days <n>           Retention for history prune            [90]
+  --playwright-json <file>  Ingest a Playwright JSON report (API-only suites)
   --undo                    Remove what init added (with --apply)
   --to <ref>                Diff head                     [HEAD]
   --tsconfig <path>         tsconfig used to resolve imports
@@ -160,6 +161,7 @@ const OPTIONS = {
   'plan-only': { type: 'boolean', default: false },
   'keep-rejected': { type: 'boolean', default: false },
   'keep-days': { type: 'string' },
+  'playwright-json': { type: 'string' },
   undo: { type: 'boolean', default: false },
   'dry-run': { type: 'boolean', default: false },
   json: { type: 'boolean', default: false },
@@ -304,6 +306,9 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
     runs: flags.runs,
     json: flags.json,
     ...(values['keep-days'] === undefined ? {} : { keepDays: values['keep-days'] }),
+    ...(values['playwright-json'] === undefined
+      ? {}
+      : { playwrightJson: values['playwright-json'] }),
   };
 
   const impactFlags: ImpactFlags = {

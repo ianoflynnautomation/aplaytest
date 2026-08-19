@@ -21,9 +21,18 @@ export {
   assessBundle,
   missingTestIds,
   testIdsIn,
+  parseAriaSnapshot,
   DEFAULT_CANDIDATE_OPTIONS,
 } from './candidates.js';
-export type { HealCandidate, CandidateOptions, HealEligibility } from './candidates.js';
+export type { HealCandidate, CandidateOptions, HealEligibility, AriaNode } from './candidates.js';
+
+export {
+  resolveSelectorSource,
+  classifyHealTarget,
+  globToRegExp,
+  DEFAULT_HEAL_TARGET_GLOBS,
+} from './resolve.js';
+export type { HealTargetKind, ResolvedSelectorSource } from './resolve.js';
 
 export { validateHeal } from './validate.js';
 export type { ValidateOptions, ValidationRecord, ValidationStatus } from './validate.js';

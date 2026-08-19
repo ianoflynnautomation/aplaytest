@@ -85,7 +85,15 @@ const HealSchema = z.object({
   allowedStrategies: z.array(z.enum(LOCATOR_STRATEGIES)).default(['testid', 'role', 'label', 'text']),
   apply: z.enum(['propose', 'pr', 'local']).default('propose'),
   /** Glob patterns a heal patch is permitted to touch. */
-  targets: z.array(z.string()).default(['src/**/*.constants.ts', 'src/**/*.page.ts']),
+  targets: z
+    .array(z.string())
+    .default([
+      'src/**/*.constants.ts',
+      'src/**/*.page.ts',
+      'src/**/*.section.ts',
+      'tests/**/*.spec.ts',
+      'tests/**/*.test.ts',
+    ]),
 });
 
 const FlakySchema = z.object({

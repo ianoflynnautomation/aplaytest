@@ -15,7 +15,7 @@
 
 import { stat } from 'node:fs/promises';
 
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { SqliteHistoryStore, ingestDirectory, ingestPlaywrightJson } from '@atest/core';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style, warn } from '../ui/output.js';
@@ -26,6 +26,8 @@ export interface HistoryFlags {
   readonly json: boolean;
   /** Retention in days for `history prune`. */
   readonly keepDays?: string | undefined;
+  /** Playwright `--reporter=json` file — API-only suites that have no atest reporter. */
+  readonly playwrightJson?: string | undefined;
 }
 
 const DEFAULT_KEEP_DAYS = 90;
@@ -95,7 +97,10 @@ export async function historyIngest(flags: HistoryFlags): Promise<ExitCode> {
   requireFileDb(flags.db);
 
   const store = new SqliteHistoryStore(flags.db);
-  const result = await ingestDirectory(store, flags.runs);
+  const result =
+    flags.playwrightJson === undefined
+      ? await ingestDirectory(store, flags.runs)
+      : await ingestPlaywrightJson(store, flags.playwrightJson);
   const runs = await store.runCount();
   await store.close();
 

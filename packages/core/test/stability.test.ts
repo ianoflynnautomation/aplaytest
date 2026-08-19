@@ -16,6 +16,12 @@ describe('parseLocator', () => {
     expect(parseLocator("getByRole('heading', { name: 'Gyms' })")).toMatchObject({
       strategy: 'role',
       value: 'heading',
+      accessibleName: 'Gyms',
+    });
+    expect(parseLocator("getByRole('button')")).toMatchObject({
+      strategy: 'role',
+      value: 'button',
+      accessibleName: null,
     });
     expect(parseLocator('[data-testid="gyms-list-item"]')).toMatchObject({
       strategy: 'testid',

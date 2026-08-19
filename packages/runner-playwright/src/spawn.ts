@@ -33,6 +33,8 @@ export interface SpecOutcome {
   readonly file: string;
   readonly passed: number;
   readonly failed: number;
+  /** Last failure message, when any result failed. Used to spot env errors. */
+  readonly error: string | null;
 }
 
 export interface PlaywrightRunResult {
@@ -65,7 +67,7 @@ export function escapeForGrep(title: string): string {
 
 interface JsonSpec {
   title?: string;
-  tests?: { results?: { status?: string }[] }[];
+  tests?: { results?: { status?: string; error?: { message?: string } }[] }[];
 }
 
 interface JsonSuite {
@@ -90,16 +92,20 @@ const RESULT_FAILED = 'failed';
 const RESULT_TIMED_OUT = 'timedOut';
 const PLAYWRIGHT_JSON_OUTPUT = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
 
-function countResults(spec: JsonSpec): Pick<SpecOutcome, 'passed' | 'failed'> {
+function countResults(spec: JsonSpec): Pick<SpecOutcome, 'passed' | 'failed' | 'error'> {
   let passed = 0;
   let failed = 0;
+  let error: string | null = null;
   for (const test of spec.tests ?? []) {
     for (const result of test.results ?? []) {
       if (result.status === RESULT_PASSED) passed += 1;
-      else if (result.status === RESULT_FAILED || result.status === RESULT_TIMED_OUT) failed += 1;
+      else if (result.status === RESULT_FAILED || result.status === RESULT_TIMED_OUT) {
+        failed += 1;
+        error = result.error?.message ?? error;
+      }
     }
   }
-  return { passed, failed };
+  return { passed, failed, error };
 }
 
 function collectSpecs(suites: readonly JsonSuite[] | undefined, file = ''): SpecOutcome[] {

@@ -18,6 +18,7 @@
     "typecheck": "tsc --build && tsc --noEmit -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:gate": "node --experimental-strip-types scripts/assert-gate.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:esm": "tsc --build",

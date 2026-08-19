@@ -65,6 +65,7 @@ export async function gate(flags: GateFlags): Promise<ExitCode> {
 
   if (flags.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.stderr.write(`${result.summary}\n`);
     return code;
   }
 

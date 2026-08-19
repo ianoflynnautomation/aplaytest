@@ -81,13 +81,20 @@ function emptyPageCode(pattern: string): string {
     return value;
   };
   await page.route('${pattern}', async route => {
-    const response = await route.fetch();
+    // Bypass Playwright's APIResponse — its body can only be read once.
+    const request = route.request();
+    const upstream = await fetch(request.url(), {
+      method: request.method(),
+      headers: request.headers(),
+    });
+    const status = upstream.status;
+    const headers = Object.fromEntries(upstream.headers.entries());
+    const body = await upstream.text();
     try {
-      const json: unknown = await response.json();
-      await route.fulfill({ response, json: strip(json) });
+      const json: unknown = JSON.parse(body);
+      await route.fulfill({ status, headers, json: strip(json) });
     } catch {
-      // Not JSON — pass it through rather than corrupting a binary body.
-      await route.fulfill({ response });
+      await route.fulfill({ status, headers, body });
     }
   });
 });`;

@@ -99,7 +99,7 @@ jobs:
       - run: npm audit --audit-level=moderate
 
   integration:
-    name: Integration (smoke example)
+    name: Integration
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -166,66 +166,10 @@ jobs:
           fi
           rm -f report.html comment.md
 
-      # The gate's ACTUAL CLAIM, which examples/smoke cannot test: that mutants
-      # kill tests. Smoke uses page.setContent and never touches the network,
-      # so every mutant is a no-op there and "survived all three" proves
-      # nothing. The fixture app serves a real /api/gyms and filters
-      # SERVER-side, so `unfiltered` has something to break.
+      # Same script a developer runs locally (`npm run test:gate`). On failure
+      # it prints both payloads — do not wrap it in bash that can swallow them.
       - name: Gate kills a meaningful test and rejects a vacuous one
-        working-directory: examples/fixture-app
-        run: |
-          set +e
-          node ../../packages/cli/dist/bin.js gate --json --validate 2 \
-            --spec tests/gyms.spec.ts \
-            --test 'MEANINGFUL: filtering by county narrows the list to that county' > meaningful.json 2>gate.err
-          meaningful=$?
-          node ../../packages/cli/dist/bin.js gate --json --validate 2 \
-            --spec tests/gyms.spec.ts \
-            --test 'VACUOUS: asserts only that the page rendered' > vacuous.json 2>>gate.err
-          vacuous=$?
-          set -e
-
-          # Print BOTH results on any failure. The first time this step failed
-          # in CI it reported only "got 0" — no mutant outcomes, no stderr — and
-          # the run could not be reproduced on macOS or in a Linux container.
-          # A gate assertion that cannot say why it failed costs more than it
-          # saves.
-          dump() {
-            echo "::group::meaningful.json"; cat meaningful.json || true; echo "::endgroup::"
-            echo "::group::vacuous.json";    cat vacuous.json    || true; echo "::endgroup::"
-            echo "::group::stderr";          cat gate.err        || true; echo "::endgroup::"
-          }
-
-          if [ "$meaningful" -ne 0 ]; then
-            echo "A test that asserts on filtered data must pass the gate; got $meaningful"; dump; exit 1
-          fi
-          # Exit 1 means UNDECIDABLE — a mutant run never executed the test. That
-          # is an environment problem, not a verdict, and it must not be confused
-          # with the rejection this step is asserting.
-          if [ "$vacuous" -eq 1 ]; then
-            echo "The gate could not decide — a mutant run failed to execute the test"; dump; exit 1
-          fi
-          if [ "$vacuous" -ne 4 ]; then
-            echo "A test asserting only page chrome must be rejected with exit 4; got $vacuous"; dump; exit 1
-          fi
-
-          # The discriminating mutant specifically. `http-500` kills almost
-          # anything that loads a page, so a kill count alone would pass even
-          # if `unfiltered` were silently broken.
-          node -e '
-            const r = require("./meaningful.json");
-            const m = r.mutants.find(x => x.name === "unfiltered");
-            if (!m || !m.killed) {
-              console.error("The unfiltered mutant did not kill a filtering test:", m);
-              process.exit(1);
-            }
-            const v = require("./vacuous.json");
-            if (v.mutants.some(x => x.class !== "liveness" && x.killed)) {
-              console.error("A vacuous test was killed by a data mutant:", v.mutants);
-              process.exit(1);
-            }
-          '
-          rm -f meaningful.json vacuous.json gate.err
+        run: npm run test:gate
 
       - name: Sharded runs merge instead of overwriting
         working-directory: examples/fixture-app

@@ -15,7 +15,17 @@
  * Only then does it generate candidates, and only then does Playwright decide.
  */
 
-import { NEVER_HEAL, ROUTING, isHealable, type EvidenceBundle } from '@atest/core';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
+
+import {
+  NEVER_HEAL,
+  ROUTING,
+  isHealable,
+  parseLocator,
+  type EvidenceBundle,
+  type LocatorStrategy,
+} from '@atest/core';
 
 import {
   assessBundle,
@@ -26,6 +36,7 @@ import {
   type HealCandidate,
 } from './candidates.js';
 import { patchConstant, type PatchResult } from './patch.js';
+import { DEFAULT_HEAL_TARGET_GLOBS, resolveSelectorSource } from './resolve.js';
 import { validateHeal, type ValidationRecord } from './validate.js';
 
 export type ProposalStatus =
@@ -63,9 +74,15 @@ export interface HealProposal {
 
 export interface ProposeOptions {
   readonly cwd: string;
-  /** Constants file that defines the selector. */
-  readonly constantsFile: string;
-  readonly constantsText: string;
+  /**
+   * File that defines the selector. Optional: when omitted the engine walks
+   * `targetGlobs` (constants, page objects, specs) and prefers the most
+   * reviewable hit. `--constants` still wins when the caller knows the file.
+   */
+  readonly constantsFile?: string | undefined;
+  readonly constantsText?: string | undefined;
+  readonly targetGlobs?: readonly string[] | undefined;
+  readonly allowedStrategies?: readonly LocatorStrategy[] | undefined;
   readonly specFile: string;
   readonly config?: string | undefined;
   readonly project?: string | undefined;
@@ -96,6 +113,32 @@ export const DEFAULT_HEAL_OPTIONS = {
   checkCollateral: true,
   flakeThreshold: 0.15,
 };
+
+async function resolvePatchSource(
+  options: ProposeOptions,
+  value: string,
+): Promise<{ file: string; text: string } | null> {
+  if (options.constantsFile !== undefined && options.constantsText !== undefined) {
+    return { file: options.constantsFile, text: options.constantsText };
+  }
+
+  if (options.constantsFile !== undefined) {
+    const path = isAbsolute(options.constantsFile)
+      ? options.constantsFile
+      : join(options.cwd, options.constantsFile);
+    const text = await readFile(path, 'utf8').catch(() => null);
+    if (text === null) return null;
+    return { file: options.constantsFile, text };
+  }
+
+  const resolved = await resolveSelectorSource({
+    cwd: options.cwd,
+    value,
+    globs: options.targetGlobs ?? DEFAULT_HEAL_TARGET_GLOBS,
+  });
+  if (resolved === null) return null;
+  return { file: resolved.file, text: resolved.text };
+}
 
 function refuse(
   bundle: EvidenceBundle,
@@ -144,12 +187,19 @@ export async function proposeHeal(
     );
   }
 
-  const eligibility = assessBundle(bundle);
+  const candidateOptions: CandidateOptions = {
+    ...(options.candidateOptions ?? DEFAULT_CANDIDATE_OPTIONS),
+    ...(options.allowedStrategies === undefined
+      ? {}
+      : { allowedStrategies: options.allowedStrategies }),
+  };
+
+  const eligibility = assessBundle(bundle, candidateOptions);
   if (!eligibility.eligible) {
     return refuse(bundle, 'refused-ineligible', eligibility.reason);
   }
 
-  const candidates = generateCandidates(bundle, options.candidateOptions ?? DEFAULT_CANDIDATE_OPTIONS);
+  const candidates = generateCandidates(bundle, candidateOptions);
   if (candidates.length === 0) {
     return refuse(
       bundle,
@@ -165,9 +215,13 @@ export async function proposeHeal(
   // The id to replace is the MISSING one, not the first one the selector
   // mentions: a composite locator names its container first, and the
   // container is usually the id that still exists.
-  const intendedValue = missingTestIds(bundle.intent.selector, bundle.page.testIdsPresent)[0];
+  const parsed = parseLocator(bundle.intent.selector);
+  const intendedValue =
+    missingTestIds(bundle.intent.selector, bundle.page.testIdsPresent)[0] ??
+    parsed?.accessibleName ??
+    (parsed !== null && parsed.strategy !== 'testid' ? parsed.value : undefined);
   if (intendedValue === undefined) {
-    return refuse(bundle, 'refused-ineligible', 'could not identify which test id is missing');
+    return refuse(bundle, 'refused-ineligible', 'could not identify which locator value is missing');
   }
 
   // Tier 1: reorder by intent, if a ranker is wired in. It can only pick from
@@ -203,8 +257,23 @@ export async function proposeHeal(
     if (preferred !== undefined) chosen = preferred;
   }
 
-  const patch = patchConstant(options.constantsText, {
-    file: options.constantsFile,
+  const source = await resolvePatchSource(options, intendedValue);
+  if (source === null) {
+    return {
+      ...refuse(
+        bundle,
+        'no-constant',
+        'No selector source found. Pass --constants, or add the file to heal.targets ' +
+          '(constants, page objects, and specs are searched by default).',
+        candidates,
+      ),
+      chosen,
+      tierOne,
+    };
+  }
+
+  const patch = patchConstant(source.text, {
+    file: source.file,
     from: intendedValue,
     to: chosen.value,
   });
@@ -237,7 +306,7 @@ export async function proposeHeal(
     cwd: options.cwd,
     specFile: options.specFile,
     testTitle: bundle.test.title,
-    patchFile: options.constantsFile,
+    patchFile: source.file,
     patchedText: patch.after,
     config: options.config,
     project: options.project,

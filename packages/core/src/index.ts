@@ -71,6 +71,7 @@ export type { RunRecord, AttemptRecord, Outcome } from './history/types.js';
 export { SqliteHistoryStore } from './history/store.js';
 export type { HistoryStore, HistoricalAttempt, HistoryQuery, TestKey } from './history/store.js';
 export { ingestDirectory } from './history/ingest.js';
+export { ingestPlaywrightJson } from './history/ingest-playwright.js';
 export type { IngestResult } from './history/ingest.js';
 
 // Config

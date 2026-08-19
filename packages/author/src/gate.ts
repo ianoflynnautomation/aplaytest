@@ -125,8 +125,23 @@ function tally(result: PlaywrightRunResult, title: string): Tally {
  */
 type MutantVerdict = 'killed' | 'survived' | 'inconclusive';
 
+const ENVIRONMENT_FAILURE =
+  /ECONNREFUSED|ERR_CONNECTION_REFUSED|net::ERR_|browserType\.launch|Executable doesn't exist/i;
+
+function environmentFailure(result: PlaywrightRunResult, title: string): string | null {
+  if (ENVIRONMENT_FAILURE.test(result.stderr)) return 'the app or browser was not reachable';
+  const matching = result.specs.filter(spec => spec.title === title);
+  for (const spec of matching) {
+    if (spec.error !== null && ENVIRONMENT_FAILURE.test(spec.error)) {
+      return spec.error;
+    }
+  }
+  return null;
+}
+
 function verdictOf(result: PlaywrightRunResult, title: string): MutantVerdict {
   if (result.inconclusive) return 'inconclusive';
+  if (environmentFailure(result, title) !== null) return 'inconclusive';
 
   const counts = tally(result, title);
   // The candidate did not run. Says nothing about the mutant either way.
@@ -139,6 +154,8 @@ function verdictOf(result: PlaywrightRunResult, title: string): MutantVerdict {
 
 /** Why a mutant run could not be read — surfaced so it is diagnosable. */
 function inconclusiveReason(result: PlaywrightRunResult, title: string): string {
+  const env = environmentFailure(result, title);
+  if (env !== null) return env;
   if (result.inconclusive) return 'the run output could not be parsed';
   if (!tally(result, title).found) {
     const ran = result.specs.length;

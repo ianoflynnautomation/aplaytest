@@ -53,7 +53,7 @@ export type {
 } from './sidecar.js';
 
 export { runPlaywright, escapeForGrep } from './spawn.js';
-export type { PlaywrightRunOptions, PlaywrightRunResult } from './spawn.js';
+export type { PlaywrightRunOptions, PlaywrightRunResult, SpecOutcome } from './spawn.js';
 
 export {
   atestApiFixtures,

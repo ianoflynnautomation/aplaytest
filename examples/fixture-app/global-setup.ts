@@ -13,6 +13,20 @@ import { startFixtureApp } from './server.js';
 
 export const FIXTURE_PORT = 4321;
 
-export default async function globalSetup(): Promise<void> {
-  await startFixtureApp(FIXTURE_PORT);
+/**
+ * Return a teardown so Playwright keeps this process alive for the run.
+ *
+ * A setup that starts a server and returns nothing lets the setup process
+ * exit immediately — `server.unref()` made that exit legal, and then the
+ * server died with it. Tests then hit ECONNREFUSED, every spec failed, and
+ * the gate recorded those failures as mutant kills. A vacuous test looked
+ * falsifiable and CI exited 0.
+ */
+export default async function globalSetup(): Promise<() => Promise<void>> {
+  const server = await startFixtureApp(FIXTURE_PORT);
+  return async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => (error ? reject(error) : resolve()));
+    });
+  };
 }

@@ -93,6 +93,30 @@ describe('patchConstant', () => {
   });
 });
 
+describe('patchConstant — page objects and specs', () => {
+  it('rewrites an inline getByTestId in a spec, the snapshot-test shape', () => {
+    const source = `await expect(page.getByTestId('gyms-page-header')).toHaveScreenshot('gyms-header.png');\n`;
+    const result = patchConstant(source, {
+      file: 'tests/features/gyms/gyms.snapshot.acceptance.spec.ts',
+      from: 'gyms-page-header',
+      to: 'gyms-header',
+    });
+    expect(result.status).toBe('applied');
+    expect(result.after).toContain("getByTestId('gyms-header')");
+  });
+
+  it('rewrites a getByRole name in a page object', () => {
+    const source = `const typeFilterButton = (page: Page, label: string) => filters(page).getByRole('button', { name: 'Seminars', exact: true });\n`;
+    const result = patchConstant(source, {
+      file: 'src/ui/pages/events/events.page.ts',
+      from: 'Seminars',
+      to: 'Seminar',
+    });
+    expect(result.status).toBe('applied');
+    expect(result.after).toContain("name: 'Seminar'");
+  });
+});
+
 describe('findConstant', () => {
   it('locates a selector without changing anything', () => {
     // The difference between "the selector broke" and "the selector broke,

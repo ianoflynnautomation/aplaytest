@@ -28,6 +28,16 @@ describe('buildMutants', () => {
     expect(first?.code).toContain('**/graphql');
   });
 
+  it('does not fulfill a Response after reading its body', () => {
+    // Playwright disposes the body after json()/text(). Passing that Response
+    // to route.fulfill throws, the test fails, and the gate treats a vacuous
+    // test as falsifiable.
+    const empty = buildMutants().find(m => m.name === 'empty-page');
+    expect(empty?.code).toContain('await fetch(request.url()');
+    expect(empty?.code).not.toContain('route.fetch()');
+    expect(empty?.code).not.toMatch(/fulfill\(\{\s*response/);
+  });
+
   it('classes http-500 as liveness only', () => {
     // Measured against the live app: a deliberately vacuous test was killed by
     // http-500 and nothing else. Counting that as falsifiability would certify
@@ -281,6 +291,29 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     });
     expect(result.passed).toBe(true);
     expect(result.undecidable).toBe(false);
+  });
+
+  it('does not treat a connection-refused failure as a data kill', () => {
+    const result = evaluateGate({
+      checks: stable,
+      outcomes: [
+        {
+          name: 'empty-page',
+          class: 'content',
+          killed: false,
+          kills: '',
+          inconclusive: true,
+          detail: 'the app or browser was not reachable',
+        },
+        outcome('unfiltered', 'discrimination', false),
+        outcome('http-500', 'liveness', false),
+      ],
+      stabilityRuns: 3,
+      stabilityPassed: 3,
+    });
+    expect(result.undecidable).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.summary).not.toContain('REJECTED');
   });
 
   it('an unreadable LIVENESS mutant does not make the gate undecidable', () => {

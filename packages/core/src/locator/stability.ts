@@ -39,12 +39,20 @@ export interface ParsedLocator {
   readonly value: string;
   /** The original expression, verbatim. */
   readonly raw: string;
+  /**
+   * Accessible name when the locator carries one (`getByRole('button', { name })`).
+   * Null for nameless roles — those are too vague to heal.
+   */
+  readonly accessibleName: string | null;
 }
+
+const ROLE_WITH_NAME =
+  /getByRole\(\s*['"`]([^'"`]+)['"`]\s*,\s*\{[^}]*\bname:\s*['"`]([^'"`]+)['"`]/;
+const ROLE_ONLY = /getByRole\(\s*['"`]([^'"`]+)['"`]/;
 
 const PATTERNS: ReadonlyArray<{ strategy: LocatorStrategy; re: RegExp }> = [
   { strategy: 'testid', re: /getByTestId\(\s*['"`]([^'"`]+)['"`]/ },
   { strategy: 'testid', re: /\[data-testid=['"]?([^\]'"]+)['"]?\]/ },
-  { strategy: 'role', re: /getByRole\(\s*['"`]([^'"`]+)['"`]/ },
   { strategy: 'label', re: /getByLabel\(\s*['"`]([^'"`]+)['"`]/ },
   { strategy: 'placeholder', re: /getByPlaceholder\(\s*['"`]([^'"`]+)['"`]/ },
   { strategy: 'text', re: /getByText\(\s*['"`]([^'"`]+)['"`]/ },
@@ -62,18 +70,31 @@ export function parseLocator(expression: string | null | undefined): ParsedLocat
   const raw = expression.trim();
   if (raw === '') return null;
 
+  const namedRole = ROLE_WITH_NAME.exec(raw);
+  const role = namedRole?.[1];
+  const roleName = namedRole?.[2];
+  if (role !== undefined && role !== '' && roleName !== undefined && roleName !== '') {
+    return { strategy: 'role', value: role, raw, accessibleName: roleName };
+  }
+
+  const bareRole = ROLE_ONLY.exec(raw);
+  const bare = bareRole?.[1];
+  if (bare !== undefined && bare !== '') {
+    return { strategy: 'role', value: bare, raw, accessibleName: null };
+  }
+
   for (const { strategy, re } of PATTERNS) {
     const match = re.exec(raw);
     const captured = match?.[1];
     if (captured !== undefined && captured !== '') {
-      return { strategy, value: captured, raw };
+      return { strategy, value: captured, raw, accessibleName: null };
     }
   }
 
   // Anything left that looks like a selector is treated as CSS. This is a
   // deliberate floor, not a guess: CSS ranks low, so an unparsed locator can
   // never be mistaken for a durable one.
-  return { strategy: 'css', value: raw, raw };
+  return { strategy: 'css', value: raw, raw, accessibleName: null };
 }
 
 export function stabilityRankOf(strategy: LocatorStrategy): number {

@@ -7,6 +7,7 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 
 import {
   DEFAULT_HEAL_OPTIONS,
@@ -153,14 +154,12 @@ function renderProposal(proposal: HealProposal): void {
 }
 
 export async function heal(flags: HealFlags): Promise<ExitCode> {
-  if (flags.constants === undefined) {
-    throw new UsageError(
-      'atest heal requires --constants <path> — the file where selectors are defined.',
-    );
+  let constantsText: string | undefined;
+  if (flags.constants !== undefined) {
+    const text = await readFile(flags.constants, 'utf8').catch(() => null);
+    if (text === null) throw new UsageError(`Cannot read ${flags.constants}`);
+    constantsText = text;
   }
-
-  const constantsText = await readFile(flags.constants, 'utf8').catch(() => null);
-  if (constantsText === null) throw new UsageError(`Cannot read ${flags.constants}`);
 
   const bundles = await loadBundles(flags.evidence, flags.run);
   if (bundles.length === 0) {
@@ -187,8 +186,8 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
     proposals.push(
       await proposeHeal(bundle, {
         cwd: flags.cwd ?? process.cwd(),
-        constantsFile: flags.constants,
-        constantsText,
+        ...(flags.constants === undefined ? {} : { constantsFile: flags.constants }),
+        ...(constantsText === undefined ? {} : { constantsText }),
         specFile: flags.spec ?? bundle.test.file,
         config: flags.config,
         project: flags.project,
@@ -235,7 +234,10 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
   const first = accepted[0];
   if (first?.patch?.after === undefined || first.patch.after === null) return EXIT.OK;
 
-  await writeFile(flags.constants, first.patch.after, 'utf8');
+  const targetFile = first.patch.file;
+  const cwd = flags.cwd ?? process.cwd();
+  const targetPath = isAbsolute(targetFile) ? targetFile : join(cwd, targetFile);
+  await writeFile(targetPath, first.patch.after, 'utf8');
 
   const record = buildRecord(first, {
     project: flags.project ?? 'default',
@@ -246,11 +248,11 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
 
   if (record !== null) {
     const path = await writeRecord(record, flags.healLedger);
-    line(style.green(`  applied to ${flags.constants}`));
+    line(style.green(`  applied to ${targetFile}`));
     line(style.dim(`  ledger:  ${path}`));
     line(style.cyan(`  undo:    atest heal revert ${record.healId}`));
   } else {
-    line(style.green(`  applied to ${flags.constants}`));
+    line(style.green(`  applied to ${targetFile}`));
   }
 
   if (accepted.length > 1) {

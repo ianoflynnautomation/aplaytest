@@ -168,9 +168,9 @@ export function createFixtureApp(): Server {
 
 export async function startFixtureApp(port: number): Promise<Server> {
   const server = createFixtureApp();
-  await new Promise<void>(resolve => server.listen(port, '127.0.0.1', resolve));
-  // Do not hold the process open. Playwright starts this from globalSetup and
-  // expects to exit when the run ends; a referenced handle hangs the runner.
-  server.unref();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => resolve());
+  });
   return server;
 }

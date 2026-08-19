@@ -8,6 +8,9 @@ network, no dependencies — a ~150-line Node HTTP server started from Playwrigh
 npm install
 npx playwright install chromium
 cd examples/fixture-app && npx playwright test      # ~1s
+
+# From the repo root, after `npm run build` — same check CI runs:
+npm run test:gate
 ```
 
 ## Why it exists

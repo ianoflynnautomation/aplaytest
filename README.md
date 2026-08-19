@@ -61,6 +61,10 @@ npm run typecheck
 npm run flaky:report # ingest run records and print a flake leaderboard
 ```
 
+Against a locally running app (`http://localhost:8080`), use
+[docs/13-local-testing.md](./docs/13-local-testing.md): `examples/bjjeire-live`
+for changing atest, `bjjeire-tests` for proving attach.
+
 ## Using it
 
 ```sh

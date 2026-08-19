@@ -21,6 +21,14 @@ describe('defineAtestConfig', () => {
     expect(c.heal.minStabilityRank).toBe(4);
     expect(c.heal.allowedStrategies).not.toContain('xpath');
     expect(c.heal.allowedStrategies).not.toContain('css');
+    expect(c.heal.allowedStrategies).toEqual(['testid', 'role', 'label', 'text']);
+  });
+
+  it('searches constants, page objects, and specs by default', () => {
+    const c = defineAtestConfig({});
+    expect(c.heal.targets).toContain('src/**/*.constants.ts');
+    expect(c.heal.targets).toContain('src/**/*.page.ts');
+    expect(c.heal.targets).toContain('tests/**/*.spec.ts');
   });
 
   it('protects the test-data oracle by default', () => {

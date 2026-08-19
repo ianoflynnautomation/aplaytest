@@ -135,9 +135,34 @@ describe('proposeHeal — eligibility', () => {
     expect(result.reason).toContain('capture fixtures');
   });
 
-  it('refuses a non-testid selector rather than guessing', async () => {
+  it('refuses a nameless getByRole rather than guessing', async () => {
     const result = await proposeHeal(bundle({ selector: "getByRole('heading')" }), BASE);
     expect(result.status).toBe('refused-ineligible');
+    expect(result.reason).toContain('without a name');
+  });
+
+  it('heals a named role from the accessibility tree when test ids are not involved', async () => {
+    const pageObject = `const typeFilter = (page: Page) => filters(page).getByRole('button', { name: 'Seminars', exact: true });\n`;
+    const result = await proposeHeal(
+      {
+        ...bundle({ selector: "getByRole('button', { name: 'Seminars' })", testIds: [] }),
+        page: {
+          ...bundle().page,
+          testIdsPresent: [],
+          ariaSnapshot: '- button "Seminar"\n- button "Camps"\n- heading "Events"\n',
+        },
+      },
+      {
+        ...BASE,
+        constantsFile: 'src/ui/pages/events/events.page.ts',
+        constantsText: pageObject,
+      },
+    );
+
+    expect(result.status).toBe('proposed');
+    expect(result.chosen?.strategy).toBe('role');
+    expect(result.chosen?.value).toBe('Seminar');
+    expect(result.patch?.after).toContain("name: 'Seminar'");
   });
 
   it('reports element-removed rather than forcing a bad rename', async () => {
@@ -174,6 +199,34 @@ describe('proposeHeal — the proposal', () => {
     expect(candidates[0]?.value).toBe('gym-card-title');
     expect(candidates.map(c => c.value)).toContain('gym-card-county');
     expect(candidates.map(c => c.value)).not.toContain('footer-copyright');
+  });
+});
+
+describe('proposeHeal — resolves the source when --constants is omitted', () => {
+  it('finds a constants file under the default target globs', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+
+    const root = await mkdir(join(tmpdir(), `atest-heal-resolve-${Date.now()}`), { recursive: true });
+    await mkdir(join(root, 'src/ui/pages/gyms'), { recursive: true });
+    await writeFile(
+      join(root, 'src/ui/pages/gyms/gyms.constants.ts'),
+      CONSTANTS,
+      'utf8',
+    );
+
+    const result = await proposeHeal(bundle(), {
+      cwd: root,
+      specFile: BASE.specFile,
+      validationRuns: BASE.validationRuns,
+      checkCollateral: BASE.checkCollateral,
+      skipValidation: BASE.skipValidation,
+    });
+
+    expect(result.status).toBe('proposed');
+    expect(result.patch?.file).toBe('src/ui/pages/gyms/gyms.constants.ts');
+    expect(result.patch?.after).toContain("cardName: 'gym-card-title'");
   });
 });
 
