@@ -63,6 +63,42 @@ export interface MutantOptions {
 const DEFAULT_API_PATTERN = '**/api/**';
 
 /**
+ * Wraps a route handler body so TEARDOWN CANNOT COUNT AS A KILL.
+ *
+ * A mutant may only kill a test by changing what the app returns. Killing one
+ * by winning a race is not evidence about the test, and it is the worst
+ * possible bug in a falsifiability gate: it certifies a vacuous test as
+ * meaningful, which is the exact failure the gate exists to prevent.
+ *
+ * The race is structural, not hypothetical. A test whose last assertion reads
+ * something already in the initial HTML — `expect(header).toBeVisible()`, the
+ * canonical vacuous test — finishes while the handler is still inside
+ * `route.fetch()`. Playwright then closes the page, the in-flight call
+ * rejects, and an unhandled rejection in a route handler FAILS THE TEST. A
+ * test that asserts on the response instead waits for the handler by
+ * construction, so only the vacuous shape is affected — precisely the shape
+ * that must not be certified.
+ *
+ * Measured: this failed 3 of 6 CI runs on a loaded runner and never once
+ * locally, always with the same signature — the vacuous fixture killed by
+ * `unfiltered` while surviving `http-500`, which breaks the API outright. A
+ * kill that a total outage does not reproduce was never about data.
+ *
+ * Errors are swallowed ONLY once the page is gone. Anything else rethrows: a
+ * handler that is genuinely broken must still be loud, because a mutant that
+ * silently no-ops reports "killed 0/3" and blames the test.
+ */
+function guarded(body: string): string {
+  return `    try {
+${body}
+    } catch (error) {
+      // The page closed mid-flight because the test finished first. Not a
+      // verdict about the test; rethrow anything that is.
+      if (!page.isClosed()) throw error;
+    }`;
+}
+
+/**
  * Empty every array in the response, whatever the payload shape.
  *
  * Shape-agnostic on purpose. Hard-coding `{ items: [] }` would work against
@@ -81,21 +117,21 @@ function emptyPageCode(pattern: string): string {
     return value;
   };
   await page.route('${pattern}', async route => {
-    // Bypass Playwright's APIResponse — its body can only be read once.
-    const request = route.request();
-    const upstream = await fetch(request.url(), {
-      method: request.method(),
-      headers: request.headers(),
-    });
-    const status = upstream.status;
-    const headers = Object.fromEntries(upstream.headers.entries());
-    const body = await upstream.text();
-    try {
-      const json: unknown = JSON.parse(body);
-      await route.fulfill({ status, headers, json: strip(json) });
-    } catch {
-      await route.fulfill({ status, headers, body });
-    }
+${guarded(`      // Bypass Playwright's APIResponse — its body can only be read once.
+      const request = route.request();
+      const upstream = await fetch(request.url(), {
+        method: request.method(),
+        headers: request.headers(),
+      });
+      const status = upstream.status;
+      const headers = Object.fromEntries(upstream.headers.entries());
+      const body = await upstream.text();
+      try {
+        const json: unknown = JSON.parse(body);
+        await route.fulfill({ status, headers, json: strip(json) });
+      } catch {
+        await route.fulfill({ status, headers, body });
+      }`)}
   });
 });`;
 }
@@ -112,13 +148,13 @@ function emptyPageCode(pattern: string): string {
 function unfilteredCode(pattern: string): string {
   return `test.beforeEach(async ({ page }) => {
   await page.route('${pattern}', async route => {
-    const url = new URL(route.request().url());
-    if ([...url.searchParams.keys()].length === 0) {
-      await route.continue();
-      return;
-    }
-    const response = await route.fetch({ url: url.origin + url.pathname });
-    await route.fulfill({ response });
+${guarded(`      const url = new URL(route.request().url());
+      if ([...url.searchParams.keys()].length === 0) {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch({ url: url.origin + url.pathname });
+      await route.fulfill({ response });`)}
   });
 });`;
 }
@@ -126,11 +162,11 @@ function unfilteredCode(pattern: string): string {
 function http500Code(pattern: string): string {
   return `test.beforeEach(async ({ page }) => {
   await page.route('${pattern}', async route => {
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'atest falsifiability mutant' }),
-    });
+${guarded(`      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'atest falsifiability mutant' }),
+      });`)}
   });
 });`;
 }

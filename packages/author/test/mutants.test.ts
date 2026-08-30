@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { MEANINGFUL_CLASSES, applyMutant, buildMutants, hasMutant, stripMutant } from '../src/mutants.js';
@@ -36,6 +37,90 @@ describe('buildMutants', () => {
     expect(empty?.code).toContain('await fetch(request.url()');
     expect(empty?.code).not.toContain('route.fetch()');
     expect(empty?.code).not.toMatch(/fulfill\(\{\s*response/);
+  });
+
+  /**
+   * REGRESSION GUARD, measured in CI: 3 failures in 6 runs, never once locally.
+   *
+   * A test whose last assertion reads something already in the initial HTML —
+   * `expect(header).toBeVisible()`, the canonical VACUOUS shape — finishes
+   * while the mutant's route handler is still awaiting the network. Playwright
+   * closes the page, the in-flight call rejects, and an unhandled rejection in
+   * a route handler fails the test. The gate scored that as a kill.
+   *
+   * That is the worst bug available in a falsifiability gate: it certifies a
+   * vacuous test as meaningful, which is the exact failure the gate exists to
+   * prevent. A mutant may only kill a test by changing what the app RETURNS.
+   *
+   * The signature that identified it: the vacuous fixture was killed by
+   * `unfiltered` while SURVIVING `http-500`, which breaks the API outright. A
+   * kill that a total outage does not reproduce was never about data.
+   */
+  describe('a closing page cannot count as a kill', () => {
+    /** Runs a mutant's handler against fakes, so no browser is involved. */
+    async function invokeHandler(
+      code: string,
+      { pageClosed, error }: { pageClosed: boolean; error: Error },
+    ): Promise<'threw' | 'swallowed'> {
+      const js = ts.transpileModule(code, {
+        compilerOptions: { target: ts.ScriptTarget.ES2022 },
+      }).outputText;
+
+      let handler: ((route: unknown) => Promise<void>) | null = null;
+      const page = {
+        isClosed: () => pageClosed,
+        route: (_pattern: string, fn: (route: unknown) => Promise<void>) => {
+          handler = fn;
+          return Promise.resolve();
+        },
+      };
+      const fakeTest = { beforeEach: (fn: (args: unknown) => Promise<void>) => fn({ page }) };
+
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      await new Function('test', `return (async () => { ${js} })()`)(fakeTest);
+      if (handler === null) throw new Error('the mutant registered no route handler');
+
+      // Every call the handler might make fails the way a disposed context does.
+      const thrower = () => Promise.reject(error);
+      const route = {
+        request: () => ({
+          url: () => 'http://localhost/api/gyms?county=Dublin',
+          method: () => 'GET',
+          headers: () => ({}),
+        }),
+        continue: thrower,
+        fetch: thrower,
+        fulfill: thrower,
+      };
+
+      try {
+        await (handler as (route: unknown) => Promise<void>)(route);
+        return 'swallowed';
+      } catch {
+        return 'threw';
+      }
+    }
+
+    const teardown = new Error('Target page, context or browser has been closed');
+
+    for (const mutant of buildMutants()) {
+      it(`${mutant.name} swallows a teardown error once the page is gone`, async () => {
+        expect(await invokeHandler(mutant.code, { pageClosed: true, error: teardown })).toBe(
+          'swallowed',
+        );
+      });
+
+      /**
+       * The other half of the contract. Swallowing unconditionally would hide a
+       * genuinely broken mutant, which reports "killed 0/3" and blames the test
+       * — a quieter version of the same lie.
+       */
+      it(`${mutant.name} still throws while the page is open`, async () => {
+        expect(
+          await invokeHandler(mutant.code, { pageClosed: false, error: new Error('real failure') }),
+        ).toBe('threw');
+      });
+    }
   });
 
   it('classes http-500 as liveness only', () => {
