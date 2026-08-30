@@ -118,6 +118,29 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps chromium
 
+      # The blob driver against a real blob endpoint. Everything ABOUT the
+      # driver — naming, windowing, read-only, the merge across shards — is
+      # unit-tested against an in-memory backend; what only a real service can
+      # settle is whether the bytes, the names and the concurrency claims
+      # survive contact with one.
+      #
+      # The claim worth spending a CI job on: eight writers ingesting at once
+      # all survive. The design this replaced round-tripped a single
+      # history.sqlite under an If-Match precondition, and two overlapping
+      # main-branch runs meant one lost the race — silently discarding the
+      # other's attempts. "Different names cannot collide" is an argument until
+      # something checks it.
+      #
+      # Testcontainers starts a pinned Azurite image and stops it afterwards.
+      # No `services:` block: the image tag lives in the test file, so CI and a
+      # laptop exercise the same emulator build, and there is one place to
+      # change it rather than two that can disagree.
+      #
+      # Ubuntu runners have a Docker daemon. Without one the tests skip rather
+      # than fail, so this step cannot break a runner that lacks it.
+      - name: Blob history store against Azurite
+        run: npm run test:integration
+
       # The smoke example fails two tests ON PURPOSE. What is asserted is that
       # atest observed them: unit tests written from clean prose missed two
       # real defects that only a live Playwright run exposed.

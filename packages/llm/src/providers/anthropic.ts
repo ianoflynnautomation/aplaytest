@@ -84,6 +84,7 @@ export class AnthropicLlmClient implements LlmClient {
         {
           type: 'text',
           text: request.system,
+          
           cache_control: { type: 'ephemeral' },
         },
       ],

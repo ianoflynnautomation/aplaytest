@@ -62,7 +62,11 @@ ${style.bold('COMMANDS')}
 
 ${style.bold('OPTIONS')}
   --runs <dir>              Run records written by the reporter  [.atest/runs]
-  --db <path>               History database             [:memory:]
+  --db <target>             History store. A path is a local SQLite file;
+                            azblob://<account>/<container>[/<prefix>] is Azure
+                            Blob Storage. Add ?readonly=1 to score without
+                            writing, ?window=<days> to bound the read.
+                            Falls back to $ATEST_HISTORY_URL, then :memory:
   --ledger <path>           Quarantine ledger            [.atest/quarantine.json]
   --test "<title>"          Test title, exactly as written in the spec
   --file <path>             Spec file containing the test
@@ -119,7 +123,12 @@ ${style.bold('EXIT CODES')}
 
 const OPTIONS = {
   runs: { type: 'string', default: '.atest/runs' },
-  db: { type: 'string', default: ':memory:' },
+  // No default here, deliberately. `parseArgs` cannot distinguish "the user
+  // passed :memory:" from "the user passed nothing" once a default is applied,
+  // and that distinction is what lets ATEST_HISTORY_URL configure a whole
+  // pipeline without threading --db through every invocation. The fallback
+  // lives in resolveHistoryUrl.
+  db: { type: 'string' },
   ledger: { type: 'string', default: '.atest/quarantine.json' },
   test: { type: 'string' },
   file: { type: 'string' },

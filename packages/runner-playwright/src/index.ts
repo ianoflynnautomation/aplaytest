@@ -23,8 +23,10 @@ export type {
   TestErrorLike,
 } from './assemble.js';
 
-export { parsePlaywrightError, splitCallLog, stripAnsi } from './errors.js';
-export type { ParsedError } from './errors.js';
+// Re-exported from @atest/core, where the parser now lives beside the
+// classifier that consumes it. Kept here so existing importers do not break.
+export { parsePlaywrightError, splitCallLog, stripAnsi, joinErrors } from '@atest/core';
+export type { ParsedError, ErrorLike } from '@atest/core';
 
 export { atestFixtures, createCaptureFixture } from './fixtures.js';
 export type { CaptureOptions } from './fixtures.js';

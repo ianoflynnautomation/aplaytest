@@ -20,13 +20,22 @@ atest/
 │   │   └── src/
 │   │       ├── config/               #   defineAtestConfig, zod schema, resolution
 │   │       ├── evidence/             #   EvidenceBundle types, store, redaction
-│   │       ├── history/              #   HistoryStore iface + sqlite/postgres drivers
+│   │       ├── history/              #   HistoryStore iface, memory-index (shared query
+│   │       │                         #   semantics), url parsing, sqlite driver
 │   │       ├── taxonomy/             #   FailureKind, classify(), routing tables
 │   │       ├── locator/              #   stability ranking, candidate scoring, parsing
 │   │       ├── policy/               #   heal/quarantine policy evaluation
 │   │       ├── patch/                #   ts-morph codemods, git patch generation
 │   │       ├── audit/                #   append-only ledger, provenance
 │   │       └── index.ts
+│   │
+│   ├── store-azure/                  # @atest/store-azure — optional peer of the CLI
+│   │   └── src/                      #   Split out so a Playwright run, which loads
+│   │       ├── layout.ts             #   @atest/core in-process, never pays for an
+│   │       │                         #   8 MB SDK only the analyze job uses.
+│   │       ├── blob-store.ts         #   HistoryStore over an append-only object log
+│   │       ├── backend.ts            #   4-method seam; the unit tests use the memory one
+│   │       └── azure-backend.ts      #   the only file importing an Azure SDK
 │   │
 │   ├── runner-playwright/            # @atest/runner-playwright
 │   │   └── src/

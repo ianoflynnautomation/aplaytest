@@ -20,15 +20,21 @@ import {
   renderQuarantineComment,
   type FlakyVerdict,
 } from '@atest/flaky';
-import { ATEST_VERSION, SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { ATEST_VERSION, ingestDirectory } from '@atest/core';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from '../exit.js';
+import { openHistoryStore, resolveHistoryUrl, storeWarnings } from '../store.js';
 import { heading, line, renderDiff, style, table, warn } from '../ui/output.js';
 import { DEFAULT_LEDGER_PATH, readLedger, removeEntry, upsertEntry, writeLedger } from '../ledger.js';
 
 export interface FlakyFlags {
   readonly runs: string;
-  readonly db: string;
+  /**
+   * History target. `undefined` means "not stated" — resolveHistoryUrl then
+   * falls back to $ATEST_HISTORY_URL and finally to :memory:. Defaulting it
+   * here would make the environment variable unreachable.
+   */
+  readonly db: string | undefined;
   readonly ledger: string;
   readonly json: boolean;
   readonly ci: boolean;
@@ -43,11 +49,15 @@ export interface FlakyFlags {
 }
 
 async function loadReport(flags: FlakyFlags) {
-  const store = new SqliteHistoryStore(flags.db);
+  const { store, description } = await openHistoryStore(resolveHistoryUrl(flags.db, process.env));
+  // Ingesting before scoring is what makes `flaky report` work as one command
+  // on a fresh CI runner: the shard artifacts land, get written to the store,
+  // and are scored against everything already there — in that order.
   const ingest = await ingestDirectory(store, flags.runs);
   const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
+  const unreadable = storeWarnings(store);
   await store.close();
-  return { ingest, report };
+  return { ingest, report, description, unreadable };
 }
 
 async function loadOptionalReport(flags: FlakyFlags) {
@@ -73,7 +83,7 @@ const verdictLabel = (v: FlakyVerdict): string =>
   v.flaky ? 'FLAKY' : v.score.insufficientData ? 'no data' : 'not flaky';
 
 export async function flakyReport(flags: FlakyFlags): Promise<ExitCode> {
-  const { ingest, report } = await loadReport(flags);
+  const { ingest, report, description, unreadable } = await loadReport(flags);
 
   if (flags.json) {
     line(JSON.stringify(report, null, 2));
@@ -82,11 +92,12 @@ export async function flakyReport(flags: FlakyFlags): Promise<ExitCode> {
 
   line(
     style.dim(
-      `ingested ${ingest.runsIngested} runs · ${ingest.attemptsIngested} attempts` +
+      `${description} · ingested ${ingest.runsIngested} runs · ${ingest.attemptsIngested} attempts` +
         (ingest.skipped.length > 0 ? ` · ${ingest.skipped.length} skipped` : ''),
     ),
   );
   for (const skip of ingest.skipped) warn(`skipped ${skip.file}: ${skip.reason}`);
+  for (const skip of unreadable) warn(`unreadable in the store: ${skip.name} — ${skip.reason}`);
 
   if (report.analyzed === 0) {
     line(`\nNo history under ${flags.runs}. Run a suite with the atest reporter first.`);

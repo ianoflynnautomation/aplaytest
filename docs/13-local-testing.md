@@ -19,6 +19,21 @@ npm run test:gate
 That is the same check as the Integration job. A failure prints both the
 meaningful and vacuous payloads; do not re-wrap it in bash.
 
+
+The blob history store has a second local contract, and it needs no app either
+— just an emulator on `127.0.0.1:10000`:
+
+```sh
+npm run test:integration
+```
+
+Testcontainers starts a pinned Azurite image on a random port and stops it
+afterwards, so it never fights the VS Code extension for port 10000. Without
+Docker those tests skip and `npm test` stays green. Set `ATEST_AZURITE_URL` to
+use an emulator you already have instead of starting a container. See
+[12 — Azure history](./12-azure-history.md#testing-it-locally), including how to
+keep the container and open it in Azure Storage Explorer.
+
 ---
 
 ## Prerequisites

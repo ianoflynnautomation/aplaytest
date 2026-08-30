@@ -11,7 +11,9 @@
 import {
   classify,
   evidenceId,
+  joinErrors,
   parseLocator,
+  parsePlaywrightError,
   testIdDistance,
   type ClassifiableFailure,
   type EvidenceBundle,
@@ -21,7 +23,6 @@ import {
   type StepRecord,
 } from '@atest/core';
 
-import { parsePlaywrightError, stripAnsi } from './errors.js';
 import { extractSteps, findFailingStep, type StepLike } from './steps.js';
 import type { ConsoleSidecar, IntentSidecar, NetworkSidecar, PageSidecar } from './sidecar.js';
 
@@ -94,13 +95,6 @@ function attachmentPath(result: TestResultLike, name: string): string | null {
  * Bundles are read by humans, matched by rules, and sent to models — colour
  * codes serve none of those and cost tokens in the last one.
  */
-function joinErrors(errors: readonly TestErrorLike[]): { message: string; stack: string } {
-  return {
-    message: stripAnsi(errors.map(e => e.message ?? '').filter(Boolean).join('\n\n')),
-    stack: stripAnsi(errors.map(e => e.stack ?? '').filter(Boolean).join('\n\n')),
-  };
-}
-
 /** Candidates further than this from the intended id are not plausible renames. */
 const MAX_SEED_DISTANCE = 0.4;
 /** Enough for a ranker to choose from; small enough to stay readable. */

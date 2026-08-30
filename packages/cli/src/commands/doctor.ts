@@ -10,7 +10,7 @@ import { access, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { MemoryHistoryStore, ingestDirectory } from '@atest/core';
 import { ground } from '@atest/author';
 
 import { EXIT, type ExitCode } from '../exit.js';
@@ -82,7 +82,7 @@ export async function doctor(flags: {
       // Actually ingest, rather than counting files: a directory full of
       // records this build cannot read is worse than an empty one, and only
       // parsing them reveals that.
-      const store = new SqliteHistoryStore(':memory:');
+      const store = new MemoryHistoryStore();
       const result = await ingestDirectory(store, runsDir);
       await store.close();
 

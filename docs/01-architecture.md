@@ -349,7 +349,9 @@ property.
 
 ## History store schema
 
-SQLite locally and for small teams; Postgres past ~50k attempts/month. Same schema,
+SQLite locally; Azure Blob in CI, where history has to outlive the runner. Same
+query semantics either way — both drivers answer through one `HistoryIndex`, so a
+score cannot differ between a laptop and the pipeline. Same interface,
 same queries — `@atest/core` speaks a narrow `HistoryStore` interface with two drivers.
 
 ```sql
@@ -452,7 +454,7 @@ export default defineAtestConfig({
     defaultConfig: 'acceptance',
   },
 
-  history: { driver: 'sqlite', url: '.atest/history.sqlite' },
+  history: { driver: 'sqlite', url: '.atest/history.sqlite' }, // or azblob://<account>/<container>
   evidence: { dir: '.atest/evidence', retainRuns: 50, redact: ['password', 'token', 'authorization'] },
 
   llm: {

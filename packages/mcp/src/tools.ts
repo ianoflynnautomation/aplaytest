@@ -17,7 +17,7 @@ import { join, relative } from 'node:path';
 import { z } from 'zod';
 import { falsifiabilityGate, ground } from '@atest/author';
 import {
-  SqliteHistoryStore,
+  MemoryHistoryStore,
   formatFailingStep,
   ingestDirectory,
   loadRunBundles,
@@ -180,7 +180,7 @@ export const flakyQuery = defineTool({
     minScore: z.number().min(0).max(1).optional(),
   }),
   async handler(input, context) {
-    const store = new SqliteHistoryStore(':memory:');
+    const store = new MemoryHistoryStore();
     const ingest = await ingestDirectory(store, context.runsDir);
     const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
     await store.close();
@@ -222,7 +222,7 @@ export const impact = defineTool({
       specPattern: DEFAULT_SPEC_PATTERN,
     });
 
-    const store = new SqliteHistoryStore(':memory:');
+    const store = new MemoryHistoryStore();
     const ingested = await ingestDirectory(store, context.runsDir);
     const attempts = await store.attempts();
     await store.close();

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Agentic test framework — a control plane around Playwright",
+  "description": "Agentic test framework \u2014 a control plane around Playwright",
   "license": "MIT",
   "engines": {
     "node": ">=22"
@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:gate": "node --experimental-strip-types scripts/assert-gate.ts",
+    "test:integration": "vitest run packages/store-azure/test/azurite.integration.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:esm": "tsc --build",
@@ -27,9 +28,10 @@
     "pack": "npm run build && node scripts/pack.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@testcontainers/azurite": "^12.1.0",
     "@types/node": "^22.15.18",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.10",
-    "@playwright/test": "^1.56.0"
+    "vitest": "^4.1.10"
   }
 }

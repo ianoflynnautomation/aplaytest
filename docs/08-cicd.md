@@ -8,8 +8,8 @@
 > been corrected.
 >
 > Persisting history across runs needs a durable store — see
-> [12 — Azure history](./12-azure-history.md). `--db :memory:` (the default)
-> reports "insufficient data" forever. & observability
+> [12 — Azure history](./12-azure-history.md). `:memory:` (the default)
+> reports "insufficient data" forever, which reads as the engine working.
 
 ## The central constraint: split execute from analyze
 
@@ -157,8 +157,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { pattern: atest-*, path: artifacts, merge-multiple: true }
 
-      - name: Restore history
-        run: npx atest history ingest --db .atest/history.sqlite --runs .atest-artifacts/runs
+      # No restore step: the store IS the container. Records are written as
+      # one immutable object per run and shard, so there is no single file to
+      # download, merge and race on. See 12 — Azure history.
+      - name: Ingest this run
+        run: npx atest history ingest --runs .atest-artifacts/runs
 
       - name: Merge run data
         run: npx atest analyze ingest --from artifacts
@@ -183,9 +186,11 @@ jobs:
         if: github.ref == 'refs/heads/main' && hashFiles('heals.json') != ''
         run: npx atest heal pr --all --branch-prefix atest/heal/
 
-      - name: Persist history
+      # Retention only. The write already happened during ingest, and it is
+      # main-only because ATEST_HISTORY_URL carries ?readonly=1 off main.
+      - name: Trim history
         if: github.ref == 'refs/heads/main'
-        run: npx atest history export --to-branch atest-history --push
+        run: npx atest history prune --keep-days 90
 
       - uses: actions/upload-artifact@v4
         with: { name: atest-report, path: playwright-report/ }
@@ -202,7 +207,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: 'npm' }
       - run: npm ci --ignore-scripts
-      - run: npx atest history ingest --db .atest/history.sqlite --runs .atest-artifacts/runs
       - run: npx atest flaky expire --ci     # exit 4 on expired quarantine or budget breach
 ```
 

@@ -1,0 +1,28 @@
+{
+  "name": "@atest/store-azure",
+  "version": "0.0.0",
+  "description": "Azure Blob Storage history store for atest — an append-only log of run records, so flake statistics outlive the run that produced them",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@atest/core": "0.0.0",
+    "@azure/core-auth": "^1.11.0",
+    "@azure/identity": "^4.13.0",
+    "@azure/storage-blob": "^12.30.0"
+  }
+}

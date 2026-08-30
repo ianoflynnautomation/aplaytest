@@ -153,14 +153,21 @@ jobs:
           merge-multiple: true
 
       # ── HISTORY ────────────────────────────────────────────────────────
-      # Flake statistics need many runs. With the default in-memory database
-      # each run sees one attempt per test and reports "insufficient data"
-      # forever — the engine looks like it works and never says anything.
+      # Flake statistics need many runs. With the default in-memory store each
+      # run sees one attempt per test and reports "insufficient data" forever —
+      # the engine looks like it works and never says anything.
       #
-      # MAIN WRITES, PULL REQUESTS READ. That split is not just concurrency
-      # control (though it removes the race for free): a flake baseline should
+      # There is no download and no upload step: the store IS the container.
+      # Records are written as one immutable object per run and shard, so two
+      # shards and two overlapping main-branch runs never collide and nothing
+      # needs an ETag precondition. See docs/12-azure-history.md.
+      #
+      # MAIN WRITES, PULL REQUESTS READ. That is not only concurrency control
+      # (which the naming scheme gives for free): a flake baseline should
       # describe trunk. A pull request that introduces an unstable test must
-      # not enter the baseline before anyone has decided to merge it.
+      # not enter the baseline before anyone has decided to merge it. The PR
+      # identity holds Storage Blob Data Reader, and \`?readonly=1\` says so up
+      # front rather than discovering it as a 403 per shard file.
       - name: Log in to Azure
         if: \${{ vars.ATEST_HISTORY_ACCOUNT != '' }}
         # SHA-pinned. The zizmor policy lets actions/* float on a tag and
@@ -168,26 +175,24 @@ jobs:
         # bjjeire-tests already vetted in env-deploy.yml.
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
-          client-id: \${{ vars.AZURE_CLIENT_ID }}
+          client-id: \${{ github.ref == 'refs/heads/main' && vars.ATEST_HISTORY_CLIENT_ID != '' && vars.ATEST_HISTORY_CLIENT_ID || vars.AZURE_CLIENT_ID }}
           tenant-id: \${{ vars.AZURE_TENANT_ID }}
           subscription-id: \${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Restore history
-        if: \${{ vars.ATEST_HISTORY_ACCOUNT != '' }}
-        env:
-          ACCOUNT: \${{ vars.ATEST_HISTORY_ACCOUNT }}
-        run: |
-          mkdir -p .atest
-          # Absent on the very first run; that is a cold start, not an error.
-          az storage blob download \\
-            --auth-mode login --account-name "\$ACCOUNT" \\
-            --container-name atest-history --name history.sqlite \\
-            --file .atest/history.sqlite 2>/dev/null || \\
-            echo "::notice title=atest::No history yet — starting a new database"
-
-      # Deterministic: runs with or without a key.
+      # Deterministic: runs with or without a model key. Unset
+      # ATEST_HISTORY_ACCOUNT and everything still works, scored against this
+      # run alone — persistence is the feature that degrades, not the job.
+      #
+      # \`?readonly=1\` is selected by the POSITIVE condition, never by
+      # \`on-main && '' || '?readonly=1'\`. That reads as a ternary and is not:
+      # an empty string is falsy, so the \`||\` always fires and main would open
+      # the store read-only too. History would silently never be written, and
+      # the only symptom is "insufficient data" forever — which is also what a
+      # correctly working new store says.
       - name: Flaky analysis
-        run: npx atest flaky report --db .atest/history.sqlite --runs .atest-artifacts/runs
+        env:
+          ATEST_HISTORY_URL: \${{ vars.ATEST_HISTORY_ACCOUNT != '' && format('azblob://{0}/atest-history{1}', vars.ATEST_HISTORY_ACCOUNT, (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && '?readonly=1' || '') || '' }}
+        run: npx atest flaky report --runs .atest-artifacts/runs
 
       - name: Propose heals
         run: npx atest heal --evidence .atest-artifacts/evidence --dry-run || true
@@ -209,36 +214,17 @@ jobs:
           path: .atest-artifacts/report.html
           retention-days: 14
 
-      # Only from main, and only after the analysis that just ingested this
-      # run. The conditional upload makes the write depend on the blob not
-      # having changed since the download, so two overlapping main runs cannot
-      # silently discard each other's attempts — the loser fails the step
-      # rather than the data.
-      - name: Persist history
+      # Retention. The account also carries a lifecycle-management policy doing
+      # the same thing on a schedule, so this is a convenience, not the only
+      # guard — and it is main-only because a read-only store refuses to prune
+      # rather than deleting nothing and reporting success.
+      - name: Trim history
         if: \${{ vars.ATEST_HISTORY_ACCOUNT != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         env:
-          ACCOUNT: \${{ vars.ATEST_HISTORY_ACCOUNT }}
+          ATEST_HISTORY_URL: azblob://\${{ vars.ATEST_HISTORY_ACCOUNT }}/atest-history
         run: |
-          npx atest history prune --db .atest/history.sqlite --keep-days 90
-
-          etag=\$(az storage blob show \\
-            --auth-mode login --account-name "\$ACCOUNT" \\
-            --container-name atest-history --name history.sqlite \\
-            --query properties.etag -o tsv 2>/dev/null || echo '')
-
-          if [ -n "\$etag" ]; then
-            az storage blob upload --overwrite \\
-              --auth-mode login --account-name "\$ACCOUNT" \\
-              --container-name atest-history --name history.sqlite \\
-              --file .atest/history.sqlite --if-match "\$etag"
-          else
-            # First write. --if-none-match '*' makes it fail rather than
-            # clobber if another run created the blob in the meantime.
-            az storage blob upload \\
-              --auth-mode login --account-name "\$ACCOUNT" \\
-              --container-name atest-history --name history.sqlite \\
-              --file .atest/history.sqlite --if-none-match '*'
-          fi
+          npx atest history prune --keep-days 90
+          npx atest history stats
 
       # Edit the existing comment when there is one, so a busy PR gets a single
       # updating comment instead of one per push. \`--edit-last\` fails when none

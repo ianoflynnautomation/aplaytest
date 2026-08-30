@@ -20,7 +20,7 @@ import {
   selectTests,
 
 } from '@atest/impact';
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { MemoryHistoryStore, ingestDirectory } from '@atest/core';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style, table } from '../ui/output.js';
@@ -81,7 +81,7 @@ export async function impact(flags: ImpactFlags): Promise<ExitCode> {
   // fixture barrel; without it the graph can only report that everything
   // depends on everything.
   const runsDir = flags.runs ?? '.atest/runs';
-  const store = new SqliteHistoryStore(':memory:');
+  const store = new MemoryHistoryStore();
   const ingested = await ingestDirectory(store, runsDir);
   const attempts = await store.attempts();
   await store.close();

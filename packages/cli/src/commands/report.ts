@@ -10,7 +10,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { ingestDirectory } from '@atest/core';
 import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@atest/flaky';
 import {
   loadEvidence,
@@ -24,12 +24,13 @@ import {
 } from '@atest/report';
 
 import { EXIT, type ExitCode } from '../exit.js';
+import { openHistoryStore, resolveHistoryUrl } from '../store.js';
 import { style, warn } from '../ui/output.js';
 
 export interface ReportFlags {
   readonly runs: string;
   readonly evidence: string;
-  readonly db: string;
+  readonly db: string | undefined;
   readonly out?: string | undefined;
   /** Write the PR comment here; omitted means stdout. */
   readonly comment?: string | undefined;
@@ -39,10 +40,11 @@ export interface ReportFlags {
 
 async function flakySummaries(flags: ReportFlags): Promise<FlakySummary[]> {
   // Best-effort. History is a nice-to-have on top of the run being reported;
-  // a missing or locked database must not cost us the failure cards, which
-  // are the part somebody is actually waiting for.
+  // a missing database, an expired credential or an unreachable storage
+  // account must not cost us the failure cards, which are the part somebody is
+  // actually waiting for.
   try {
-    const store = new SqliteHistoryStore(flags.db);
+    const { store } = await openHistoryStore(resolveHistoryUrl(flags.db, process.env));
     await ingestDirectory(store, flags.runs);
     const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
     await store.close();

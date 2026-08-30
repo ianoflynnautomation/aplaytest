@@ -24,8 +24,9 @@ checked against "does this survive contact with that suite?"
 | 09  | [Roadmap](./09-roadmap.md)                         | Phase 0 → 6, with exit criteria                          |
 | 10  | [Recommendations](./10-recommendations.md)         | Models, prompting, trade-offs, anti-recommendations      |
 | 11  | [Adoption for this repo](./11-adoption-bjjeire.md) | Ordered runbook for `bjjeire-tests`, revised after running each step |
-| 12  | [Azure history](./12-azure-history.md)            | Persisting run history: blob store, terraform, main-writes/PRs-read |
+| 12  | [Azure history](./12-azure-history.md)            | Run history as an append-only blob log: layout, terraform, main-writes/PRs-read |
 | 13  | [Local testing](./13-local-testing.md)            | Dev loop against a local app (`localhost:8080`), live example + `bjjeire-tests` |
+| 14  | [bjjeire CI integration](./14-bjjeire-ci-integration.md) | Reviewed against two real runs: the flake gate, the zero-touch analyze job, phasing |
 
 ---
 

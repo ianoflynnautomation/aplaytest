@@ -95,6 +95,7 @@ $ atest init
   ✔ Detected quarantine convention: @quarantine + grepInvert
 
   ? History store              › sqlite (.atest/history.sqlite)
+                                 or azblob://<account>/atest-history
   ? Model provider             › anthropic   (ANTHROPIC_API_KEY found in env)
   ? Healing aggressiveness     › balanced — propose selector + role heals, open a PR
   ? Heal targets               › src/ui/pages/**/*.constants.ts

@@ -24,10 +24,31 @@ const PlaywrightSchema = z.object({
 });
 
 const HistorySchema = z.object({
-  driver: z.enum(['sqlite', 'postgres']).default('sqlite'),
+  /**
+   * Chosen from `url`, not configured separately. Two fields naming one thing
+   * can disagree, and `driver: 'sqlite'` beside an `azblob://` url has no
+   * correct interpretation — so this is derived, and left here only because
+   * `atest doctor` and the report header print it.
+   */
+  driver: z.enum(['sqlite', 'azure-blob', 'memory']).default('sqlite'),
+  /**
+   * Where history lives. A path is a local SQLite file; `azblob://<account>/
+   * <container>[/<prefix>]` is Azure Blob Storage; `:memory:` is a throwaway.
+   *
+   * `:memory:` is a footgun in CI and is deliberately NOT the default here —
+   * with it, every run sees one attempt per test and flake scoring reports
+   * "insufficient data" forever, which reads as the engine working.
+   */
   url: z.string().default('.atest/history.sqlite'),
   /** Attempts older than this are pruned by `atest history prune`. */
   retainDays: z.number().int().positive().default(90),
+  /**
+   * Days the blob driver downloads before scoring. Bounded on purpose: an
+   * unbounded read gets slower every week until someone turns the feature off.
+   * Keep it at or below `retainDays` — reading further back than prune keeps
+   * only buys empty listings.
+   */
+  windowDays: z.number().int().positive().default(90),
 });
 
 const EvidenceSchema = z.object({

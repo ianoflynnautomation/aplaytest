@@ -20,6 +20,7 @@
  */
 
 import type { ClassifiableFailure } from '../evidence/types.js';
+import { stripCodeFrame } from './parse-error.js';
 import type { FailureKind } from './kinds.js';
 
 export type Confidence = 'high' | 'medium' | 'low';
@@ -323,7 +324,25 @@ const TEST_TIMEOUT_RULE: ClassificationRule = {
       : null,
 };
 
-export function classify(failure: ClassifiableFailure): Classification {
+/**
+ * Every rule below matches against `message` and `stack`, so the code frame
+ * Playwright embeds in a message — the user's own source, quoted with context —
+ * is matched against too. Strip it here, at the single choke point, rather than
+ * at each call site: there are two of those today (the reporter and the
+ * Playwright-JSON adapter), a caller who forgets gets silently wrong verdicts,
+ * and "silently wrong" is the one failure mode a router must not have.
+ */
+function forMatching(failure: ClassifiableFailure): ClassifiableFailure {
+  return {
+    ...failure,
+    message: stripCodeFrame(failure.message),
+    stack: stripCodeFrame(failure.stack),
+  };
+}
+
+export function classify(input: ClassifiableFailure): Classification {
+  const failure = forMatching(input);
+
   for (const rule of RULES) {
     const signals = rule.match(failure);
     if (signals !== null && signals.length > 0) {

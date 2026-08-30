@@ -171,43 +171,85 @@ describe('ci generate — history persistence', () => {
   const analyzeJob = (yaml: string): string =>
     yaml.slice(yaml.indexOf('  analyze:'), yaml.indexOf('  policy:'));
 
-  it('gives flaky analysis a FILE database, not the in-memory default', async () => {
+  it('gives flaky analysis a PERSISTENT store, not the in-memory default', async () => {
     // With :memory: each run ingests only its own shards, sees one attempt per
     // test, and reports "insufficient data" forever — the engine looks like it
     // works and never says anything.
     const yaml = await generate();
-    expect(yaml).toContain('flaky report --db .atest/history.sqlite');
+    expect(yaml).toContain('ATEST_HISTORY_URL');
+    expect(yaml).toContain('azblob://');
   });
 
-  it('writes history ONLY from main', async () => {
+  /**
+   * REGRESSION GUARD. The previous design downloaded one history.sqlite,
+   * ingested into it, and re-uploaded under an If-Match precondition. Two
+   * overlapping main-branch runs meant one lost the ETag race — failing the
+   * step at best, discarding the other run's attempts at worst. The blob
+   * layout writes one immutable object per run and shard instead, so if a
+   * download/upload pair ever reappears here, the race came back with it.
+   */
+  it('has no download/upload round trip at all — the store IS the container', async () => {
+    const yaml = await generate();
+    expect(yaml).not.toContain('az storage blob download');
+    expect(yaml).not.toContain('az storage blob upload');
+    expect(yaml).not.toContain('--if-match');
+    expect(yaml).not.toContain('history.sqlite');
+  });
+
+  /**
+   * REGRESSION GUARD for a GitHub Actions expression trap.
+   *
+   * `on-main && '' || '?readonly=1'` reads as a ternary and is not: the empty
+   * string is FALSY, so `||` always fires and every branch — main included —
+   * opens the store read-only. History is then never written, and the only
+   * symptom is flake verdicts reading "insufficient data" forever, which is
+   * also exactly what a correctly working new store says. Nothing goes red.
+   *
+   * The fix is to select the read-only case with the POSITIVE condition, so
+   * the truthy branch is the non-empty string.
+   */
+  it('does not select read-only with an empty-string branch, which would apply it always', async () => {
+    const yaml = await generate();
+    // Scoped to the expression itself. The comment above it in the template
+    // quotes the broken form as the thing not to write, and a whole-file match
+    // would fail on the warning rather than on the bug.
+    const line = yaml.split('\n').find(l => l.includes('ATEST_HISTORY_URL:')) ?? '';
+    expect(line).not.toMatch(/&&\s*''\s*\|\|\s*'\?readonly=1'/);
+    expect(line).toContain("&& '?readonly=1' || ''");
+  });
+
+  it('opens the store read-only off main, so a pull request cannot amend the baseline', async () => {
     // A flake baseline describes trunk. A pull request that introduces an
-    // unstable test must not enter the baseline before anyone merges it — and
-    // restricting writes to one branch removes the concurrent-write race for
-    // free.
+    // unstable test must not enter the baseline before anyone merges it. Said
+    // up front rather than left to a 403 per shard file.
     const yaml = await generate();
-    const persist = yaml.slice(yaml.indexOf('- name: Persist history'));
-    expect(persist).toContain("github.ref == 'refs/heads/main'");
-    expect(persist).toContain("github.event_name != 'pull_request'");
+    expect(yaml).toContain('?readonly=1');
+    expect(analyzeJob(yaml)).toContain("github.ref == 'refs/heads/main'");
   });
 
-  it('restores history unconditionally, so pull requests still get scored', async () => {
+  it('still scores pull requests, rather than skipping analysis off main', async () => {
     const yaml = await generate();
-    const restore = yaml.slice(yaml.indexOf('- name: Restore history'), yaml.indexOf('- name: Flaky analysis'));
-    expect(restore).not.toContain('refs/heads/main');
+    const analysis = yaml.slice(yaml.indexOf('- name: Flaky analysis'));
+    // The step itself is unconditional; only the URL it is given differs.
+    expect(analysis.slice(0, analysis.indexOf('run:'))).not.toContain('if:');
   });
 
-  it('makes the upload conditional so overlapping runs cannot clobber each other', async () => {
+  it('prunes only from main, where the store is writable', async () => {
     const yaml = await generate();
-    expect(yaml).toContain('--if-match');
-    // The very first write has no ETag to match; --if-none-match '*' fails
-    // rather than overwriting a blob another run just created.
-    expect(yaml).toContain("--if-none-match '*'");
+    const trim = yaml.slice(yaml.indexOf('- name: Trim history'));
+    expect(trim).toContain("github.ref == 'refs/heads/main'");
+    expect(trim).toContain("github.event_name != 'pull_request'");
+    expect(trim).toContain('history prune');
   });
 
-  it('prunes before uploading, so the blob does not grow without bound', async () => {
+  it('uses the main-only writer identity for main, and the PR identity otherwise', async () => {
+    // The two are different user-assigned identities on purpose: only the
+    // main-branch one is granted Contributor, so "pull requests cannot write
+    // history" is enforced by Entra rather than by this YAML file.
     const yaml = await generate();
-    const persist = yaml.slice(yaml.indexOf('- name: Persist history'));
-    expect(persist.indexOf('history prune')).toBeLessThan(persist.indexOf('blob upload'));
+    const login = yaml.slice(yaml.indexOf('- name: Log in to Azure'));
+    expect(login).toContain('ATEST_HISTORY_CLIENT_ID');
+    expect(login).toContain('AZURE_CLIENT_ID');
   });
 
   it('degrades to no history when the storage account is not configured', async () => {

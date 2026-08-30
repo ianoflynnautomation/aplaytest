@@ -25,6 +25,15 @@ export type {
 export { classify, listRules } from './taxonomy/classify.js';
 export type { Classification, Confidence } from './taxonomy/classify.js';
 
+export {
+  parsePlaywrightError,
+  splitCallLog,
+  stripAnsi,
+  stripCodeFrame,
+  joinErrors,
+} from './taxonomy/parse-error.js';
+export type { ParsedError, ErrorLike } from './taxonomy/parse-error.js';
+
 // Locators
 export {
   LOCATOR_STRATEGIES,
@@ -70,8 +79,32 @@ export { RUN_SCHEMA_VERSION, isFailure, isConclusive } from './history/types.js'
 export type { RunRecord, AttemptRecord, Outcome } from './history/types.js';
 export { SqliteHistoryStore } from './history/store.js';
 export type { HistoryStore, HistoricalAttempt, HistoryQuery, TestKey } from './history/store.js';
+export { HistoryIndex, MemoryHistoryStore, shardKeyOf } from './history/memory-index.js';
+export {
+  parseHistoryUrl,
+  describeHistoryTarget,
+  HistoryUrlError,
+  DEFAULT_BLOB_ENDPOINT_SUFFIX,
+} from './history/url.js';
+export type {
+  HistoryTarget,
+  AzureBlobTarget,
+  ParseHistoryUrlOptions,
+} from './history/url.js';
 export { ingestDirectory } from './history/ingest.js';
 export { ingestPlaywrightJson } from './history/ingest-playwright.js';
+export type { IngestPlaywrightJsonOptions } from './history/ingest-playwright.js';
+export { mapPlaywrightReport } from './history/playwright-report.js';
+export type {
+  JsonReport,
+  JsonSuite,
+  JsonSpec,
+  JsonTest,
+  JsonResult,
+  MappedReport,
+  MapReportOptions,
+  RunIdentity,
+} from './history/playwright-report.js';
 export type { IngestResult } from './history/ingest.js';
 
 // Config

@@ -257,4 +257,44 @@ describe('classify — auditability and fallbacks', () => {
     expect(c.kind).toBe('assertion_visibility');
     expect(c.confidence).toBe('low');
   });
+
+  /**
+   * Playwright quotes the failing line plus a few either side into
+   * `error.message`. Those neighbours are the user's source, they have already
+   * run, and they must not vote. Verbatim from run 33253028409: a click that
+   * timed out was routed `navigation_failure` — `heal: never` — because two
+   * lines above it the spec read `await page.goto('/about')`.
+   */
+  it('ignores the code frame, which is the user source and not the failure', () => {
+    const c = classify(
+      failure({
+        message: [
+          'TimeoutError: locator.click: Timeout 10000ms exceeded.',
+          'Call log:',
+          "  - waiting for getByTestId('navigation-mobile-toggle')",
+          '  - attempting click action',
+          '    - waiting for element to be visible, enabled and stable',
+          '',
+          "  13 |       await page.goto('/about');",
+          '  14 |',
+          '> 15 |       await page.getByTestId(mobileToggle).click();',
+          '     |                                            ^',
+          '    at /repo/tests/layout/mobile-nav.ui.acceptance.spec.ts:15:44',
+        ].join('\n'),
+        timedOut: true,
+      }),
+    );
+
+    expect(c.kind).not.toBe('navigation_failure');
+    expect(c.kind).toBe('locator_not_actionable');
+  });
+
+  it('still routes a navigation failure Playwright reports in its own prose', () => {
+    const c = classify(
+      failure({ message: 'Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/gyms' }),
+    );
+
+    // net::ERR_ outranks navigation: the transport is what actually broke.
+    expect(c.kind).toBe('network_error');
+  });
 });

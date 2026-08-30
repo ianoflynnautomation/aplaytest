@@ -25,6 +25,14 @@
     "@atest/report": "0.0.0",
     "@atest/author": "0.0.0"
   },
+  "peerDependencies": {
+    "@atest/store-azure": "0.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@atest/store-azure": {
+      "optional": true
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

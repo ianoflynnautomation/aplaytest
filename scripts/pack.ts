@@ -39,6 +39,7 @@ const OUT = join(ROOT, 'dist-pack');
  */
 const PUBLISHABLE = [
   'core',
+  'store-azure',
   'runner-playwright',
   'flaky',
   'heal',

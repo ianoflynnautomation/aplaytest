@@ -305,9 +305,13 @@ client agent worse at choosing.
 
 `@atest/core`:
 
-- **History store** (`history/`) — `node:sqlite`, so there is no native dependency to compile
-  on a developer machine or a CI image. Ingestion is idempotent: CI re-runs and shard merges
-  replay the same run id, and double-counting would corrupt every derived score.
+- **History store** (`history/`) — two drivers, one set of query semantics. `node:sqlite`
+  locally, so there is no native dependency to compile on a developer machine or a CI image;
+  `@atest/store-azure` in CI, where history has to outlive the runner. Both answer through the
+  same `HistoryIndex`, because two implementations of "the same history" that disagree would
+  surface as a flake score differing between a laptop and the pipeline, months later.
+  Ingestion is idempotent: CI re-runs and shard merges replay the same run id, and
+  double-counting would corrupt every derived score.
 - **Failure taxonomy** (`taxonomy/kinds.ts`) — 14 kinds, each with heal eligibility and flake
   relevance. `NEVER_HEAL` is a `Set`, checked in code, not a config flag.
 - **Deterministic classifier** (`taxonomy/classify.ts`) — ordered rules over real Playwright

@@ -1,0 +1,94 @@
+name: Publish
+
+# Publish the atest tarballs to GHCR, so consumers install a version instead of
+# vendoring 468 KB of binaries into their own git history.
+#
+# ── What this replaces ────────────────────────────────────────────────────────
+# `npm run pack` locally, then copying dist-pack/*.tgz into
+# .github/vendor/atest/ in every consuming repo. That worked and it had three
+# costs: the tarballs were binaries in git, nothing recorded which commit
+# produced them, and updating a consumer meant a pull request full of blobs
+# nobody could review.
+#
+# ── Why GHCR and not the npm registry ─────────────────────────────────────────
+# GitHub Packages' npm registry only accepts packages scoped to the repository
+# owner. This workspace publishes `atest` and `@atest/core`; renaming both to
+# `@ianoflynnautomation/*` would mean every import in every consumer changes to
+# match a registry rule, and the published code would no longer match the
+# source. GHCR takes the tarballs exactly as `npm pack` produced them.
+#
+# All eleven ship as ONE artifact under one digest, because they resolve each
+# other by `file:` specifier and none is on a public registry — install any one
+# alone and npm 404s looking for @atest/core on registry.npmjs.org.
+#
+# ── Triggers ──────────────────────────────────────────────────────────────────
+#   tag push  → v1.2.3 + latest, attached to the GitHub release
+#   main push → main + the commit sha, so consumers can track trunk
+#   dispatch  → whatever tags you name, for a one-off
+#
+# `latest` moves only on a tag. A consumer pinned to `latest` should get the
+# last thing somebody decided to release, not the last thing that merged.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Whitespace-separated tags to publish under."
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish tarball bundle
+    permissions:
+      contents: write # attaching release assets on a tag
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/npm-tarball-publish-oci.yml@v1
+    with:
+      image: ghcr.io/${{ github.repository_owner }}/atest-packages
+      tags: ${{ inputs.tags != '' && inputs.tags
+                || (startsWith(github.ref, 'refs/tags/')
+                    && format('{0} {1} latest', github.ref_name, github.sha)
+                    || format('main {0}', github.sha)) }}
+      node-version: "22"
+      # --ignore-scripts everywhere else in this repo's CI, but not here: the
+      # build has to run, and it is this repo's own lockfile.
+      install-command: npm ci
+      build-command: npm run build
+      pack-command: npm run pack
+      tarball-dir: dist-pack
+      bundle-name: atest-packages-{version}.tar.gz
+      # scripts/pack.ts names them explicitly. If that list changes, this
+      # number is the thing that makes it a deliberate change rather than a
+      # consumer discovering a missing package at import time.
+      expected-tarballs: 11
+      verify-install: true
+      # Loading the reporter from CommonJS is what Playwright actually does —
+      # `require.resolve` from a CJS context — and it is the entry point most
+      # likely to break in a way `npm install` cannot see.
+      verify-command: |
+        node --input-type=commonjs -e "
+          const r = require('@atest/runner-playwright/reporter');
+          if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load from the tarball'); }
+        "
+        node --input-type=module -e "
+          import { BlobHistoryStore } from '@atest/store-azure';
+          if (typeof BlobHistoryStore !== 'function') { throw new Error('Azure history store did not load'); }
+        "
+        npx atest --help > /dev/null
+      artifact-type: application/vnd.atest.packages.v1
+      attest-provenance: true
+      attach-to-release: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
