@@ -58,7 +58,7 @@ export function createLlmClient(options: CreateClientOptions = {}): LlmClient {
 }
 
 /**
- * One-line description of which roles a client can serve, for `atest doctor`
+ * One-line description of which roles a client can serve, for `aplaytest doctor`
  * and CLI banners.
  *
  * @param client - The client to describe.

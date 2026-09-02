@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The atest binary.
+ * The aplaytest binary.
  *
  * Argument parsing uses Node's built-in `util.parseArgs` — a CLI framework
  * would be a dependency, a version to keep current, and a supply-chain
@@ -35,10 +35,10 @@ import {
 import { error, line, style } from './ui/output.js';
 
 const USAGE = `
-${style.bold('atest')} — a control plane around Playwright
+${style.bold('aplaytest')} — a control plane around Playwright
 
 ${style.bold('USAGE')}
-  atest <command> [options]
+  aplaytest <command> [options]
 
 ${style.bold('COMMANDS')}
   init                      Wire atest into an existing Playwright repo
@@ -361,7 +361,7 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
 
     case 'ci':
       if (subcommand !== 'generate') {
-        throw new UsageError('Only `atest ci generate` is supported.');
+        throw new UsageError('Only `aplaytest ci generate` is supported.');
       }
       return ciGenerate(ciFlags);
 

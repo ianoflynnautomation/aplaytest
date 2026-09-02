@@ -132,15 +132,15 @@ What every command does with `ANTHROPIC_API_KEY` unset, the provider down, or
 
 | Command                | Without a model                                                          |
 | ---------------------- | ------------------------------------------------------------------------ |
-| `atest run`            | Full function. Evidence + history recorded.                              |
-| `atest report`         | Full function, minus the "insights" section.                             |
-| `atest flaky analyze`  | Scores + deterministic classification. No narrative.                     |
-| `atest flaky report`   | Full function.                                                           |
-| `atest quarantine`     | Full function.                                                           |
-| `atest impact`         | Full function (in-repo). Cross-repo mapping degrades to "run everything". |
-| `atest heal`           | Tier-0 candidates, validated. Typically resolves ~60% of selector drift. |
-| `atest agent`          | Exits 3 with `llm_unavailable`. Never silently no-ops.                   |
-| `atest mcp serve`      | Serves; agent/authoring tools return a typed `unavailable` error.        |
+| `aplaytest run`            | Full function. Evidence + history recorded.                              |
+| `aplaytest report`         | Full function, minus the "insights" section.                             |
+| `aplaytest flaky analyze`  | Scores + deterministic classification. No narrative.                     |
+| `aplaytest flaky report`   | Full function.                                                           |
+| `aplaytest quarantine`     | Full function.                                                           |
+| `aplaytest impact`         | Full function (in-repo). Cross-repo mapping degrades to "run everything". |
+| `aplaytest heal`           | Tier-0 candidates, validated. Typically resolves ~60% of selector drift. |
+| `aplaytest agent`          | Exits 3 with `llm_unavailable`. Never silently no-ops.                   |
+| `aplaytest mcp serve`      | Serves; agent/authoring tools return a typed `unavailable` error.        |
 
 Rule: **no command silently changes behaviour when the model is missing.** It either
 works, works with a reduced-scope banner, or exits non-zero with a named reason.

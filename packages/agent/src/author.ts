@@ -2,7 +2,7 @@
  * The author agent — plan, then synthesize.
  *
  * It writes a test; it never decides whether that test is any good. That
- * judgement belongs to the falsifiability gate in @atest/author, which runs
+ * judgement belongs to the falsifiability gate in @aplaytest/author, which runs
  * the candidate against a real app with the data broken underneath it. The
  * split matters: a model asked "is this test meaningful?" will say yes about
  * its own output, and it will be wrong in exactly the cases that matter.
@@ -22,8 +22,8 @@
  */
 
 import { z } from 'zod';
-import type { LlmClient } from '@atest/llm';
-import { BudgetGuard, RefusalError } from '@atest/llm';
+import type { LlmClient } from '@aplaytest/llm';
+import { BudgetGuard, RefusalError } from '@aplaytest/llm';
 
 /**
  * LENGTH LIVES IN `.describe()`, NOT IN `.max()`.

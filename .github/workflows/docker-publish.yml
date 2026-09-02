@@ -16,8 +16,8 @@ name: Publish Image
 # repository can run the CLI without installing Node.
 #
 # ── Two images, published on different schedules ──────────────────────────────
-#   atest             ~0.5 GB   the analyze surface. Every main push.
-#   atest-playwright  ~3.9 GB   adds gate/heal/bisect/authoring, which spawn
+#   aplaytest             ~0.5 GB   the analyze surface. Every main push.
+#   aplaytest-playwright  ~3.9 GB   adds gate/heal/bisect/authoring, which spawn
 #                               browsers. TAGS AND DISPATCH ONLY — eight times
 #                               the storage and build time, for commands a
 #                               pipeline runs rarely. Pushing 3.9 GB on every
@@ -70,7 +70,7 @@ permissions:
 
 jobs:
   cli:
-    name: atest (cli)
+    name: aplaytest (cli)
     permissions:
       contents: read
       packages: write
@@ -79,7 +79,7 @@ jobs:
       security-events: write
     uses: ./.github/workflows/docker-build-push.yml
     with:
-      image-name: atest
+      image-name: aplaytest
       dockerfile: Dockerfile
       target: cli
       platforms: linux/amd64
@@ -104,7 +104,7 @@ jobs:
         VCS_REF=${{ github.sha }}
 
   playwright:
-    name: atest-playwright (browsers)
+    name: aplaytest-playwright (browsers)
     if: startsWith(github.ref, 'refs/tags/') || inputs.publish-playwright
     permissions:
       contents: read
@@ -114,7 +114,7 @@ jobs:
       security-events: write
     uses: ./.github/workflows/docker-build-push.yml
     with:
-      image-name: atest-playwright
+      image-name: aplaytest-playwright
       dockerfile: Dockerfile
       target: playwright
       platforms: linux/amd64
@@ -148,22 +148,22 @@ jobs:
         shell: bash
         run: |
           {
-            echo "### atest images"
+            echo "### aplaytest images"
             echo ""
             echo "| image | tag | digest |"
             echo "|---|---|---|"
-            echo "| \`${CLI_REF:-atest}\` | \`${CLI_TAG:-—}\` | \`${CLI_DIGEST:-—}\` |"
+            echo "| \`${CLI_REF:-aplaytest}\` | \`${CLI_TAG:-—}\` | \`${CLI_DIGEST:-—}\` |"
             if [ "${PW_RESULT}" = "success" ]; then
-              echo "| atest-playwright | \`${PW_TAG:-—}\` | published |"
+              echo "| aplaytest-playwright | \`${PW_TAG:-—}\` | published |"
             else
-              echo "| atest-playwright | — | skipped (tags and dispatch only) |"
+              echo "| aplaytest-playwright | — | skipped (tags and dispatch only) |"
             fi
             echo ""
             echo "Consume the analyze image with:"
             echo ""
             echo '```yaml'
             echo "container:"
-            echo "  image: ${CLI_REF:-ghcr.io/${{ github.repository_owner }}/atest}:${CLI_TAG:-latest}"
+            echo "  image: ${CLI_REF:-ghcr.io/${{ github.repository_owner }}/aplaytest}:${CLI_TAG:-latest}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -199,6 +199,6 @@ jobs:
             echo "::warning title=GHCR::Could not mark ${pkg} public via API (common while the repository is still private)."
             echo "::warning title=GHCR::After the repo is public, re-run this workflow or set https://github.com/users/${OWNER}/packages/container/${pkg}/settings to Public."
           }
-          set_public atest
-          set_public atest-playwright
+          set_public aplaytest
+          set_public aplaytest-playwright
 

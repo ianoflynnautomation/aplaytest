@@ -40,21 +40,21 @@ inverts it:
 Requires **Node.js 22+**.
 
 ```sh
-npm i -D @atest/cli @atest/runner-playwright
-npx atest init --apply
+npm i -D @aplaytest/cli @aplaytest/runner-playwright
+npx aplaytest init --apply
 ```
 
-`atest init` adds one reporter line to `playwright.config.ts` and a
+`aplaytest init` adds one reporter line to `playwright.config.ts` and a
 `.gitignore` block. `--apply` writes; without it, you see the diff first.
-`atest init --undo --apply` removes both.
+`aplaytest init --undo --apply` removes both.
 
 pnpm and yarn work the same way (`pnpm add -D …`, `yarn add -D …`).
 
 Optional extras:
 
 ```sh
-npm i -D @atest/store-azure   # Azure Blob history in CI
-npm i -D @atest/mcp           # IDE agent server
+npm i -D @aplaytest/store-azure   # Azure Blob history in CI
+npm i -D @aplaytest/mcp           # IDE agent server
 ```
 
 ## Quick start
@@ -66,14 +66,14 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   reporter: [
     ['list'],
-    ['@atest/runner-playwright/reporter'],
+    ['@aplaytest/runner-playwright/reporter'],
   ],
 });
 ```
 
 ```ts
 // atest.config.ts — every field is optional; empty means the safe defaults
-import { defineAtestConfig } from '@atest/core';
+import { defineAtestConfig } from '@aplaytest/core';
 
 export default defineAtestConfig({
   mode: 'strict',
@@ -85,10 +85,10 @@ Run the suite as usual. Failures land in `.atest/evidence` and `.atest/runs`.
 Then:
 
 ```sh
-npx atest doctor
-npx atest flaky report
-npx atest heal --spec tests/gyms.spec.ts
-npx atest impact --from origin/main
+npx aplaytest doctor
+npx aplaytest flaky report
+npx aplaytest heal --spec tests/gyms.spec.ts
+npx aplaytest impact --from origin/main
 ```
 
 `ATEST=0` disables the reporter completely. Removing the reporter line
@@ -100,7 +100,7 @@ the capture fixtures — still no spec changes, because the fixture is
 
 ```ts
 import { test as base } from '@playwright/test';
-import { atestFixtures, bindPage } from '@atest/runner-playwright';
+import { atestFixtures, bindPage } from '@aplaytest/runner-playwright';
 import * as GymsPageMod from './pages/gyms.page.js';
 
 export const test = base.extend({
@@ -125,36 +125,36 @@ argument is what turns *"a selector did not resolve"* into
 
 ## API reference
 
-Packages are independently versioned under the `@atest` scope. Engines import
-`@atest/core`; they never import one another.
+Packages are independently versioned under the `@aplaytest` scope. Engines import
+`@aplaytest/core`; they never import one another.
 
 | Package | Role |
 | --- | --- |
-| `@atest/core` | Types, failure taxonomy, locator ranking, evidence, config, SQLite history |
-| `@atest/runner-playwright` | Reporter, error parsing, step extraction, capture fixtures |
-| `@atest/flaky` | Scoring, classification, bisect, quarantine policy and codemod |
-| `@atest/heal` | Candidate generation, ts-morph patching, validation, ledger |
-| `@atest/impact` | Import graph, hub detection, route-coverage selection |
-| `@atest/author` | Falsifiability gate and data mutants |
-| `@atest/report` | Shard merge, self-contained HTML report, PR comment |
-| `@atest/store-azure` | Append-only blob log implementing the same `HistoryStore` |
-| `@atest/llm` | Injected `LlmClient`, Anthropic adapter, budget, scripted fake |
-| `@atest/agent` | Repair agent (ranks pre-verified options) and author agent |
-| `@atest/cli` | The `atest` binary |
-| `@atest/mcp` | MCP server over the same engines |
+| `@aplaytest/core` | Types, failure taxonomy, locator ranking, evidence, config, SQLite history |
+| `@aplaytest/runner-playwright` | Reporter, error parsing, step extraction, capture fixtures |
+| `@aplaytest/flaky` | Scoring, classification, bisect, quarantine policy and codemod |
+| `@aplaytest/heal` | Candidate generation, ts-morph patching, validation, ledger |
+| `@aplaytest/impact` | Import graph, hub detection, route-coverage selection |
+| `@aplaytest/author` | Falsifiability gate and data mutants |
+| `@aplaytest/report` | Shard merge, self-contained HTML report, PR comment |
+| `@aplaytest/store-azure` | Append-only blob log implementing the same `HistoryStore` |
+| `@aplaytest/llm` | Injected `LlmClient`, Anthropic adapter, budget, scripted fake |
+| `@aplaytest/agent` | Repair agent (ranks pre-verified options) and author agent |
+| `@aplaytest/cli` | The `aplaytest` binary |
+| `@aplaytest/mcp` | MCP server over the same engines |
 
 Primary entry points:
 
 ```ts
-import { defineAtestConfig, classify } from '@atest/core';
-import { proposeHeal } from '@atest/heal';
-import { scoreTest, classifyFlake, extractFeatures } from '@atest/flaky';
-import { buildGraph, selectTests, toPlaywrightArgs } from '@atest/impact';
-import { createLlmClient } from '@atest/llm';
-import { falsifiabilityGate } from '@atest/author';
+import { defineAtestConfig, classify } from '@aplaytest/core';
+import { proposeHeal } from '@aplaytest/heal';
+import { scoreTest, classifyFlake, extractFeatures } from '@aplaytest/flaky';
+import { buildGraph, selectTests, toPlaywrightArgs } from '@aplaytest/impact';
+import { createLlmClient } from '@aplaytest/llm';
+import { falsifiabilityGate } from '@aplaytest/author';
 ```
 
-Full design: [docs/README.md](./docs/README.md). CLI surface: `atest --help`
+Full design: [docs/README.md](./docs/README.md). CLI surface: `aplaytest --help`
 and [docs/03-cli.md](./docs/03-cli.md).
 
 ## Configuration
@@ -186,7 +186,7 @@ Read-only unless you opt in:
   "mcpServers": {
     "atest": {
       "command": "npx",
-      "args": ["-y", "@atest/mcp"],
+      "args": ["-y", "@aplaytest/mcp"],
       "env": { "ATEST_MCP_WRITE": "0" }
     }
   }
@@ -195,7 +195,7 @@ Read-only unless you opt in:
 
 ### CI
 
-`atest ci generate --shards 4` emits a workflow built around one constraint:
+`aplaytest ci generate --shards 4` emits a workflow built around one constraint:
 **the job that runs tests and the job that holds model credentials are
 different jobs.** Generated output is verified against `actionlint`,
 `yamllint`, and a pinning policy.
@@ -207,9 +207,9 @@ Deterministic engines (`core`, `runner-playwright`, `flaky`, `heal`,
 tested, including live Playwright runs and an Azurite integration for blob
 history.
 
-`@atest/llm` and `@atest/agent` are built and unit-tested against a scripted
+`@aplaytest/llm` and `@aplaytest/agent` are built and unit-tested against a scripted
 client. A live model call is optional: set `ANTHROPIC_API_KEY` and run
-`atest heal` against a failing test. Until then the deterministic tier stands
+`aplaytest heal` against a failing test. Until then the deterministic tier stands
 on its own.
 
 See [docs/09-roadmap.md](./docs/09-roadmap.md) for what lands next, and
@@ -218,7 +218,7 @@ See [docs/09-roadmap.md](./docs/09-roadmap.md) for what lands next, and
 ## Contributing & license
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md). Please report vulnerabilities via
-[GitHub security advisories](https://github.com/ianoflynnautomation/atest/security/advisories/new)
+[GitHub security advisories](https://github.com/ianoflynnautomation/aplaytest/security/advisories/new)
 rather than a public issue ([SECURITY.md](./SECURITY.md)).
 
 Licensed under the [MIT License](./LICENSE).

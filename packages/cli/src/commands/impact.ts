@@ -1,5 +1,5 @@
 /**
- * `atest impact` — which specs a diff could affect.
+ * `aplaytest impact` — which specs a diff could affect.
  *
  * Prints the selection AND the edge that selected each spec. A selection
  * nobody can explain is a coverage hole waiting to happen, so "why did this
@@ -19,8 +19,8 @@ import {
   scanRouteOwnership,
   selectTests,
 
-} from '@atest/impact';
-import { MemoryHistoryStore, ingestDirectory } from '@atest/core';
+} from '@aplaytest/impact';
+import { MemoryHistoryStore, ingestDirectory } from '@aplaytest/core';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style, table } from '../ui/output.js';

@@ -16,7 +16,7 @@
  *     outage.
  */
 
-import type { EvidenceBundle } from '@atest/core';
+import type { EvidenceBundle } from '@aplaytest/core';
 
 import { formatArgs } from './args.js';
 import { formatDuration, type MergedRun } from './merge.js';

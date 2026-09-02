@@ -17,7 +17,7 @@ name: Pack and publish tarball bundle (Reusable)
 # so the tarballs go there exactly as `npm pack` produced them.
 #
 # ── Why ONE artifact and not one per package ──────────────────────────────────
-# Workspace tarballs declare each other as `@atest/core@^0.1.0`. Install one
+# Workspace tarballs declare each other as `@aplaytest/core@^0.1.0`. Install one
 # alone against a registry that does not yet have that version and npm 404s.
 # They have to be installed together, so they are published together: one
 # manifest, one digest, and no way to end up with a set whose versions disagree.
@@ -266,7 +266,7 @@ jobs:
 
           cd "${work}"
           npm init -y > /dev/null
-          # ALL of them in one command: each tarball declares @atest/core@^0.1.0,
+          # ALL of them in one command: each tarball declares @aplaytest/core@^0.1.0,
           # and npm satisfies that from the other tarballs in the same invocation.
           npm install ./*.tgz --no-audit --no-fund > /dev/null
 

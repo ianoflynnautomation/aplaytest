@@ -1,5 +1,5 @@
 /**
- * @atest/mcp — a façade over the same engine calls the CLI makes.
+ * @aplaytest/mcp — a façade over the same engine calls the CLI makes.
  *
  * Read-only by default. Mutating tools need both ATEST_MCP_WRITE=1 and an
  * explicit `confirm: true`, because "the agent changed my files while I was

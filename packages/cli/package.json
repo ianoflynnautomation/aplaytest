@@ -1,13 +1,13 @@
 {
-  "name": "@atest/cli",
+  "name": "@aplaytest/cli",
   "version": "0.1.0",
-  "description": "The atest binary: flaky analysis, healing, impact, reporting, and diagnostics",
+  "description": "The aplaytest binary: flaky analysis, healing, impact, reporting, and diagnostics",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "atest": "./dist/bin.js"
+    "aplaytest": "./dist/bin.js"
   },
   "files": [
     "dist"
@@ -16,20 +16,20 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "@atest/core": "^0.1.0",
-    "@atest/flaky": "^0.1.0",
-    "@atest/heal": "^0.1.0",
-    "@atest/impact": "^0.1.0",
-    "@atest/llm": "^0.1.0",
-    "@atest/agent": "^0.1.0",
-    "@atest/report": "^0.1.0",
-    "@atest/author": "^0.1.0"
+    "@aplaytest/core": "^0.1.0",
+    "@aplaytest/flaky": "^0.1.0",
+    "@aplaytest/heal": "^0.1.0",
+    "@aplaytest/impact": "^0.1.0",
+    "@aplaytest/llm": "^0.1.0",
+    "@aplaytest/agent": "^0.1.0",
+    "@aplaytest/report": "^0.1.0",
+    "@aplaytest/author": "^0.1.0"
   },
   "peerDependencies": {
-    "@atest/store-azure": "^0.1.0"
+    "@aplaytest/store-azure": "^0.1.0"
   },
   "peerDependenciesMeta": {
-    "@atest/store-azure": {
+    "@aplaytest/store-azure": {
       "optional": true
     }
   },
@@ -44,11 +44,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "url": "git+https://github.com/ianoflynnautomation/aplaytest.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "homepage": "https://github.com/ianoflynnautomation/aplaytest#readme",
   "bugs": {
-    "url": "https://github.com/ianoflynnautomation/atest/issues"
+    "url": "https://github.com/ianoflynnautomation/aplaytest/issues"
   }
 }

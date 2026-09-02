@@ -1,13 +1,13 @@
 /**
- * `atest gate` — run the falsifiability gate against a test.
+ * `aplaytest gate` — run the falsifiability gate against a test.
  *
- * Exposed as its own command rather than only as a phase of `atest agent
+ * Exposed as its own command rather than only as a phase of `aplaytest agent
  * author`, because it is just as useful on a HUMAN-written test. "Does this
  * test actually assert anything?" is not a question that only applies to
  * generated code, and the answer is frequently uncomfortable.
  */
 
-import { falsifiabilityGate, type MutantName } from '@atest/author';
+import { falsifiabilityGate, type MutantName } from '@aplaytest/author';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style } from '../ui/output.js';
@@ -28,8 +28,8 @@ export interface GateFlags {
 const MUTANT_NAMES: readonly MutantName[] = ['empty-page', 'unfiltered', 'http-500'];
 
 export async function gate(flags: GateFlags): Promise<ExitCode> {
-  if (flags.spec === undefined) throw new UsageError('atest gate requires --spec <file>.');
-  if (flags.test === undefined) throw new UsageError('atest gate requires --test <title>.');
+  if (flags.spec === undefined) throw new UsageError('aplaytest gate requires --spec <file>.');
+  if (flags.test === undefined) throw new UsageError('aplaytest gate requires --test <title>.');
 
   let only: MutantName[] | undefined;
   if (flags.only !== undefined) {

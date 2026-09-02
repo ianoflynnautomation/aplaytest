@@ -21,7 +21,7 @@ import {
   type LocatorCandidate,
   type RequestRecord,
   type StepRecord,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 import { extractSteps, findFailingStep, type StepLike } from './steps.js';
 import type { ConsoleSidecar, IntentSidecar, NetworkSidecar, PageSidecar } from './sidecar.js';

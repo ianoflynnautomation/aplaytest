@@ -1,5 +1,5 @@
 /**
- * @atest/llm — the only package that talks to a model.
+ * @aplaytest/llm — the only package that talks to a model.
  *
  * Everything else takes an injected `LlmClient`, which is what keeps a model
  * SDK out of the reporter (running in every test worker) and lets the agent

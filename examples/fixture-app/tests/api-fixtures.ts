@@ -1,5 +1,5 @@
 import { test as base } from '@playwright/test';
-import { atestApiFixtures } from '@atest/runner-playwright';
+import { atestApiFixtures } from '@aplaytest/runner-playwright';
 
 /** An API-project barrel: capture, but never a browser. */
 export const test = base.extend({ ...atestApiFixtures });

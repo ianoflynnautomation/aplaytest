@@ -374,8 +374,8 @@ justifies.
 }
 ```
 
-- `atest heal revert heal_2f81c0` applies `revertPatch` and marks the row `reverted`.
-- `atest heal list --status reverted` surfaces heals that were wrong — the feedback
+- `aplaytest heal revert heal_2f81c0` applies `revertPatch` and marks the row `reverted`.
+- `aplaytest heal list --status reverted` surfaces heals that were wrong — the feedback
   signal for prompt and scoring evaluation.
 - Reverted heals decay `historicalAgreement`, so a bad pattern stops being confidently
   repeated.

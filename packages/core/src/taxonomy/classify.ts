@@ -388,9 +388,9 @@ export function classify(input: ClassifiableFailure): Classification {
   };
 }
 
-/** Exposed for the CLI's `atest doctor --rules` and for prompt-corpus tooling. */
+/** Exposed for the CLI's `aplaytest doctor --rules` and for prompt-corpus tooling. */
 /**
- * The ordered rule list, for diagnostics and `atest doctor`.
+ * The ordered rule list, for diagnostics and `aplaytest doctor`.
  *
  * @returns Rule name and kind, in evaluation order (first match wins).
  */

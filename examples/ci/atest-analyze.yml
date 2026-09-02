@@ -1,4 +1,4 @@
-# atest analyze — paste-in job for a repo whose CI already runs Playwright
+# aplaytest analyze — paste-in job for a repo whose CI already runs Playwright
 #
 # Reads the merged Playwright JSON that the test job ALREADY uploads, so it
 # needs no change to the test repo (no reporter, no fixtures), no change to the
@@ -23,11 +23,11 @@ atest_analyze:
   permissions:
     contents: read
     actions: read
-    packages: read # the atest IMAGE is pulled from GHCR — the job runs in it
+    packages: read # the aplaytest IMAGE is pulled from GHCR — the job runs in it
     id-token: write # mints the OIDC token for AZURE_FEDERATED_TOKEN_FILE
     pull-requests: write # only needed with comment-on-pr
-  # Pin to a version tag after the first atest release (`v0.1.0`), not `@main`.
-  uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@main
+  # Pin to a SHA or version tag, not `@main`.
+  uses: ianoflynnautomation/aplaytest/.github/workflows/atest-analyze.yml@090e29fa773ec50866fc94885bdee3f3e4dee333
   with:
     results-artifact: playwright-json-results
     history-account: ${{ vars.ATEST_HISTORY_ACCOUNT }}

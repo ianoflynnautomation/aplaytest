@@ -1,5 +1,5 @@
 /**
- * `atest report` — merge shards, render the HTML report and the PR comment.
+ * `aplaytest report` — merge shards, render the HTML report and the PR comment.
  *
  * Runs at the very end of a CI job that has usually already failed, so it must
  * NEVER fail the build itself. A report generator that exits non-zero converts
@@ -10,8 +10,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { ingestDirectory } from '@atest/core';
-import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@atest/flaky';
+import { ingestDirectory } from '@aplaytest/core';
+import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@aplaytest/flaky';
 import {
   loadEvidence,
   loadRuns,
@@ -21,7 +21,7 @@ import {
   renderMarkdown,
   type FlakySummary,
   type ReportInput,
-} from '@atest/report';
+} from '@aplaytest/report';
 
 import { EXIT, type ExitCode } from '../exit.js';
 import { openHistoryStore, resolveHistoryUrl } from '../store.js';
@@ -115,7 +115,7 @@ export async function report(flags: ReportFlags): Promise<ExitCode> {
   }
 
   // The summary goes to STDERR, never stdout. Without `--comment` the markdown
-  // IS stdout, and `atest report --out r.html > comment.md` would otherwise
+  // IS stdout, and `aplaytest report --out r.html > comment.md` would otherwise
   // append this human-readable block to the file it just wrote — landing the
   // words "report / 3 tests · 1 failed" at the bottom of a PR comment.
   const note = (text: string): void => void process.stderr.write(`${text}\n`);

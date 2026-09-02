@@ -130,18 +130,18 @@ describe('ci generate — reporting', () => {
     // quarter of the run as if it were the run.
     const yaml = await generate();
     const analyze = yaml.slice(yaml.indexOf('  analyze:'), yaml.indexOf('  policy:'));
-    expect(analyze).toContain('atest report');
+    expect(analyze).toContain('aplaytest report');
     const test = yaml.slice(yaml.indexOf('  test:'), yaml.indexOf('  analyze:'));
-    expect(test).not.toContain('atest report');
+    expect(test).not.toContain('aplaytest report');
   });
 
   it('given a generated workflow -> when the comment step is inspected -> then the comment is written to a file rather than redirected from stdout', { tags: ['@integration', '@cli'] }, async () => {
-    // `atest report > comment.md` would capture the human summary too. The
+    // `aplaytest report > comment.md` would capture the human summary too. The
     // command puts diagnostics on stderr, but the workflow must not rely on
     // that being true forever.
     const yaml = await generate();
     expect(yaml).toContain('--comment .atest-artifacts/comment.md');
-    expect(yaml).not.toMatch(/atest report[^\n]*>\s*\S+\.md/);
+    expect(yaml).not.toMatch(/aplaytest report[^\n]*>\s*\S+\.md/);
   });
 
   it('given a generated workflow -> when the comment step is inspected -> then it is conditioned on a pull request', { tags: ['@integration', '@cli'] }, async () => {

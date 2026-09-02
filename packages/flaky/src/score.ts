@@ -19,7 +19,7 @@
  * patterns. No model is involved anywhere in this file.
  */
 
-import { countsTowardFlakeStats, isFailure, type HistoricalAttempt } from '@atest/core';
+import { countsTowardFlakeStats, isFailure, type HistoricalAttempt } from '@aplaytest/core';
 
 export type ScoreConfidence = 'low' | 'medium' | 'high';
 

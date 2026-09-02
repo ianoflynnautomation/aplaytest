@@ -1,15 +1,15 @@
 /**
  * Ingest run records and print a flake leaderboard.
  *
- * A stand-in for `atest flaky report` until the CLI package lands, and the
+ * A stand-in for `aplaytest flaky report` until the CLI package lands, and the
  * end-to-end check for the whole Phase 1 path: reporter JSON → history store →
  * score → features → classification.
  *
  *   node scripts/flaky-report.ts <runs-dir> [--db <path>]
  */
 
-import { analyzeAll, type FlakyVerdict } from '@atest/flaky';
-import { SqliteHistoryStore, ingestDirectory } from '@atest/core';
+import { analyzeAll, type FlakyVerdict } from '@aplaytest/flaky';
+import { SqliteHistoryStore, ingestDirectory } from '@aplaytest/core';
 
 const [runsDir = 'examples/bjjeire-live/.atest/runs'] = process.argv.slice(2);
 const dbIndex = process.argv.indexOf('--db');

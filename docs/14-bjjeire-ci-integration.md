@@ -81,7 +81,7 @@ escape the test job.**
 
 There is a way in that needs none of that.
 
-`atest history ingest --playwright-json <file>` is a runner adapter: it reads a
+`aplaytest history ingest --playwright-json <file>` is a runner adapter: it reads a
 merged Playwright JSON report and produces the same `AttemptRecord` rows the
 reporter would, minus the evidence bundle and with a coarser failure kind.
 And `playwright-report.yml` **already uploads that exact file** on both
@@ -221,7 +221,7 @@ and `ci-pr.yml`. It is `continue-on-error: true` and gates nothing.
 
 | Step | Notes |
 | --- | --- |
-| Install atest | `oras pull ghcr.io/<owner>/atest-packages:<tag>` then `npm i vendor/*.tgz`. Published by the atest repo's `oci-publish.yml`; needs only `packages: read`. This replaced 468 KB of tarballs vendored into git — binaries nobody could review, with no record of which commit produced them. Pulled as ONE bundle because each tarball declares `@atest/core@^0.1.0`: install any one alone against a registry that does not yet have that version and npm 404s. |
+| Install atest | `oras pull ghcr.io/<owner>/aplaytest-packages:<tag>` then `npm i vendor/*.tgz`. Published by the aplaytest repo's `oci-publish.yml`; needs only `packages: read`. This replaced 468 KB of tarballs vendored into git — binaries nobody could review, with no record of which commit produced them. Pulled as ONE bundle because each tarball declares `@aplaytest/core@^0.1.0`: install any one alone against a registry that does not yet have that version and npm 404s. |
 | Download JSON | `playwright-json-results` (main) / `playwright-docker-json-results` (PR). Already uploaded. |
 | Restore history | *No such step.* The store IS the Azure container: one immutable object per run and shard, so there is no single file to download, merge and race on. |
 | Ingest | `--playwright-json`. Identical on every branch — off main the URL carries `?readonly=1`, so the run is scored against trunk and leaves nothing behind. |
@@ -245,7 +245,7 @@ the symptom a correctly working engine also produces, which makes it the worst
 available failure. The terraform in doc 12 is applied on dev; the container is
 cheap (~50 MB a quarter) and does not evict.
 
-> **`atest history export --to-branch` does not exist,** and is no longer
+> **`aplaytest history export --to-branch` does not exist,** and is no longer
 > needed. Earlier drafts recommended an orphan branch holding a SQLite file.
 > The CLI implements `history stats`, `ingest` and `prune`, and `--db` takes a
 > URL — a path for a local file, `azblob://<account>/<container>` for Azure.
@@ -254,7 +254,7 @@ cheap (~50 MB a quarter) and does not evict.
 ### Then wait
 
 `minRuns` is 10, and only main writes. Expect "insufficient data" for a week or
-two. `atest history stats` says so explicitly, which is the point — tell the
+two. `aplaytest history stats` says so explicitly, which is the point — tell the
 team before someone reads it as broken.
 
 **Do not turn on the PR comment before the wait is over.** A flake engine that
@@ -272,11 +272,11 @@ blocks on *hygiene*:
 
 1. Set `fail-on-flaky: false` on `acceptance_ephemeral` and `compose_smoke`.
 2. Quarantine what the leaderboard actually indicts, with an expiry and an
-   owner: `atest flaky quarantine --test "…" --file … --reason … --expires 14d`.
+   owner: `aplaytest flaky quarantine --test "…" --file … --reason … --expires 14d`.
    The suite already has `grepInvert: /@quarantine/` in
    `src/shared/config/playwright.ts`, so the tag takes effect with no config
    change.
-3. Add `atest flaky expire --ci` as a **separate, blocking** job. It exits 4 on
+3. Add `aplaytest flaky expire --ci` as a **separate, blocking** job. It exits 4 on
    an expired waiver or a breached quarantine budget.
 
 The blocking surface stays exactly one job, and what it blocks on changes from
@@ -304,7 +304,7 @@ three-repo change:
 2. **`bjjeire-java`** — bump the SHA pin, pass `.atest/runs` and
    `.atest/evidence`.
 3. **`bjjeire-tests`** — vendor the two tarballs, add
-   `reporters.push(['@atest/runner-playwright/reporter'])` to `activeReporters()`.
+   `reporters.push(['@aplaytest/runner-playwright/reporter'])` to `activeReporters()`.
 
 Two traps, both already measured, both worth restating because they are silent:
 
@@ -325,7 +325,7 @@ costs one run.
 
 ## Not recommended yet
 
-- **`atest ci generate`** — emits a self-contained workflow that assumes it
+- **`aplaytest ci generate`** — emits a self-contained workflow that assumes it
   owns the pipeline. This one delegates execution to a SHA-pinned shared
   template. Read it for the analyze job's shape, not as a drop-in.
 - **Impact analysis** — the acceptance suite is 28 minutes and the selection

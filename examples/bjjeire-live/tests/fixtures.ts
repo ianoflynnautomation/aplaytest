@@ -1,5 +1,5 @@
 import { test as base } from '@playwright/test';
-import { atestFixtures, bindPage, type BoundPageObject } from '@atest/runner-playwright';
+import { atestFixtures, bindPage, type BoundPageObject } from '@aplaytest/runner-playwright';
 
 import * as GymsPageMod from '../pages/gyms.page.js';
 

@@ -2,19 +2,19 @@ name: atest Flake Analysis (Reusable)
 
 # Flake analysis over a Playwright run, with history that outlives the run.
 #
-# ── Why this lives in the atest repo ──────────────────────────────────────────
+# ── Why this lives in the aplaytest repo ──────────────────────────────────────
 # A shared template repository earns its name by holding workflows any project
-# can call. This one runs `atest history ingest`, parses atest's verdict JSON,
+# can call. This one runs `aplaytest history ingest`, parses atest's verdict JSON,
 # and speaks `azblob://` history URLs. Nothing about it generalises, and a
 # "generic" template with a hardcoded product in it is worse than no template.
 #
 # CONSUMERS CALL IT CROSS-REPO (pin a tag or SHA, not `@main`, in production):
 #
-#   uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@<ref>
+#   uses: ianoflynnautomation/aplaytest/.github/workflows/atest-analyze.yml@<ref>
 #
-# The caller needs `packages: read` so GitHub Actions can pull the atest image
-# from GHCR. If the image package is private, the calling repo must be granted
-# access or the pull fails with a generic "unauthorized".
+# The caller needs `packages: read` so GitHub Actions can pull the aplaytest image
+# from GHCR. The image package must be public (or the caller granted access)
+# or the pull fails with a generic "unauthorized".
 #
 # ── The problem this exists for ───────────────────────────────────────────────
 # `fail-on-flaky: true` has no memory. A pipeline goes red with ZERO failed
@@ -45,7 +45,7 @@ name: atest Flake Analysis (Reusable)
 # should describe trunk, and a branch whose test code may itself be broken must
 # not enter it before anyone has decided to merge.
 #
-# ── It runs INSIDE the atest image ────────────────────────────────────────────
+# ── It runs INSIDE the aplaytest image ────────────────────────────────────────
 # So a caller needs no Node toolchain, no ORAS, and no install step — which is
 # the point: a Java repository should not install Node to invoke one CLI. It
 # also needs no `az`: DefaultAzureCredential authenticates from a
@@ -67,7 +67,7 @@ name: atest Flake Analysis (Reusable)
 # Required caller permissions:
 #   contents: read
 #   actions: read          # downloading the upstream test artifact
-#   packages: read         # the atest image is pulled from GHCR
+#   packages: read         # the aplaytest image is pulled from GHCR
 #   id-token: write        # Azure OIDC; only needed when history-account is set
 #   pull-requests: write   # only when comment-on-pr is true
 #
@@ -91,7 +91,7 @@ on:
           because the repositories calling this are not all Node repositories.
         required: false
         type: string
-        default: "ghcr.io/ianoflynnautomation/atest"
+        default: "ghcr.io/ianoflynnautomation/aplaytest"
       atest-tag:
         description: >-
           Tag on atest-image. `main` tracks trunk and is the bootstrap default,
@@ -133,7 +133,7 @@ on:
         type: number
         default: 90
       history-retain-days:
-        description: "Retention for `atest history prune`, which runs on the write branch only."
+        description: "Retention for `aplaytest history prune`, which runs on the write branch only."
         required: false
         type: number
         default: 90
@@ -367,7 +367,7 @@ jobs:
         shell: bash
         env:
           REPORT_JSON: ${{ steps.locate.outputs.json }}
-        run: atest history ingest --playwright-json "$REPORT_JSON"
+        run: aplaytest history ingest --playwright-json "$REPORT_JSON"
 
       - name: Score and summarise
         id: report
@@ -375,8 +375,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          atest flaky report --json > flaky.json
-          atest history stats --json > history.json
+          aplaytest flaky report --json > flaky.json
+          aplaytest history stats --json > history.json
 
           # Written to a file rather than passed to `node -e`: the summary is a
           # markdown template full of backticks and ${...}, and quoting that
@@ -439,7 +439,7 @@ jobs:
         shell: bash
         env:
           RETAIN_DAYS: ${{ inputs.history-retain-days }}
-        run: atest history prune --keep-days "$RETAIN_DAYS"
+        run: aplaytest history prune --keep-days "$RETAIN_DAYS"
 
       - name: Comment on the pull request
         if: inputs.comment-on-pr && github.event_name == 'pull_request' && steps.report.outcome == 'success'

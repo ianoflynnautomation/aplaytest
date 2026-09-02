@@ -126,7 +126,7 @@ Assumptions: an evidence bundle with a 6k-token ARIA snapshot plus conventions �
 | Explain a run | Haiku 4.5 | ~$0.02 | One call over the run summary |
 
 For this suite — 271 tests, a typical run with 3–5 failures of which 2–3 are healable — a full
-`atest analyze` pass lands around **$0.05–0.15 per run**. Even a bad day with 20 failures stays
+`aplaytest analyze` pass lands around **$0.05–0.15 per run**. Even a bad day with 20 failures stays
 under $0.50. Test authoring is the only line item worth watching, and it is human-initiated and
 low-volume.
 

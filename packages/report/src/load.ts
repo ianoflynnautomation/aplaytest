@@ -11,7 +11,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { EvidenceBundle, RunRecord } from '@atest/core';
+import type { EvidenceBundle, RunRecord } from '@aplaytest/core';
 
 export interface LoadResult<T> {
   readonly items: readonly T[];

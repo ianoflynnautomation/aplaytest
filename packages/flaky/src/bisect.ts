@@ -11,7 +11,7 @@
  * running the test.
  */
 
-import { runPlaywright, type PlaywrightRunOptions } from '@atest/runner-playwright';
+import { runPlaywright, type PlaywrightRunOptions } from '@aplaytest/runner-playwright';
 
 import type { FlakeClass } from './classify.js';
 

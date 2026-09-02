@@ -1,5 +1,5 @@
 /**
- * @atest/impact — test selection from a static import graph.
+ * @aplaytest/impact — test selection from a static import graph.
  *
  * Entirely deterministic. The one place a model could help is mapping a diff
  * in ANOTHER repository (the application) onto tests here, where no import

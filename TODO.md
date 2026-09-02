@@ -8,7 +8,7 @@ heals, and some failures are never healed.
 
 ### Eval as a product feature
 
-`atest eval` over a versioned corpus: injected testid renames, flake vs
+`aplaytest eval` over a versioned corpus: injected testid renames, flake vs
 regression, `NEVER_HEAL` adversarial cases, vacuous generated tests the gate
 must reject. Prompt changes become score deltas.
 

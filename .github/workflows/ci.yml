@@ -50,11 +50,11 @@ jobs:
       - name: Both entry points load
         run: |
           node --input-type=commonjs -e "
-            const r = require('@atest/runner-playwright/reporter');
+            const r = require('@aplaytest/runner-playwright/reporter');
             if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load'); }
           "
           node --input-type=module -e "
-            import R from '@atest/runner-playwright/reporter';
+            import R from '@aplaytest/runner-playwright/reporter';
             if (typeof R !== 'function') { throw new Error('ESM reporter did not load'); }
           "
 
@@ -67,15 +67,15 @@ jobs:
           cd "$work"
           npm init -y >/dev/null
 
-          # All of them in one command: each tarball declares @atest/core@^0.1.0,
+          # All of them in one command: each tarball declares @aplaytest/core@^0.1.0,
           # and npm satisfies that from the other tarballs in the same invocation.
           npm install ./*.tgz --no-audit --no-fund >/dev/null
 
           node --input-type=commonjs -e "
-            const r = require('@atest/runner-playwright/reporter');
+            const r = require('@aplaytest/runner-playwright/reporter');
             if (typeof r.default !== 'function') { throw new Error('reporter did not load from the tarball'); }
           "
-          npx atest --help > /dev/null
+          npx aplaytest --help > /dev/null
           echo "Installed from tarballs and the CLI runs."
 
       - name: No JavaScript in source

@@ -1,5 +1,5 @@
 /**
- * `atest history` — inspect and trim the run history.
+ * `aplaytest history` — inspect and trim the run history.
  *
  * The history store is the one piece of atest state that OUTLIVES a run.
  * Everything else is derived from the current run's artifacts and can be
@@ -14,7 +14,7 @@
 
 import { stat } from 'node:fs/promises';
 
-import { ingestDirectory, ingestPlaywrightJson, type HistoryTarget } from '@atest/core';
+import { ingestDirectory, ingestPlaywrightJson, type HistoryTarget } from '@aplaytest/core';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { openHistoryStore, resolveHistoryUrl, storeWarnings } from '../store.js';

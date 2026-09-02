@@ -1,11 +1,11 @@
 /**
- * @atest/runner-playwright — the Playwright adapter.
+ * @aplaytest/runner-playwright — the Playwright adapter.
  *
  * The only package that knows Playwright exists. Everything above it consumes
  * EvidenceBundles and RunRecords, so swapping in a different runner means
  * writing a sibling of this package and nothing else.
  *
- * NOTE: this package must NOT depend on @atest/llm. The reporter runs inside
+ * NOTE: this package must NOT depend on @aplaytest/llm. The reporter runs inside
  * the test process; pulling an HTTP client and a model SDK into every worker
  * would be both slow and a place a credential should never be.
  */
@@ -23,10 +23,10 @@ export type {
   TestErrorLike,
 } from './assemble.js';
 
-// Re-exported from @atest/core, where the parser now lives beside the
+// Re-exported from @aplaytest/core, where the parser now lives beside the
 // classifier that consumes it. Kept here so existing importers do not break.
-export { parsePlaywrightError, splitCallLog, stripAnsi, joinErrors } from '@atest/core';
-export type { ParsedError, ErrorLike } from '@atest/core';
+export { parsePlaywrightError, splitCallLog, stripAnsi, joinErrors } from '@aplaytest/core';
+export type { ParsedError, ErrorLike } from '@aplaytest/core';
 
 export { atestFixtures, createCaptureFixture, test, expect } from './fixtures.js';
 export type { CaptureOptions } from './fixtures.js';

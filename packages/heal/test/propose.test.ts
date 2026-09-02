@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { assessBundle, generateCandidates } from '../src/candidates.js';
 import { proposeHeal } from '../src/propose.js';
-import type { EvidenceBundle, FailureKind } from '@atest/core';
+import type { EvidenceBundle, FailureKind } from '@aplaytest/core';
 
 const CONSTANTS = `export const TEST_IDS = {
   cardName: 'gym-card-name',

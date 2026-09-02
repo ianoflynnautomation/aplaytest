@@ -1,4 +1,4 @@
-import type { HistoricalAttempt, Outcome } from '@atest/core';
+import type { HistoricalAttempt, Outcome } from '@aplaytest/core';
 
 export const DAY = 86_400_000;
 export const NOW = Date.parse('2026-08-16T12:00:00.000Z');

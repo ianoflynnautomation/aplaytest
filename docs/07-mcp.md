@@ -12,14 +12,14 @@ Consequences that follow from "façade, not a second product":
 - **It is built in Phase 5, not Phase 1.** MCP's value depends on the evidence store,
   history, and heal ledger already existing. Building it first optimises for a demo.
 - **CI never uses it.** CI uses the CLI. MCP has no place in a pipeline.
-- **No engine logic lives in `@atest/mcp`.** Any `if` in a tool handler that is not
+- **No engine logic lives in `@aplaytest/mcp`.** Any `if` in a tool handler that is not
   input translation or output shaping is a bug.
 
 ```
 Claude Code / Cursor
         │  stdio (local)  |  streamable-http (remote, authed)
         ▼
-  @atest/mcp  ──────►  the same engine calls the CLI makes
+  @aplaytest/mcp  ──────►  the same engine calls the CLI makes
         │
         └─ safety layer: write-gating · size caps · redaction · path allow-list
 ```
@@ -225,7 +225,7 @@ Default is read-only. A fresh install can inspect everything and change nothing.
 
 ### 2. Path confinement
 
-Every write goes through `@atest/core`'s patch layer, which enforces the same
+Every write goes through `@aplaytest/core`'s patch layer, which enforces the same
 `REPO_DENY` list the agent tools use (04): no writes to `tests/testdata/seeded/**`,
 `__screenshots__/**`, `__aria__/**`, `.env*`, `.github/workflows/**`, or
 `atest.config.ts`. Enforced at the filesystem boundary, not in a prompt.
@@ -250,7 +250,7 @@ Every write goes through `@atest/core`'s patch layer, which enforces the same
   "mcpServers": {
     "atest": {
       "command": "npx",
-      "args": ["-y", "@atest/mcp"],
+      "args": ["-y", "@aplaytest/mcp"],
       "env": { "ATEST_MCP_WRITE": "0" }
     }
   }

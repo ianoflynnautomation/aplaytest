@@ -14,7 +14,7 @@
 
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 
-import { runPlaywright } from '@atest/runner-playwright';
+import { runPlaywright } from '@aplaytest/runner-playwright';
 
 export type ValidationStatus =
   | 'validated'

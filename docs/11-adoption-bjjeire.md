@@ -23,7 +23,7 @@ that runs tests: `bjjeire-java`'s `ci-main.yml` calls
 from your `Dockerfile` and executes shards inside it. atest has to fit through
 that seam rather than replace it.
 
-> **`atest ci generate` does not fit this repo.** It emits a self-contained
+> **`aplaytest ci generate` does not fit this repo.** It emits a self-contained
 > workflow that assumes it owns the pipeline. Yours delegates execution to a
 > shared template. Use it as a reference for the analyze job's shape — the
 > credential split, the history steps — not as a drop-in.
@@ -55,17 +55,17 @@ success on nothing.
 
 ## Step 2 — Install atest
 
-Packages publish to npm under the `@atest` scope with real semver on each other.
+Packages publish to npm under the `@aplaytest` scope with real semver on each other.
 `npm run pack` in this repo emits a tarball per package — that is the path for
 testing unreleased edits:
 
 ```sh
 # in bjjeire-tests
-npm i -D @atest/runner-playwright
+npm i -D @aplaytest/runner-playwright
 ```
 
 To pin a build that was never released, copy the tarballs and install them
-**in one command** — each declares `@atest/core@^0.1.0`, and asking for one
+**in one command** — each declares `@aplaytest/core@^0.1.0`, and asking for one
 alone resolves that against the registry, giving you the last released core
 rather than the one you just built.
 
@@ -95,16 +95,16 @@ the `extra-output-paths` mount.
 
 Your reporter list is **computed**, not a literal:
 `src/shared/config/playwright.ts` builds it conditionally and all five configs
-share it. `atest init` deliberately declines to rewrite that — a regex that
+share it. `aplaytest init` deliberately declines to rewrite that — a regex that
 half-understands a config produces a file that still parses and no longer does
 what its author meant — and instead points at the file to edit.
 
 ```ts
 // src/shared/config/playwright.ts, inside activeReporters()
-reporters.push(['@atest/runner-playwright/reporter']);
+reporters.push(['@aplaytest/runner-playwright/reporter']);
 ```
 
-Run `atest init --cwd . ` first to see what it would do; it also adds the
+Run `aplaytest init --cwd . ` first to see what it would do; it also adds the
 `.gitignore` block, and `--undo --apply` removes both.
 
 **Verify the property that matters before anything else:** the reporter must
@@ -164,7 +164,7 @@ fifty-four.
 ## Step 6 — Wait
 
 `minRuns: 10`. Until ten main-branch runs have accumulated, every flake verdict
-reads "insufficient data". `atest history stats` says so explicitly rather than
+reads "insufficient data". `aplaytest history stats` says so explicitly rather than
 returning an empty report.
 
 **Do not turn on the PR comment before this.** A flake engine that says
@@ -176,14 +176,14 @@ has had a chance to be useful.
 ## Step 7 — Then, in order of risk
 
 1. **PR comment** — read-only, informative, `continue-on-error`.
-2. **`atest gate`** on request, against a spec you are already suspicious of.
+2. **`aplaytest gate`** on request, against a spec you are already suspicious of.
    It answers "does this test assert anything?", and it applies to
    human-written tests as readily as generated ones.
-3. **`atest heal --dry-run`** — proposals only. Never in the merge path.
-4. **`atest agent author`** — needs `ANTHROPIC_API_KEY`, and produces a
+3. **`aplaytest heal --dry-run`** — proposals only. Never in the merge path.
+4. **`aplaytest agent author`** — needs `ANTHROPIC_API_KEY`, and produces a
    candidate that must pass the gate before it is kept.
 
-`atest flaky expire` is the only command intended to block a merge, and only on
+`aplaytest flaky expire` is the only command intended to block a merge, and only on
 quarantine hygiene: a waiver that has outlived its expiry.
 
 ---
@@ -199,7 +199,7 @@ Honesty about scope, because the defect rate on new surface has not flattened:
   complete evidence bundle that reached the host through the mount.
 - **Scale.** The largest run atest has processed is four tests. Yours is a full
   acceptance suite across nine projects.
-- **`@atest/llm` at volume.** Live calls work — repair and authoring both
+- **`@aplaytest/llm` at volume.** Live calls work — repair and authoring both
   produced correct output against the real app — but only a handful of them.
 
 None of these are reasons not to start. They are reasons to start in shadow

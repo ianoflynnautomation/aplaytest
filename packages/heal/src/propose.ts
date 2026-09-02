@@ -25,7 +25,7 @@ import {
   parseLocator,
   type EvidenceBundle,
   type LocatorStrategy,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 import {
   assessBundle,

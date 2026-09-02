@@ -1,7 +1,7 @@
 /**
- * @atest/author — deterministic verification for generated tests.
+ * @aplaytest/author — deterministic verification for generated tests.
  *
- * The model tier lives in @atest/agent and only ever PROPOSES. This package
+ * The model tier lives in @aplaytest/agent and only ever PROPOSES. This package
  * decides, and it decides without consulting a model: a generated test is
  * trustworthy when it passes reliably and fails when the world breaks.
  */

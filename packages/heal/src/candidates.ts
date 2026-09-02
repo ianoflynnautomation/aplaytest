@@ -14,7 +14,7 @@ import {
   testIdDistance,
   type EvidenceBundle,
   type LocatorStrategy,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 /**
  * Every test id referenced by a locator expression, in order.

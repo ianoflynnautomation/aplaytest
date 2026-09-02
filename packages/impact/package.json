@@ -1,5 +1,5 @@
 {
-  "name": "@atest/impact",
+  "name": "@aplaytest/impact",
   "version": "0.1.0",
   "description": "Test impact analysis: static import graph and selection",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "^0.1.0",
+    "@aplaytest/core": "^0.1.0",
     "ts-morph": "^28.0.0"
   },
   "exports": {
@@ -28,11 +28,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "url": "git+https://github.com/ianoflynnautomation/aplaytest.git",
     "directory": "packages/impact"
   },
-  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "homepage": "https://github.com/ianoflynnautomation/aplaytest#readme",
   "bugs": {
-    "url": "https://github.com/ianoflynnautomation/atest/issues"
+    "url": "https://github.com/ianoflynnautomation/aplaytest/issues"
   }
 }

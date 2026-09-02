@@ -10,8 +10,8 @@
  * would corrupt every number derived from it.
  */
 
-import type { AttemptRecord, RunRecord } from '@atest/core';
-import { isFailure } from '@atest/core';
+import type { AttemptRecord, RunRecord } from '@aplaytest/core';
+import { isFailure } from '@aplaytest/core';
 
 export interface MergedRun {
   readonly runId: string;

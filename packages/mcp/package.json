@@ -1,5 +1,5 @@
 {
-  "name": "@atest/mcp",
+  "name": "@aplaytest/mcp",
   "version": "0.1.0",
   "description": "MCP server: the same engine calls the CLI makes, exposed to IDE agents",
   "license": "MIT",
@@ -14,13 +14,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "^0.1.0",
-    "@atest/flaky": "^0.1.0",
-    "@atest/heal": "^0.1.0",
-    "@atest/impact": "^0.1.0",
+    "@aplaytest/core": "^0.1.0",
+    "@aplaytest/flaky": "^0.1.0",
+    "@aplaytest/heal": "^0.1.0",
+    "@aplaytest/impact": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.3.6",
-    "@atest/author": "^0.1.0"
+    "@aplaytest/author": "^0.1.0"
   },
   "exports": {
     ".": {
@@ -29,18 +29,18 @@
     }
   },
   "bin": {
-    "atest-mcp": "./dist/bin.js"
+    "aplaytest-mcp": "./dist/bin.js"
   },
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "url": "git+https://github.com/ianoflynnautomation/aplaytest.git",
     "directory": "packages/mcp"
   },
-  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "homepage": "https://github.com/ianoflynnautomation/aplaytest#readme",
   "bugs": {
-    "url": "https://github.com/ianoflynnautomation/atest/issues"
+    "url": "https://github.com/ianoflynnautomation/aplaytest/issues"
   }
 }

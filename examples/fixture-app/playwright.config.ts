@@ -12,7 +12,7 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   timeout: 20_000,
   expect: { timeout: 4_000 },
-  reporter: [['list'], ['@atest/runner-playwright/reporter', { runId: 'fixture-run' }]],
+  reporter: [['list'], ['@aplaytest/runner-playwright/reporter', { runId: 'fixture-run' }]],
   use: {
     baseURL: `http://127.0.0.1:${FIXTURE_PORT}`,
     headless: true,

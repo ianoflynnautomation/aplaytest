@@ -1,5 +1,5 @@
 /**
- * @atest/heal — selector healing.
+ * @aplaytest/heal — selector healing.
  *
  * Tier 0 only, and entirely deterministic: candidates come from the test-id
  * index captured at failure time, and acceptance comes from re-running the

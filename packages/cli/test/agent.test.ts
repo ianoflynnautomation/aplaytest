@@ -1,5 +1,5 @@
 /**
- * End-to-end for `atest agent author`, driven by a scripted model.
+ * End-to-end for `aplaytest agent author`, driven by a scripted model.
  *
  * This runs REAL Playwright against the smoke example, because the property
  * under test — that a candidate failing the gate never survives on disk —
@@ -9,7 +9,7 @@
 import { readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { FakeLlmClient, UnavailableLlmClient } from '@atest/llm';
+import { FakeLlmClient, UnavailableLlmClient } from '@aplaytest/llm';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { agentAuthor, extractTestTitle, type AgentFlags } from '../src/commands/agent.js';
@@ -60,7 +60,7 @@ afterEach(async () => {
   await rm(join(SMOKE, GENERATED), { force: true });
 });
 
-describe('atest agent author', () => {
+describe('aplaytest agent author', () => {
   it('given a model producing a vacuous spec the gate rejects -> when agent author runs -> then it exits on the policy violation and no spec is left on disk', { tags: ['@integration', '@cli'], timeout: 180_000 }, async () => {
     // The property the command exists for. A rejected candidate is green and
     // asserts nothing — strictly worse than generating nothing, because it

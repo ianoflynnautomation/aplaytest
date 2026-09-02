@@ -1,5 +1,5 @@
 /**
- * @atest/flaky — statistical flake detection and root-cause classification.
+ * @aplaytest/flaky — statistical flake detection and root-cause classification.
  *
  * Entirely deterministic. Every number here is measured from recorded
  * attempts; no model is called anywhere in this package. A model may later be

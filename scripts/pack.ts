@@ -3,15 +3,15 @@
  *
  * These exist for the NO-REGISTRY path — an air-gapped runner, a fork that
  * cannot authenticate, a consumer pinning a build that was never released.
- * The normal path is `npm install @atest/runner-playwright`, because the
- * packages are published to npm under the `@atest` scope with real semver
+ * The normal path is `npm install @aplaytest/runner-playwright`, because the
+ * packages are published to npm under the `@aplaytest` scope with real semver
  * dependencies on each other.
  *
- * Install every tarball in ONE command. Each declares `@atest/core@^0.1.0`,
+ * Install every tarball in ONE command. Each declares `@aplaytest/core@^0.1.0`,
  * and npm satisfies that from the other tarballs in the same invocation; ask
  * for one alone and — if the version is not yet on the registry — you get:
  *
- *   npm error 404 Not Found - GET https://registry.npmjs.org/@atest%2fcore
+ *   npm error 404 Not Found - GET https://registry.npmjs.org/@aplaytest%2fcore
  *
  * The consumer flow this enables when a registry is unavailable:
  *
@@ -84,5 +84,5 @@ To consume from a test repository (no registry, no auth):
     ./vendor/atest-core-${reporterPkg.version}.tgz \\
     ./vendor/atest-runner-playwright-${reporterPkg.version}.tgz
 
-Install every tarball in one command — each declares @atest/core@^0.1.0, and
+Install every tarball in one command — each declares @aplaytest/core@^0.1.0, and
 npm satisfies that from the other tarballs in the same invocation.`);

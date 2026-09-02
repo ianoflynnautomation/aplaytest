@@ -11,7 +11,7 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import { RUN_SCHEMA_VERSION, type AttemptRecord, type RunRecord } from '@atest/core';
+import { RUN_SCHEMA_VERSION, type AttemptRecord, type RunRecord } from '@aplaytest/core';
 
 import { BlobHistoryStore } from '../src/blob-store.js';
 import { MemoryBlobBackend, type BlobBackend } from '../src/backend.js';

@@ -24,7 +24,7 @@ describe('addReporter', () => {
    * REGRESSION GUARD. The first implementation used a non-greedy
    * `[\s\S]*?\]` to find the end of the reporter array. For
    * `reporter: [['list'], ['html']]` that stops at the `]` closing `['list']`,
-   * so it produced `['list',\n ['@atest/…'],],` — a config that no longer
+   * so it produced `['list',\n ['@aplaytest/…'],],` — a config that no longer
    * parses, written to disk by --apply. An edit tool that corrupts the file it
    * was pointed at is worse than one that declines to edit.
    */
@@ -32,7 +32,7 @@ describe('addReporter', () => {
     const out = applied(CONFIG);
     expect(out).toContain("['list'],");
     expect(out).toContain("['html', { open: 'never' }],");
-    expect(out).toContain("['@atest/runner-playwright/reporter'],");
+    expect(out).toContain("['@aplaytest/runner-playwright/reporter'],");
     expect(out).not.toContain("['list',\n");
   });
 
@@ -45,16 +45,16 @@ describe('addReporter', () => {
     const tricky = CONFIG.replace("{ open: 'never' }", "{ outputFolder: 'reports/a[1]' }");
     const out = applied(tricky);
     expect(out).toContain("'reports/a[1]'");
-    expect(out.indexOf('@atest')).toBeGreaterThan(out.indexOf('a[1]'));
+    expect(out.indexOf('@aplaytest')).toBeGreaterThan(out.indexOf('a[1]'));
   });
 
   it('given a reporter declared as a single string -> when addReporter appends -> then the reporter is promoted to an array holding both', { tags: ['@unit', '@cli'] }, () => {
     const out = applied(`export default defineConfig({ reporter: 'list' });`);
-    expect(out).toContain("[['list'], ['@atest/runner-playwright/reporter']]");
+    expect(out).toContain("[['list'], ['@aplaytest/runner-playwright/reporter']]");
   });
 
   it('given an empty reporter array -> when addReporter appends -> then the entry is added', { tags: ['@unit', '@cli'] }, () => {
-    expect(applied(`export default defineConfig({ reporter: [] });`)).toContain('@atest');
+    expect(applied(`export default defineConfig({ reporter: [] });`)).toContain('@aplaytest');
   });
 
   it('given a config where the reporter is already present -> when addReporter runs again -> then nothing changes', { tags: ['@unit', '@cli'] }, () => {
@@ -93,7 +93,7 @@ describe('removeReporter', () => {
    * Undo dropped whole LINES containing the atest entry. That is fine for the
    * array form, where the entry owns its line. For a config that started as
    * `reporter: 'list'` — promoted on the way in to
-   * `reporter: [['list'], ['@atest/…']],` — it deleted the whole line, taking
+   * `reporter: [['list'], ['@aplaytest/…']],` — it deleted the whole line, taking
    * the user's own reporter with it and leaving a config with no reporter key.
    * Undo must never remove something the user wrote.
    */
@@ -109,7 +109,7 @@ describe('removeReporter', () => {
     const out = removeReporter(applied(inline));
     expect(out).toContain("['list']");
     expect(out).toContain("['json']");
-    expect(out).not.toContain('@atest');
+    expect(out).not.toContain('@aplaytest');
   });
 
   it('given a config the tool never modified -> when removeReporter runs -> then the config is unchanged', { tags: ['@unit', '@cli'] }, () => {

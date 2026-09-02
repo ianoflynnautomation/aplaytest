@@ -65,15 +65,15 @@ sync, and a repo moves from a local file to Azure by changing one string.
 
 ```bash
 # Local: unchanged.
-atest flaky report --db .atest/history.sqlite
+aplaytest flaky report --db .atest/history.sqlite
 
 # Azure.
-atest history ingest --db azblob://bjjeireatest/atest-history --runs .atest/runs
-atest flaky report   --db azblob://bjjeireatest/atest-history
+aplaytest history ingest --db azblob://bjjeireatest/atest-history --runs .atest/runs
+aplaytest flaky report   --db azblob://bjjeireatest/atest-history
 
 # Or set it once for a whole pipeline. --db still wins where it is passed.
 export ATEST_HISTORY_URL=azblob://bjjeireatest/atest-history
-atest flaky report
+aplaytest flaky report
 ```
 
 | Form | Means |
@@ -100,11 +100,11 @@ shorthand, for sovereign clouds.
 ### Installing the driver
 
 ```bash
-npm i -D atest @atest/store-azure
+npm i -D @aplaytest/cli @aplaytest/store-azure
 ```
 
-`@atest/store-azure` is a separate package and an **optional peer** of the CLI.
-`@atest/core` is loaded inside the Playwright process by the reporter, and its
+`@aplaytest/store-azure` is a separate package and an **optional peer** of the CLI.
+`@aplaytest/core` is loaded inside the Playwright process by the reporter, and its
 contract is "no Playwright, no network, no model" — an 8 MB SDK and a credential
 chain behind that import would make every test run pay for a feature only the
 analyze job uses. The CLI imports it dynamically and, when it is absent, says
@@ -281,7 +281,7 @@ that reads as a slow job and a log full of red herrings.
 
 Two mechanisms, deliberately:
 
-- **`atest history prune --keep-days 90`** runs on main after scoring. Day
+- **`aplaytest history prune --keep-days 90`** runs on main after scoring. Day
   granularity: blobs are partitioned by date, so it trims whole days. Trimming
   to the hour would mean downloading every record on the boundary day to
   recover a timestamp already encoded, less precisely, in its name.
@@ -356,7 +356,7 @@ for the first week or two of adoption — that is the engine working, not
 failing, and it is worth telling the team before someone reads it as broken.
 
 The generated step summary says so explicitly while the window fills, and
-`atest history stats` reports the run count with the same warning, so the wait
+`aplaytest history stats` reports the run count with the same warning, so the wait
 is visible rather than mysterious.
 
 **Evidence egress** is no longer a blocker: `extra-output-paths` on

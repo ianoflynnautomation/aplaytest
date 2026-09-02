@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { correlation, extractFeatures } from '../src/features.js';
 import { attempt, series } from './helpers.js';
-import type { HistoricalAttempt } from '@atest/core';
+import type { HistoricalAttempt } from '@aplaytest/core';
 
 describe('workerLoadDelta', () => {
   it('given a test never failing at 1 worker and failing a third of the time at 8 -> when extractFeatures runs -> then workerLoadDelta measures the dependency the correlation understates', { tags: ['@unit', '@flaky'] }, () => {

@@ -28,7 +28,7 @@ const HistorySchema = z.object({
    * Chosen from `url`, not configured separately. Two fields naming one thing
    * can disagree, and `driver: 'sqlite'` beside an `azblob://` url has no
    * correct interpretation — so this is derived, and left here only because
-   * `atest doctor` and the report header print it.
+   * `aplaytest doctor` and the report header print it.
    */
   driver: z.enum(['sqlite', 'azure-blob', 'memory']).default('sqlite'),
   /**
@@ -40,7 +40,7 @@ const HistorySchema = z.object({
    * "insufficient data" forever, which reads as the engine working.
    */
   url: z.string().default('.atest/history.sqlite'),
-  /** Attempts older than this are pruned by `atest history prune`. */
+  /** Attempts older than this are pruned by `aplaytest history prune`. */
   retainDays: z.number().int().positive().default(90),
   /**
    * Days the blob driver downloads before scoring. Bounded on purpose: an
@@ -255,7 +255,7 @@ export interface ResolvedAtestConfig extends AtestConfig {
  * @example
  * ```ts
  * // atest.config.ts
- * import { defineAtestConfig } from '@atest/core';
+ * import { defineAtestConfig } from '@aplaytest/core';
  *
  * export default defineAtestConfig({
  *   mode: 'strict',

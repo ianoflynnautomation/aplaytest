@@ -9,7 +9,7 @@ name: Publish to npm
 # block npm, and a missing NPM_TOKEN must not look like the air-gap bundle
 # failed.
 #
-# The BIN is `atest`. The package is `@atest/cli` because the unscoped name
+# The BIN is `aplaytest`. The package is `@aplaytest/cli` because the unscoped name
 # `atest` was already taken on npmjs.
 
 on:
@@ -67,14 +67,14 @@ jobs:
           npm init -y > /dev/null
           npm install ./*.tgz --no-audit --no-fund > /dev/null
           node --input-type=commonjs -e "
-            const r = require('@atest/runner-playwright/reporter');
+            const r = require('@aplaytest/runner-playwright/reporter');
             if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load'); }
           "
           node --input-type=module -e "
-            const m = await import('@atest/store-azure');
+            const m = await import('@aplaytest/store-azure');
             if (typeof m.BlobHistoryStore !== 'function') { throw new Error('Azure driver did not load'); }
           "
-          npx atest --help > /dev/null
+          npx aplaytest --help > /dev/null
 
       # `--workspaces` publishes every non-private workspace, so the set is
       # decided by `"private": true` in each package.json rather than by a list

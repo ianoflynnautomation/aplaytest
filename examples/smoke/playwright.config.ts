@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 10_000,
   reporter: [
     ['list'],
-    ['@atest/runner-playwright/reporter', {
+    ['@aplaytest/runner-playwright/reporter', {
       evidenceDir: '.atest/evidence',
       runsDir: '.atest/runs',
       runId: 'smoke-run',

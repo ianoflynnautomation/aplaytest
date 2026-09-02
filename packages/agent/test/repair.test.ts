@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BudgetGuard, FakeLlmClient, UnavailableLlmClient } from '@atest/llm';
+import { BudgetGuard, FakeLlmClient, UnavailableLlmClient } from '@aplaytest/llm';
 
 import { REPAIR_SYSTEM_PROMPT, runRepairAgent, type RepairInput } from '../src/repair.js';
 

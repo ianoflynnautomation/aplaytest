@@ -1,7 +1,7 @@
 /**
- * @atest/report — shard merge, PR comment, and the self-contained HTML report.
+ * @aplaytest/report — shard merge, PR comment, and the self-contained HTML report.
  *
- * Wholly deterministic, like @atest/flaky: this package renders what was
+ * Wholly deterministic, like @aplaytest/flaky: this package renders what was
  * measured and never asks a model to phrase it. The report is what people read
  * when a release is broken at 2am, and it has to be identical every time it is
  * generated from the same inputs.

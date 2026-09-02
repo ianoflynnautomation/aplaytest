@@ -7,7 +7,7 @@
  * reproducible and arguable rather than an opinion.
  */
 
-import { isFailure, type FailureKind, type HistoricalAttempt } from '@atest/core';
+import { isFailure, type FailureKind, type HistoricalAttempt } from '@aplaytest/core';
 
 export interface FlakeFeatures {
   /** Share of this test's failures landing in its single worst project. */

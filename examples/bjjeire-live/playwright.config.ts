@@ -11,7 +11,7 @@ export default defineConfig({
   expect: { timeout: 4_000 },
   reporter: [
     ['list'],
-    ['@atest/runner-playwright/reporter', { runId: 'live-run' }],
+    ['@aplaytest/runner-playwright/reporter', { runId: 'live-run' }],
   ],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:8080',

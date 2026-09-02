@@ -3,12 +3,12 @@
 ## Reporting a vulnerability
 
 Please report security issues privately via
-[GitHub security advisories](https://github.com/ianoflynnautomation/atest/security/advisories/new).
+[GitHub security advisories](https://github.com/ianoflynnautomation/aplaytest/security/advisories/new).
 Do not open a public issue for a vulnerability that is still unfixed.
 
 ## What this project is careful about
 
-- **The test job never holds a model API key.** `atest ci generate` emits
+- **The test job never holds a model API key.** `aplaytest ci generate` emits
   workflows where the job that executes specs and the job that holds
   `ANTHROPIC_API_KEY` are different jobs. A pull request that edits a spec,
   a fixture, or `playwright.config.ts` can run arbitrary code in the test

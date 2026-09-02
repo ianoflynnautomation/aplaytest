@@ -1,5 +1,5 @@
 {
-  "name": "@atest/runner-playwright",
+  "name": "@aplaytest/runner-playwright",
   "version": "0.1.0",
   "description": "Playwright adapter: reporter plugin, error parsing, step extraction, evidence assembly",
   "license": "MIT",
@@ -27,7 +27,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "^0.1.0",
+    "@aplaytest/core": "^0.1.0",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
@@ -41,11 +41,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "url": "git+https://github.com/ianoflynnautomation/aplaytest.git",
     "directory": "packages/runner-playwright"
   },
-  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "homepage": "https://github.com/ianoflynnautomation/aplaytest#readme",
   "bugs": {
-    "url": "https://github.com/ianoflynnautomation/atest/issues"
+    "url": "https://github.com/ianoflynnautomation/aplaytest/issues"
   }
 }

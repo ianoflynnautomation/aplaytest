@@ -38,7 +38,7 @@ jobs:
       attestations: write
     uses: ./.github/workflows/oci-publish-tarballs.yml
     with:
-      image: ghcr.io/${{ github.repository_owner }}/atest-packages
+      image: ghcr.io/${{ github.repository_owner }}/aplaytest-packages
       tags: ${{ inputs.tags != '' && inputs.tags
                 || (startsWith(github.ref, 'refs/tags/')
                     && format('{0} {1} latest', github.ref_name, github.sha)
@@ -50,7 +50,7 @@ jobs:
       build-command: npm run build
       pack-command: npm run pack
       tarball-dir: dist-pack
-      bundle-name: atest-packages-{version}.tar.gz
+      bundle-name: aplaytest-packages-{version}.tar.gz
       # scripts/pack.ts names them explicitly. If that list changes, this
       # number is the thing that makes it a deliberate change rather than a
       # consumer discovering a missing package at import time.
@@ -61,14 +61,14 @@ jobs:
       # likely to break in a way `npm install` cannot see.
       verify-command: |
         node --input-type=commonjs -e "
-          const r = require('@atest/runner-playwright/reporter');
+          const r = require('@aplaytest/runner-playwright/reporter');
           if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load from the tarball'); }
         "
         node --input-type=module -e "
-          import { BlobHistoryStore } from '@atest/store-azure';
+          import { BlobHistoryStore } from '@aplaytest/store-azure';
           if (typeof BlobHistoryStore !== 'function') { throw new Error('Azure history store did not load'); }
         "
-        npx atest --help > /dev/null
+        npx aplaytest --help > /dev/null
       artifact-type: application/vnd.atest.packages.v1
       attest-provenance: true
       attach-to-release: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
@@ -89,7 +89,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pkg=atest-packages
+          pkg=aplaytest-packages
           if gh api --method PUT "/user/packages/container/${pkg}/visibility" \
                -f visibility=public >/dev/null 2>&1 \
             || gh api --method PUT "/users/${OWNER}/packages/container/${pkg}/visibility" \

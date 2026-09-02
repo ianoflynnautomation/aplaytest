@@ -30,7 +30,7 @@ const text = (): string => out.join('');
 describe('doctor', () => {
   it('given a project directory named by --cwd -> when doctor runs -> then it diagnoses that directory rather than the process cwd', { tags: ['@integration', '@cli'] }, async () => {
     // REGRESSION GUARD: doctor ignored --cwd while every other command honoured
-    // it, so `atest doctor --cwd ../suite` reported the wrong repo's Playwright
+    // it, so `aplaytest doctor --cwd ../suite` reported the wrong repo's Playwright
     // version and every file as missing — the most misleading answer a
     // diagnostic can give.
     const root = await mkdtemp(join(tmpdir(), 'atest-doctor-'));

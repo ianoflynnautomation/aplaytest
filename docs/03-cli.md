@@ -5,7 +5,7 @@ principles:
 
 - **Playwright flags pass through unchanged.** `--project`, `--grep`, `--shard`,
   `--workers`, `--repeat-each`, `-g` all mean exactly what they mean today. Anyone who
-  knows `playwright test` already knows `atest run`.
+  knows `playwright test` already knows `aplaytest run`.
 - **Every mutating command has a dry-run and prints a diff before acting.**
 - **Exit codes are semantic.** CI branches on them without parsing text.
 - **TTY output is rich; non-TTY output is plain and greppable.** Detected, not flagged.
@@ -14,7 +14,7 @@ principles:
 ## Command surface
 
 ```
-atest <command> [options]
+aplaytest <command> [options]
 
   BUILT
   init                      Attach the reporter; --undo removes it
@@ -27,17 +27,17 @@ atest <command> [options]
   agent author              Generate a test, then prove it asserts something
   ci generate               Emit a CI workflow with the execute/analyze split
   doctor                    Verify configuration, history, and versions
-  (atest-mcp)               MCP server — the `@atest/mcp` binary, not an
-                            `atest` subcommand
+  (aplaytest-mcp)               MCP server — the `@aplaytest/mcp` binary, not an
+                            `aplaytest` subcommand
 
   DESIGN ONLY — described in this document, not implemented
   run                       Dropped deliberately; see the section below
   analyze                   Split into `report` and `flaky report`
-  agent repair              The engine exists; `atest heal` drives it
+  agent repair              The engine exists; `aplaytest heal` drives it
   agent explore | chat      Roadmap phase 6
   history export | import   Covered by `history ingest` and `--json` output
   ci validate               Not built
-  mcp serve                 The server exists, but as the `atest-mcp` binary
+  mcp serve                 The server exists, but as the `aplaytest-mcp` binary
 ```
 
 > Kept as one list rather than two documents so the gap between what was
@@ -73,14 +73,14 @@ atest <command> [options]
 
 ---
 
-## `atest init`
+## `aplaytest init`
 
 Interactive, idempotent, and honest about what it changes.
 
 ```
-$ atest init
+$ aplaytest init
 
-  atest — project setup
+  aplaytest — project setup
 
   ✔ Detected Playwright 1.61.0 (pinned)
   ✔ Found 4 Playwright configs
@@ -108,7 +108,7 @@ $ atest init
 
   ? Apply? › yes
 
-  ✔ Done.  Next:  atest run --grep @smoke
+  ✔ Done.  Next:  aplaytest run --grep @smoke
 ```
 
 The `~` edits are shown as a real diff under `--verbose` and skipped entirely under
@@ -116,16 +116,16 @@ The `~` edits are shown as a real diff under `--verbose` and skipped entirely un
 
 ---
 
-## `atest run` — NOT BUILT, and dropped from the roadmap
+## `aplaytest run` — NOT BUILT, and dropped from the roadmap
 
 > Everything in this section is design, not documentation. There is no
-> `atest run`, and there will not be: a wrapper owes permanent exit-code and
+> `aplaytest run`, and there will not be: a wrapper owes permanent exit-code and
 > behaviour parity with `playwright test` for no capability, and it contradicts
 > the principle the rest of the design rests on — that removing the reporter
 > line removes the framework. Invoke `playwright test` exactly as before.
 >
-> The features sketched below live elsewhere: `--analyze` is `atest report` and
-> `atest flaky report`, `--impact` is `atest impact`, `--heal` is `atest heal`.
+> The features sketched below live elsewhere: `--analyze` is `aplaytest report` and
+> `aplaytest flaky report`, `--impact` is `aplaytest impact`, `--heal` is `aplaytest heal`.
 > The section is kept because the footer design it describes is still the
 > intended shape of the reporter's output.
 
@@ -133,7 +133,7 @@ Wraps `playwright test`. In `strict` mode the child process is invoked with iden
 arguments to what you would have run — the only addition is the reporter.
 
 ```
-atest run [pw-args...]
+aplaytest run [pw-args...]
 
   --mode strict|assisted|agentic       [default: strict]
   --project <name>                     (repeatable, passthrough)
@@ -142,7 +142,7 @@ atest run [pw-args...]
   --workers <n>                        (passthrough)
 
   --heal                               shorthand for --mode assisted --then heal
-  --analyze                            run `atest analyze` on completion
+  --analyze                            run `aplaytest analyze` on completion
   --impact                             select tests via impact analysis
   --impact-from <ref>                  diff base                 [default: origin/main]
   --repeat-flaky <n>                   re-run only known-flaky tests n× to refresh stats
@@ -154,7 +154,7 @@ Live output in a TTY: Playwright's own reporter is preserved (you keep `list`), 
 atest footer appended after the run.
 
 ```
-$ atest run --grep @smoke --analyze
+$ aplaytest run --grep @smoke --analyze
 
   Running 28 tests using 6 workers  … [playwright's own output] …
 
@@ -175,10 +175,10 @@ $ atest run --grep @smoke --analyze
     verdict     not flaky — likely a real selector change   (confidence: high, no model used)
 
     evidence    .atest/evidence/2026-08-16T14-02-11Z/ev_9f3a21
-    next        atest heal --failure ev_9f3a21
+    next        aplaytest heal --failure ev_9f3a21
 
   ─── flaky ────────────────────────────────────────────────────────────────────
-  no new flake signals · 2 tests above threshold (atest flaky report)
+  no new flake signals · 2 tests above threshold (aplaytest flaky report)
 ```
 
 Note what that block does with **no model at all**: it names the failing intent, points
@@ -188,17 +188,17 @@ majority of debugging value, delivered deterministically.
 
 ---
 
-## `atest heal`
+## `aplaytest heal`
 
 ```
-atest heal                              propose heals for the latest run's failures
-atest heal --failure <evidenceId>       one failure
-atest heal --run <runId>
-atest heal list                         open proposals
-atest heal show <healId>                full diff + validation record + reasoning
-atest heal apply <healId|--all>         write to the working tree
-atest heal revert <healId>              restore the prior source
-atest heal pr [--all]                   open a PR on atest/heal/<runId>
+aplaytest heal                              propose heals for the latest run's failures
+aplaytest heal --failure <evidenceId>       one failure
+aplaytest heal --run <runId>
+aplaytest heal list                         open proposals
+aplaytest heal show <healId>                full diff + validation record + reasoning
+aplaytest heal apply <healId|--all>         write to the working tree
+aplaytest heal revert <healId>              restore the prior source
+aplaytest heal pr [--all]                   open a PR on atest/heal/<runId>
 
   --aggressiveness off|conservative|balanced|aggressive   [default: config]
   --strategies selector,assertion,flow                    [default: selector]
@@ -208,7 +208,7 @@ atest heal pr [--all]                   open a PR on atest/heal/<runId>
 ```
 
 ```
-$ atest heal --failure ev_9f3a21
+$ aplaytest heal --failure ev_9f3a21
 
   Analyzing 1 failure …
 
@@ -233,7 +233,7 @@ $ atest heal --failure ev_9f3a21
     also  GYM_CARD_TEST_IDS.name (line 5) holds the same literal and is used by
           gyms.card.page.ts — included in the patch.
 
-  Apply?  atest heal apply heal_2f81c0        Open PR?  atest heal pr heal_2f81c0
+  Apply?  aplaytest heal apply heal_2f81c0        Open PR?  aplaytest heal pr heal_2f81c0
 ```
 
 The "also" line matters: a codemod that understands the constants file catches the
@@ -241,19 +241,19 @@ second occurrence. A regex-replace on the spec would not have.
 
 ---
 
-## `atest flaky`
+## `aplaytest flaky`
 
 ```
-atest flaky analyze [--window 50] [--since 14d] [--project <p>]
-atest flaky report  [--format table|html|json|markdown] [--ci]
-atest flaky bisect  --test <id> [--with-suite] [--workers-sweep] [--repeat 30]
-atest flaky quarantine --test <id> --reason <text> [--expires 14d] [--issue]
-atest flaky expire  [--ci]        fail if any quarantine is past its expiry
-atest flaky release --test <id>   remove @quarantine, run 30× to confirm
+aplaytest flaky analyze [--window 50] [--since 14d] [--project <p>]
+aplaytest flaky report  [--format table|html|json|markdown] [--ci]
+aplaytest flaky bisect  --test <id> [--with-suite] [--workers-sweep] [--repeat 30]
+aplaytest flaky quarantine --test <id> --reason <text> [--expires 14d] [--issue]
+aplaytest flaky expire  [--ci]        fail if any quarantine is past its expiry
+aplaytest flaky release --test <id>   remove @quarantine, run 30× to confirm
 ```
 
 ```
-$ atest flaky report
+$ aplaytest flaky report
 
   Flaky leaderboard — last 50 runs, 14 days
 
@@ -276,7 +276,7 @@ $ atest flaky report
       · co-scheduled with snapshot project in 9/11 failures
 
     suggested next step
-      atest flaky bisect --test footer-stores-link --workers-sweep
+      aplaytest flaky bisect --test footer-stores-link --workers-sweep
 
     (all of the above is deterministic — no model was called)
 ```
@@ -285,7 +285,7 @@ $ atest flaky report
 turn a hunch into a fact:
 
 ```
-$ atest flaky bisect --test footer-stores-link --workers-sweep --repeat 20
+$ aplaytest flaky bisect --test footer-stores-link --workers-sweep --repeat 20
 
   workers=1   20/20 pass
   workers=2   20/20 pass
@@ -302,18 +302,18 @@ $ atest flaky bisect --test footer-stores-link --workers-sweep --repeat 20
 
 ---
 
-## `atest agent`
+## `aplaytest agent`
 
 The only command family that requires a model. Exits 3 without one.
 
 ```
-atest agent author  --goal "<natural language>" [--feature <name>] [--out <path>]
+aplaytest agent author  --goal "<natural language>" [--feature <name>] [--out <path>]
                     [--plan-only] [--keep-rejected] [--dry-run] [--force]
 
 # Not yet implemented — see docs/09-roadmap.md:
-#   atest agent repair  --failure <evidenceId>   (the engine exists; `atest heal` drives it)
-#   atest agent explore --route /gyms
-#   atest agent chat
+#   aplaytest agent repair  --failure <evidenceId>   (the engine exists; `aplaytest heal` drives it)
+#   aplaytest agent explore --route /gyms
+#   aplaytest agent chat
 ```
 
 `--dry-run` prints the grounding and exits without spending anything. It is the
@@ -324,7 +324,7 @@ conventions file, page object, seeded fixtures and exemplars the agent was hande
 of one call rather than reviewing plausible-looking code.
 
 ```
-$ atest agent author \
+$ aplaytest agent author \
     --goal "a visitor filtering events by county sees only that county's events" \
     --feature events
 
@@ -359,20 +359,20 @@ which is the combination most likely to be committed by someone who trusts the t
 Pass `--keep-rejected` to inspect one.
 
 Run the gate on its own — including on a human-written test — with
-`atest gate --spec <file> --test "<title>"`. "Does this test actually assert anything?"
+`aplaytest gate --spec <file> --test "<title>"`. "Does this test actually assert anything?"
 is not a question that only applies to generated code.
 
 ---
 
-## `atest impact`
+## `aplaytest impact`
 
 ```
-atest impact [--from origin/main] [--to HEAD] [--format list|grep|shard-plan|json]
+aplaytest impact [--from origin/main] [--to HEAD] [--format list|grep|shard-plan|json]
              [--app-repo <path>]   # cross-repo: map an app diff to affected tests
 ```
 
 ```
-$ atest impact --from origin/main --format shard-plan
+$ aplaytest impact --from origin/main --format shard-plan
 
   changed  3 files
     src/ui/pages/gyms/gyms.constants.ts
@@ -399,25 +399,25 @@ always runs, and any run on `main` ignores impact entirely.
 
 ---
 
-## `atest ci generate`
+## `aplaytest ci generate`
 
 Emits workflows wired to your existing conventions (sharded matrix, blob reports, the
 analyze/execute secret split from 08).
 
 ```
-atest ci generate --provider github --shards 4 --projects api,chromium-desktop,...
-atest ci generate --provider gitlab
-atest ci validate                  # lints generated workflows: actionlint + policy
+aplaytest ci generate --provider github --shards 4 --projects api,chromium-desktop,...
+aplaytest ci generate --provider gitlab
+aplaytest ci validate                  # lints generated workflows: actionlint + policy
 ```
 
 ---
 
-## `atest doctor`
+## `aplaytest doctor`
 
 The first thing anyone runs when something is odd.
 
 ```
-$ atest doctor
+$ aplaytest doctor
 
   ✔ atest 0.4.1
   ✔ atest.config.ts valid

@@ -1,10 +1,10 @@
 # 08 — CI/CD
 
-> **`atest run` does not exist, and deliberately.** Tests are invoked with
+> **`aplaytest run` does not exist, and deliberately.** Tests are invoked with
 > `playwright test` exactly as before; atest attaches through the reporter.
 > A wrapper would contradict the design's own claim that removing the reporter
 > line removes the framework, and would owe permanent exit-code parity for no
-> capability. Earlier drafts of this document showed `atest run`; those have
+> capability. Earlier drafts of this document showed `aplaytest run`; those have
 > been corrected.
 >
 > Persisting history across runs needs a durable store — see
@@ -90,9 +90,9 @@ jobs:
       - id: plan
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            npx atest ci plan --all --shards 4 >> "$GITHUB_OUTPUT"
+            npx aplaytest ci plan --all --shards 4 >> "$GITHUB_OUTPUT"
           else
-            npx atest ci plan --impact-from origin/main --shards auto --max-shards 4 \
+            npx aplaytest ci plan --impact-from origin/main --shards auto --max-shards 4 \
               >> "$GITHUB_OUTPUT"
           fi
 
@@ -161,36 +161,36 @@ jobs:
       # one immutable object per run and shard, so there is no single file to
       # download, merge and race on. See 12 — Azure history.
       - name: Ingest this run
-        run: npx atest history ingest --runs .atest-artifacts/runs
+        run: npx aplaytest history ingest --runs .atest-artifacts/runs
 
       - name: Merge run data
-        run: npx atest analyze ingest --from artifacts
+        run: npx aplaytest analyze ingest --from artifacts
 
       # Flaky analysis is fully deterministic — runs even with no model key.
       - name: Flaky analysis
         run: |
-          npx atest flaky analyze --ci
-          npx atest flaky expire --ci || echo "EXPIRED_QUARANTINE=1" >> "$GITHUB_ENV"
+          npx aplaytest flaky analyze --ci
+          npx aplaytest flaky expire --ci || echo "EXPIRED_QUARANTINE=1" >> "$GITHUB_ENV"
 
       # Heals need a browser to validate candidates against the live page.
       - name: Propose heals
         if: env.ANTHROPIC_API_KEY != ''
-        run: npx atest heal --run latest --aggressiveness balanced --validate 3 --json > heals.json
+        run: npx aplaytest heal --run latest --aggressiveness balanced --validate 3 --json > heals.json
         continue-on-error: true
 
       - name: PR comment
         if: github.event_name == 'pull_request'
-        run: npx atest report --format markdown --ci | npx atest ci comment --update
+        run: npx aplaytest report --format markdown --ci | npx aplaytest ci comment --update
 
       - name: Open heal PR
         if: github.ref == 'refs/heads/main' && hashFiles('heals.json') != ''
-        run: npx atest heal pr --all --branch-prefix atest/heal/
+        run: npx aplaytest heal pr --all --branch-prefix atest/heal/
 
       # Retention only. The write already happened during ingest, and it is
       # main-only because ATEST_HISTORY_URL carries ?readonly=1 off main.
       - name: Trim history
         if: github.ref == 'refs/heads/main'
-        run: npx atest history prune --keep-days 90
+        run: npx aplaytest history prune --keep-days 90
 
       - uses: actions/upload-artifact@v4
         with: { name: atest-report, path: playwright-report/ }
@@ -207,7 +207,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: 'npm' }
       - run: npm ci --ignore-scripts
-      - run: npx atest flaky expire --ci     # exit 4 on expired quarantine or budget breach
+      - run: npx aplaytest flaky expire --ci     # exit 4 on expired quarantine or budget breach
 ```
 
 The four-job shape maps cleanly onto the properties you want: `plan` is cheap and
@@ -224,7 +224,7 @@ The history store must survive between runs. Three options; start with the first
 ### Option A — orphan branch (recommended to start)
 
 ```bash
-atest history export --to-branch atest-history --push
+aplaytest history export --to-branch atest-history --push
 ```
 
 An orphan branch `atest-history` holding `history.sqlite` (plus a JSONL fallback for
@@ -266,7 +266,7 @@ plan:
   image: node:22
   script:
     - npm ci --ignore-scripts
-    - npx atest ci plan --impact-from origin/$CI_DEFAULT_BRANCH --shards auto > plan.env
+    - npx aplaytest ci plan --impact-from origin/$CI_DEFAULT_BRANCH --shards auto > plan.env
   artifacts: { reports: { dotenv: plan.env } }
 
 test:
@@ -290,13 +290,13 @@ analyze:
     ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY     # masked, protected, this job only
   script:
     - npm ci --ignore-scripts
-    - npx atest analyze ingest --from .
-    - npx atest flaky analyze --ci
-    - npx atest heal --run latest --json > heals.json || true
-    - npx atest report --format markdown --ci | npx atest ci comment --provider gitlab
+    - npx aplaytest analyze ingest --from .
+    - npx aplaytest flaky analyze --ci
+    - npx aplaytest heal --run latest --json > heals.json || true
+    - npx aplaytest report --format markdown --ci | npx aplaytest ci comment --provider gitlab
 ```
 
-`atest ci generate --provider gitlab` emits this, adapted to the detected project list.
+`aplaytest ci generate --provider gitlab` emits this, adapted to the detected project list.
 
 ---
 
@@ -358,7 +358,7 @@ Non-negotiable guards:
 - **`main` always runs everything.** Impact analysis is a PR-latency optimisation only.
 - **`@smoke` always runs.** 28 tests, ~18s. It is the floor.
 - **Above 60% selection, run everything.** The savings do not justify the risk.
-- **Every selection is explained.** `atest impact --format list` prints, per test, the
+- **Every selection is explained.** `aplaytest impact --format list` prints, per test, the
   edge that selected it. A selection nobody can explain is a coverage hole waiting to
   happen.
 
@@ -419,7 +419,7 @@ so a log line can always be joined back to a trace.
 
 ## Notifications
 
-Thin integrations over `atest report --format <x>`; no bespoke logic.
+Thin integrations over `aplaytest report --format <x>`; no bespoke logic.
 
 | Target | Trigger | Content |
 | --- | --- | --- |

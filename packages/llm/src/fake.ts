@@ -2,7 +2,7 @@
  * A scripted client for tests.
  *
  * Exported from the package, not hidden in a test folder, because the agent
- * runtime in @atest/agent needs it too — and because an agent loop that can
+ * runtime in @aplaytest/agent needs it too — and because an agent loop that can
  * only be exercised with a live API key is an agent loop nobody will test.
  */
 

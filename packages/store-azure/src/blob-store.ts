@@ -38,7 +38,7 @@ import {
   type HistoryStore,
   type RunRecord,
   type TestKey,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 import type { BlobBackend } from './backend.js';
 import { StorageSharedKeyCredential } from '@azure/storage-blob';

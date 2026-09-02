@@ -22,7 +22,7 @@ Three independent sources, each with different strength:
 | --- | --- | --- |
 | **Retry flip** — failed then passed on retry, same run, same commit | Strongest | You already run `retries: 1` in CI. Free. |
 | **Same-commit variance** — different outcomes across runs at one SHA | Strong | Nightly / re-runs / `--repeat-flaky` |
-| **Stable-impact variance** — different outcomes across commits where the test's impact set did not change | Moderate | Joins the impact engine (`atest impact`) |
+| **Stable-impact variance** — different outcomes across commits where the test's impact set did not change | Moderate | Joins the impact engine (`aplaytest impact`) |
 
 The third is the interesting one. Most tools compare outcomes across commits blindly and
 so misread a genuine regression as flake. Using the import graph to ask *"did anything
@@ -171,7 +171,7 @@ first — rather than suggesting a retry.
 
 ---
 
-## `atest flaky bisect`
+## `aplaytest flaky bisect`
 
 Classification produces a hypothesis. Bisect turns it into a fact by re-running under
 controlled perturbations. This is the command that earns the tool its keep.
@@ -190,7 +190,7 @@ export const BISECT_DIMENSIONS = {
 Applied to your real, documented flake:
 
 ```
-$ atest flaky bisect --test "footer …Stores quick link" --repeat 20
+$ aplaytest flaky bisect --test "footer …Stores quick link" --repeat 20
 
   isolation
     alone      20/20 pass
@@ -217,7 +217,7 @@ $ atest flaky bisect --test "footer …Stores quick link" --repeat 20
     1. harden: await the navigation response, then assert the URL
          await Promise.all([page.waitForURL('**/stores'), storesLink.click()]);
     2. or quarantine for 14 days:
-         atest flaky quarantine --test footer-stores-link \
+         aplaytest flaky quarantine --test footer-stores-link \
            --reason "firefox nav race under parallel load" --expires 14d --issue
 ```
 
@@ -278,7 +278,7 @@ Result in the spec — self-documenting, greppable, and it deletes cleanly:
 ### Enforcement — the part that keeps the list from growing
 
 ```
-$ atest flaky expire --ci
+$ aplaytest flaky expire --ci
 
   quarantine budget   2 / 5 tests  (0.7% of suite, cap 2.0%)   ✔
 
@@ -290,8 +290,8 @@ $ atest flaky expire --ci
   ✗ 1 expired quarantine
 
     Quarantines expire so they get fixed. Choose one:
-      atest flaky release --test competitions-results-sort    # verify + un-quarantine
-      atest flaky quarantine --test … --expires 14d --justify "waiting on APP-441"
+      aplaytest flaky release --test competitions-results-sort    # verify + un-quarantine
+      aplaytest flaky quarantine --test … --expires 14d --justify "waiting on APP-441"
       delete the test
 
   exit 4 (policy violation)
@@ -303,7 +303,7 @@ Three enforcement mechanisms, all deterministic:
 2. **Budget** — hard cap (default `max(5 tests, 2% of suite)`). Exceeding it fails CI.
    This is the pressure valve that stops quarantine becoming the default response to
    any red build.
-3. **Release verification** — `atest flaky release` runs the test 30× under the
+3. **Release verification** — `aplaytest flaky release` runs the test 30× under the
    conditions that made it flake (from the bisect record, e.g. `--workers 8` on
    firefox). Passing 29/30 is not passing.
 
@@ -326,7 +326,7 @@ than becoming a second scheduler.
 
 ## Reporting
 
-`atest flaky report --format html` produces a dashboard with:
+`aplaytest flaky report --format html` produces a dashboard with:
 
 - **Leaderboard** — score, n, class, trend sparkline, quarantine state.
 - **Suite health** — aggregate flake rate over time. This is the number to put on a wall.

@@ -1,5 +1,5 @@
 /**
- * `atest flaky …`
+ * `aplaytest flaky …`
  *
  * Every command body here is thin on purpose: parse flags, call one engine
  * function, format the result. Logic that lives in a command cannot be tested
@@ -19,8 +19,8 @@ import {
   releaseCodemod,
   renderQuarantineComment,
   type FlakyVerdict,
-} from '@atest/flaky';
-import { ATEST_VERSION, ingestDirectory } from '@atest/core';
+} from '@aplaytest/flaky';
+import { ATEST_VERSION, ingestDirectory } from '@aplaytest/core';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from '../exit.js';
 import { openHistoryStore, resolveHistoryUrl, storeWarnings } from '../store.js';
@@ -141,7 +141,7 @@ export async function flakyReport(flags: FlakyFlags): Promise<ExitCode> {
     for (const evidence of v.classification.evidence) line(style.dim(`  evidence      · ${evidence}`));
     line(
       style.cyan(
-        `  next          atest flaky quarantine --test ${JSON.stringify(v.title)} --file ${v.file}`,
+        `  next          aplaytest flaky quarantine --test ${JSON.stringify(v.title)} --file ${v.file}`,
       ),
     );
   }
@@ -151,7 +151,7 @@ export async function flakyReport(flags: FlakyFlags): Promise<ExitCode> {
 
 export async function flakyQuarantine(flags: FlakyFlags): Promise<ExitCode> {
   if (flags.test === undefined || flags.file === undefined) {
-    throw new UsageError('atest flaky quarantine requires --test "<title>" and --file <path>');
+    throw new UsageError('aplaytest flaky quarantine requires --test "<title>" and --file <path>');
   }
 
   const ledger = await readLedger(flags.ledger);
@@ -214,7 +214,7 @@ export async function flakyQuarantine(flags: FlakyFlags): Promise<ExitCode> {
 
 export async function flakyRelease(flags: FlakyFlags): Promise<ExitCode> {
   if (flags.test === undefined || flags.file === undefined) {
-    throw new UsageError('atest flaky release requires --test "<title>" and --file <path>');
+    throw new UsageError('aplaytest flaky release requires --test "<title>" and --file <path>');
   }
 
   const source = await readFile(flags.file, 'utf8').catch(() => null);
@@ -285,7 +285,7 @@ export async function flakyExpire(flags: FlakyFlags): Promise<ExitCode> {
   line(
     style.cyan(
       '\nrelease it, extend it with a written justification, or delete the test:' +
-        '\n  atest flaky release --test "<title>" --file <path>',
+        '\n  aplaytest flaky release --test "<title>" --file <path>',
     ),
   );
   return EXIT.POLICY_VIOLATION;

@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     // DOM is scoped to THIS package only. `page.evaluate` callbacks are
     // serialised and executed in the browser, so their bodies genuinely need
-    // browser types. @atest/core deliberately stays on the Node-only lib so a
+    // browser types. @aplaytest/core deliberately stays on the Node-only lib so a
     // stray `document` reference there fails the build rather than shipping.
     "lib": ["ES2023", "DOM"]
   },

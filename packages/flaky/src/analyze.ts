@@ -7,7 +7,7 @@
  * aggregate is the number that hides the bug.
  */
 
-import type { HistoricalAttempt, HistoryStore } from '@atest/core';
+import type { HistoricalAttempt, HistoryStore } from '@aplaytest/core';
 
 import { classifyFlake, type Classification } from './classify.js';
 import { extractFeatures, type FlakeFeatures } from './features.js';

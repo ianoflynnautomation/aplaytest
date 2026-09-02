@@ -73,8 +73,8 @@ you just built:
 
 ```sh
 cd /path/to/atest
-npx atest doctor
-npx atest heal --evidence examples/bjjeire-live/.atest/evidence \
+npx aplaytest doctor
+npx aplaytest heal --evidence examples/bjjeire-live/.atest/evidence \
   --spec examples/bjjeire-live/tests/gyms.spec.ts
 ```
 
@@ -123,37 +123,37 @@ mkdir -p /path/to/bjjeire-tests/vendor
 cp dist-pack/*.tgz /path/to/bjjeire-tests/vendor/
 
 # in bjjeire-tests — ALL of them in one command. Each declares
-# @atest/core@^0.1.0, and npm satisfies that from its siblings in the same
+# @aplaytest/core@^0.1.0, and npm satisfies that from its siblings in the same
 # invocation. Ask for one alone and it resolves against the registry, which
 # gives you the last RELEASED core rather than the one you just built.
 npm i ./vendor/*.tgz
 ```
 
 For anything other than testing local edits, install from npm instead — the
-packages are published under the `@atest` scope with real semver between them:
+packages are published under the `@aplaytest` scope with real semver between them:
 
 ```sh
-npm i -D @atest/runner-playwright @atest/cli
+npm i -D @aplaytest/runner-playwright @aplaytest/cli
 ```
 
 The reporter is not wired until you add it. `src/shared/config/playwright.ts`
 builds the reporter list in `activeReporters()`:
 
 ```ts
-reporters.push(['@atest/runner-playwright/reporter']);
+reporters.push(['@aplaytest/runner-playwright/reporter']);
 ```
 
 Then after a failing gyms run:
 
 ```sh
-npx atest doctor
-npx atest heal --evidence .atest/evidence
+npx aplaytest doctor
+npx aplaytest heal --evidence .atest/evidence
 ```
 
 API-only history, no reporter required:
 
 ```sh
-npx atest history ingest --db .atest/history.sqlite \
+npx aplaytest history ingest --db .atest/history.sqlite \
   --playwright-json test-results/results.json
 ```
 
@@ -167,8 +167,8 @@ unless that path is mounted. See [11 — Adoption](./11-adoption-bjjeire.md).
 | You are changing… | Run this |
 | --- | --- |
 | Core / heal / flaky logic | `npm test` in atest (vitest) |
-| Reporter, capture, heal against a real page | `examples/bjjeire-live` + `atest heal` |
-| Attach, CLI flags, flake/history on the real suite | `bjjeire-tests` gyms spec + `atest` CLI |
+| Reporter, capture, heal against a real page | `examples/bjjeire-live` + `aplaytest heal` |
+| Attach, CLI flags, flake/history on the real suite | `bjjeire-tests` gyms spec + `aplaytest` CLI |
 | Model ranking | same as live example, with `ANTHROPIC_API_KEY` set |
 
 ---

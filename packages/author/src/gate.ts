@@ -14,7 +14,7 @@
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { runPlaywright, type PlaywrightRunResult } from '@atest/runner-playwright';
+import { runPlaywright, type PlaywrightRunResult } from '@aplaytest/runner-playwright';
 
 import {
   MEANINGFUL_CLASSES,

@@ -16,10 +16,10 @@
  * runner. Two consumers need it and only one of them can see the runner: the
  * reporter (inside the test process, with a live `TestResult`) and the
  * Playwright-JSON history adapter (in CI, with only a merged report on disk).
- * Leaving it in `@atest/runner-playwright` would have forced core to depend on
+ * Leaving it in `@aplaytest/runner-playwright` would have forced core to depend on
  * the runner — inverting the dependency — or forced the adapter to reimplement
  * the regexes, which is how two parsers drift into disagreeing about the same
- * error. `@atest/runner-playwright` re-exports it, so its public API is
+ * error. `@aplaytest/runner-playwright` re-exports it, so its public API is
  * unchanged.
  */
 

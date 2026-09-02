@@ -1,5 +1,5 @@
 /**
- * `atest init` — wire atest into an existing Playwright repository.
+ * `aplaytest init` — wire atest into an existing Playwright repository.
  *
  * The whole design rests on one claim: **removing the reporter line fully
  * removes the framework**. So init's job is to add that line and almost
@@ -11,7 +11,7 @@
  *   1. NEVER silently overwrite. It edits `playwright.config.ts` in place, so
  *      it reports what it would change and requires `--apply` to write it.
  *   2. Be reversible in one line. What it adds is a reporter entry and a
- *      gitignore block. `atest init --undo` removes both.
+ *      gitignore block. `aplaytest init --undo` removes both.
  *   3. Say what it could NOT do. A config it cannot parse, an API project that
  *      needs the other fixture — these are reported, not guessed at. Guessing
  *      produces a config that looks wired up and captures nothing.
@@ -38,7 +38,7 @@ const CANDIDATE_CONFIGS = [
   'playwright.config.mjs',
 ];
 
-const REPORTER_ENTRY = "['@atest/runner-playwright/reporter']";
+const REPORTER_ENTRY = "['@aplaytest/runner-playwright/reporter']";
 
 const GITIGNORE_BLOCK = `
 # atest working data — generated, never source. The quarantine ledger is the
@@ -66,7 +66,7 @@ export interface ConfigEdit {
  * what its author meant.
  */
 export function addReporter(source: string): ConfigEdit['reason'] | { text: string } {
-  if (source.includes('@atest/runner-playwright/reporter')) {
+  if (source.includes('@aplaytest/runner-playwright/reporter')) {
     return 'already present';
   }
 
@@ -75,7 +75,7 @@ export function addReporter(source: string): ConfigEdit['reason'] | { text: stri
   // The close bracket is found by COUNTING, not by regex. A non-greedy
   // `[\s\S]*?\]` stops at the first `]` it meets, which for
   // `reporter: [['list'], ['html']]` is the one closing `['list']`. That
-  // produced `['list',\n ['@atest/...'],],` — a file that no longer parses,
+  // produced `['list',\n ['@aplaytest/...'],],` — a file that no longer parses,
   // written straight to disk by --apply. An edit tool that corrupts the config
   // it was pointed at is worse than one that declines to edit.
   const open = /\breporter\s*:\s*\[/.exec(source);
@@ -207,7 +207,7 @@ export function matchingBracket(source: string, openIndex: number): number {
  * Dropping whole lines is fine for the array form, where the entry has a line
  * to itself, and destructive for the promoted form. Measured: a config that
  * started as `reporter: 'list'` was rewritten to
- * `reporter: [['list'], ['@atest/…']],` on the way in, and undo deleted that
+ * `reporter: [['list'], ['@aplaytest/…']],` on the way in, and undo deleted that
  * entire line — silently taking the user's own reporter with it and leaving a
  * config with no `reporter` key at all. Undo must never remove something the
  * user wrote.
@@ -254,7 +254,7 @@ export async function init(flags: InitFlags): Promise<ExitCode> {
     throw new UsageError(
       `No Playwright config found in ${cwd}.\n` +
         `  Looked for: ${CANDIDATE_CONFIGS.join(', ')}\n` +
-        '  Run atest init from your test project, or pass --config <path>.',
+        '  Run aplaytest init from your test project, or pass --config <path>.',
     );
   }
 
@@ -268,7 +268,7 @@ export async function init(flags: InitFlags): Promise<ExitCode> {
   const result = addReporter(configSource);
   const gitignoreNeedsBlock = !gitignore.includes('.atest/runs');
 
-  heading(`atest init · ${configPath}`);
+  heading(`aplaytest init · ${configPath}`);
 
   if (typeof result === 'string') {
     if (result === 'already present') {
@@ -308,14 +308,14 @@ export async function init(flags: InitFlags): Promise<ExitCode> {
   // buried in a doc: the capture fixtures are opt-in and project-specific,
   // and choosing the wrong one for an API project launches a browser per test.
   line(style.bold('  Next — capture fixtures (optional, and the part that must be chosen):'));
-  line('    UI projects   import { atestFixtures }    from \'@atest/runner-playwright\'');
-  line('    API projects  import { atestApiFixtures } from \'@atest/runner-playwright\'');
+  line('    UI projects   import { atestFixtures }    from \'@aplaytest/runner-playwright\'');
+  line('    API projects  import { atestApiFixtures } from \'@aplaytest/runner-playwright\'');
   line(style.dim('    Compose into your fixture barrel: base.extend({ ...atestFixtures, ...yours })'));
   line();
   line(style.dim('    An API project given atestFixtures still passes — and launches a'));
   line(style.dim('    browser for every test, because the capture fixture depends on `page`.'));
   line();
-  line(style.dim('  Undo everything with: atest init --undo --apply'));
+  line(style.dim('  Undo everything with: aplaytest init --undo --apply'));
   return EXIT.OK;
 }
 
@@ -327,7 +327,7 @@ async function undo(
   gitignore: string,
   flags: InitFlags,
 ): Promise<ExitCode> {
-  heading(`atest init --undo · ${configPath}`);
+  heading(`aplaytest init --undo · ${configPath}`);
 
   const strippedConfig = removeReporter(configSource);
   const configChanged = strippedConfig !== configSource;

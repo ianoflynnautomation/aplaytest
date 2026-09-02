@@ -15,22 +15,22 @@ import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import { z } from 'zod';
-import { falsifiabilityGate, ground } from '@atest/author';
+import { falsifiabilityGate, ground } from '@aplaytest/author';
 import {
   MemoryHistoryStore,
   formatFailingStep,
   ingestDirectory,
   loadRunBundles,
   type EvidenceBundle,
-} from '@atest/core';
-import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@atest/flaky';
+} from '@aplaytest/core';
+import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@aplaytest/flaky';
 import {
   DEFAULT_HEAL_OPTIONS,
   assessBundle,
   generateCandidates,
   missingTestIds,
   proposeHeal,
-} from '@atest/heal';
+} from '@aplaytest/heal';
 import {
   DEFAULT_SELECTION_CONFIG,
   DEFAULT_SPEC_PATTERN,
@@ -39,7 +39,7 @@ import {
   resolveTsConfig,
   scanRouteOwnership,
   selectTests,
-} from '@atest/impact';
+} from '@aplaytest/impact';
 
 export interface ToolContext {
   readonly cwd: string;
@@ -258,7 +258,7 @@ export const proposeHealTool = defineTool({
   title: 'Propose a selector heal',
   description:
     'Computes a patch for a drifted selector and returns it as data. Does NOT write anything ' +
-    'and does NOT validate — safe to call while exploring. To apply, run `atest heal --apply` ' +
+    'and does NOT validate — safe to call while exploring. To apply, run `aplaytest heal --apply` ' +
     'from the CLI after showing the diff to the user.',
   schema: z.object({ evidenceId: z.string(), constantsFile: z.string() }),
   async handler(input, context) {
@@ -290,7 +290,7 @@ export const proposeHealTool = defineTool({
       diffPreview: proposal.patch.after,
       candidates: proposal.candidates,
       validated: false,
-      note: 'Not validated. Run `atest heal --apply` to validate by re-running the test.',
+      note: 'Not validated. Run `aplaytest heal --apply` to validate by re-running the test.',
     };
   },
 });

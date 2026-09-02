@@ -9,8 +9,8 @@
  *
  * The Azure driver is imported DYNAMICALLY and only when the URL asks for it.
  * `@azure/identity` and `@azure/storage-blob` are around 8 MB and start a
- * credential chain on construction; a developer running `atest flaky report`
- * against a local file should pay for neither, and `atest --help` in a repo
+ * credential chain on construction; a developer running `aplaytest flaky report`
+ * against a local file should pay for neither, and `aplaytest --help` in a repo
  * that never installed the package must not crash.
  */
 
@@ -21,7 +21,7 @@ import {
   parseHistoryUrl,
   type HistoryStore,
   type HistoryTarget,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 import { UsageError } from './exit.js';
 
@@ -36,7 +36,7 @@ export interface OpenStoreResult {
  * `--db` beats `ATEST_HISTORY_URL` beats `:memory:`.
  *
  * The environment variable exists so a CI template can point a whole pipeline
- * at one store without threading a flag through every `npx atest` invocation —
+ * at one store without threading a flag through every `npx aplaytest` invocation —
  * and so that forgetting one invocation degrades to the same store as the rest
  * rather than to a throwaway.
  *
@@ -58,15 +58,15 @@ async function openBlobStore(
   target: Extract<HistoryTarget, { kind: 'azure-blob' }>,
   env: NodeJS.ProcessEnv,
 ) {
-  let module: typeof import('@atest/store-azure');
+  let module: typeof import('@aplaytest/store-azure');
   try {
-    module = await import('@atest/store-azure');
+    module = await import('@aplaytest/store-azure');
   } catch {
     throw new UsageError(
       `${target.account}/${target.container} needs the Azure driver, which is not installed.\n` +
         '  Install it alongside the CLI:\n' +
-        '    npm i -D @atest/store-azure\n' +
-        '  It is a separate package so that a Playwright run, which loads @atest/core inside\n' +
+        '    npm i -D @aplaytest/store-azure\n' +
+        '  It is a separate package so that a Playwright run, which loads @aplaytest/core inside\n' +
         '  the test process, never pays for an SDK only the analyze job uses.',
     );
   }
@@ -85,7 +85,7 @@ async function openBlobStore(
  * Open a `HistoryStore` for a URL resolved by {@link resolveHistoryUrl}.
  *
  * The Azure driver is imported dynamically and only when the URL asks for it,
- * so `atest --help` in a repo that never installed `@atest/store-azure` does
+ * so `aplaytest --help` in a repo that never installed `@aplaytest/store-azure` does
  * not crash.
  *
  * @param url - SQLite path, `azblob://…`, or `:memory:`.

@@ -36,7 +36,7 @@ import {
   type FailureKind,
   type Outcome,
   type RunRecord,
-} from '@atest/core';
+} from '@aplaytest/core';
 
 import { assembleBundle, classifyResult, type Sidecars, type TestResultLike } from './assemble.js';
 import { SIDECAR, SidecarParseError, parseSidecar } from './sidecar.js';

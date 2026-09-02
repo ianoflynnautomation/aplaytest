@@ -1,5 +1,5 @@
 {
-  "name": "@atest/flaky",
+  "name": "@aplaytest/flaky",
   "version": "0.1.0",
   "description": "Statistical flake detection, root-cause classification, and quarantine policy",
   "license": "MIT",
@@ -14,9 +14,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "^0.1.0",
+    "@aplaytest/core": "^0.1.0",
     "ts-morph": "^28.0.0",
-    "@atest/runner-playwright": "^0.1.0"
+    "@aplaytest/runner-playwright": "^0.1.0"
   },
   "exports": {
     ".": {
@@ -29,11 +29,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "url": "git+https://github.com/ianoflynnautomation/aplaytest.git",
     "directory": "packages/flaky"
   },
-  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "homepage": "https://github.com/ianoflynnautomation/aplaytest#readme",
   "bugs": {
-    "url": "https://github.com/ianoflynnautomation/atest/issues"
+    "url": "https://github.com/ianoflynnautomation/aplaytest/issues"
   }
 }

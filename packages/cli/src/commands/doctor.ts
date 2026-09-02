@@ -1,5 +1,5 @@
 /**
- * `atest doctor` — the first thing anyone runs when something is odd.
+ * `aplaytest doctor` — the first thing anyone runs when something is odd.
  *
  * Reports what it can actually verify and says plainly what it cannot, rather
  * than printing a wall of green ticks that mean nothing. Every warning carries
@@ -10,8 +10,8 @@ import { access, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
-import { MemoryHistoryStore, ingestDirectory } from '@atest/core';
-import { ground } from '@atest/author';
+import { MemoryHistoryStore, ingestDirectory } from '@aplaytest/core';
+import { ground } from '@aplaytest/author';
 
 import { EXIT, type ExitCode } from '../exit.js';
 import { heading, line, style } from '../ui/output.js';
@@ -51,7 +51,7 @@ export async function doctor(flags: {
   cwd?: string | undefined;
 }): Promise<ExitCode> {
   const checks: Check[] = [];
-  // Honour --cwd like every other command. Without it, `atest doctor --cwd
+  // Honour --cwd like every other command. Without it, `aplaytest doctor --cwd
   // ../suite` silently diagnoses the wrong directory and reports everything
   // missing — the most misleading answer a diagnostic can give.
   const cwd = resolve(flags.cwd ?? process.cwd());
@@ -180,7 +180,7 @@ export async function doctor(flags: {
         ),
   );
 
-  heading('atest doctor');
+  heading('aplaytest doctor');
   for (const check of checks) {
     const mark =
       check.status === 'ok'

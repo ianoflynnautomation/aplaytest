@@ -9,7 +9,7 @@
 └───────────────────────────┬─────────────────────────────────────────────┘
                             │  same in-process API — no HTTP between them
 ┌───────────────────────────▼─────────────────────────────────────────────┐
-│  CORE ENGINE  @atest/core                                               │
+│  CORE ENGINE  @aplaytest/core                                               │
 │    config resolution · run orchestration · policy evaluation · audit    │
 └──┬──────────┬───────────┬───────────┬──────────┬──────────┬─────────────┘
    │          │           │           │          │          │
@@ -25,13 +25,13 @@
 └──────────┘└───────────┘└──────────┘└────┬────┘└────┬────┘└────────────┘
                                           │          │
                               ┌───────────▼──────────▼──────────┐
-                              │  AGENT RUNTIME  @atest/agent    │
+                              │  AGENT RUNTIME  @aplaytest/agent    │
                               │  repair agent · author agent    │
                               │  tool registry · budget guard   │
                               └───────────────┬─────────────────┘
                                               │
                               ┌───────────────▼─────────────────┐
-                              │  LLM ABSTRACTION  @atest/llm    │
+                              │  LLM ABSTRACTION  @aplaytest/llm    │
                               │  anthropic (openai/ollama: n/i) │
                               │  structured output · caching    │
                               └─────────────────────────────────┘
@@ -41,7 +41,7 @@
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Dependency rule:** arrows point down only. `@atest/heal` may import `@atest/core`;
+**Dependency rule:** arrows point down only. `@aplaytest/heal` may import `@aplaytest/core`;
 `core` never imports an engine. Engines never import each other — `flaky` needing
 impact data receives it through `core`. This keeps each engine independently testable
 with a fake history store.
@@ -57,7 +57,7 @@ first.
 
 ```ts
 // atest.config.ts consumers add one line to their reporter list
-reporter: [['list'], ['@atest/runner-playwright/reporter']];
+reporter: [['list'], ['@aplaytest/runner-playwright/reporter']];
 ```
 
 In this repo that means one entry in `activeReporters()` in
@@ -82,7 +82,7 @@ each bound function records `{ pageObject, method, args }` as a Playwright step,
 turns a stack trace into *"failed inside `gymsPage.expectCardData('Blackwater Valley BJJ')`"*.
 
 ```ts
-// @atest/runner-playwright/bind — a drop-in for src/ui/fixtures/bind-page.ts
+// @aplaytest/runner-playwright/bind — a drop-in for src/ui/fixtures/bind-page.ts
 export function bindPage<T extends object>(mod: T, page: Page, meta: BindMeta): BoundPageObject<T> {
   const bound: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(mod)) {
@@ -107,7 +107,7 @@ it wanted.
 
 ### 3. Executor mode (agentic only)
 
-For `atest agent` runs, `atest` drives Playwright's API directly rather than the test
+For `aplaytest agent` runs, `atest` drives Playwright's API directly rather than the test
 runner. Separate code path; does not affect normal runs.
 
 ---
@@ -119,7 +119,7 @@ MCP resources, report insights — consumes this and only this. Engines never re
 browser to "go look"; if a field is missing, the fix is to capture it, not to re-run.
 
 ```ts
-// @atest/core/src/evidence/types.ts
+// @aplaytest/core/src/evidence/types.ts
 
 export interface EvidenceBundle {
   readonly schemaVersion: 1;
@@ -330,7 +330,7 @@ const NEVER_HEAL: ReadonlySet<FailureKind> = new Set([
 
     ── everything above is synchronous, deterministic, and LLM-free ──
 
- 6. atest analyze    ──► (separate process / separate CI job / local command)
+ 6. aplaytest analyze    ──► (separate process / separate CI job / local command)
       ├─ flaky engine: query history → score → classify → policy proposal
       ├─ heal engine:  healable bundles → Tier-0 candidates
       │                 → [optional LLM rank] → validate by re-run → patch
@@ -352,7 +352,7 @@ property.
 SQLite locally; Azure Blob in CI, where history has to outlive the runner. Same
 query semantics either way — both drivers answer through one `HistoryIndex`, so a
 score cannot differ between a laptop and the pipeline. Same interface,
-same queries — `@atest/core` speaks a narrow `HistoryStore` interface with two drivers.
+same queries — `@aplaytest/core` speaks a narrow `HistoryStore` interface with two drivers.
 
 ```sql
 CREATE TABLE runs (
@@ -442,7 +442,7 @@ One file, fully typed, Zod-validated at load, with every field optional.
 
 ```ts
 // atest.config.ts
-import { defineAtestConfig } from '@atest/core';
+import { defineAtestConfig } from '@aplaytest/core';
 
 export default defineAtestConfig({
   playwright: {

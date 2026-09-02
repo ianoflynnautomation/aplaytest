@@ -22,10 +22,10 @@
 #               times the pull for four commands most jobs never run, which is
 #               why it is a separate target rather than a fatter default.
 #
-#   docker build --target cli        -t atest .
-#   docker build --target playwright -t atest-playwright .
+#   docker build --target cli        -t aplaytest .
+#   docker build --target playwright -t aplaytest-playwright .
 #
-# @atest/runner-playwright is deliberately NOT a use case for either. The
+# @aplaytest/runner-playwright is deliberately NOT a use case for either. The
 # reporter is loaded by `require` from inside the test process; it belongs in
 # the test suite's own image, installed from the tarballs.
 
@@ -99,9 +99,9 @@ FROM node:22-bookworm-slim AS cli
 ARG PLAYWRIGHT_VERSION
 ARG APP_VERSION=0.0.0
 ARG VCS_REF=unknown
-LABEL org.opencontainers.image.title="atest" \
+LABEL org.opencontainers.image.title="aplaytest" \
       org.opencontainers.image.description="A control plane around Playwright: flake scoring, healing, impact analysis" \
-      org.opencontainers.image.source="https://github.com/ianoflynnautomation/atest" \
+      org.opencontainers.image.source="https://github.com/ianoflynnautomation/aplaytest" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.licenses="MIT"
@@ -109,9 +109,9 @@ LABEL org.opencontainers.image.title="atest" \
 # Installed into a real project directory, NOT with `npm install -g`.
 #
 # A global install puts each package at the top of the global tree, where
-# nothing can resolve its siblings: `require('@atest/runner-playwright/…')`
+# nothing can resolve its siblings: `require('@aplaytest/runner-playwright/…')`
 # fails from any cwd, and — the one that matters — the CLI's dynamic
-# `import('@atest/store-azure')` fails too, because Node resolves it relative
+# `import('@aplaytest/store-azure')` fails too, because Node resolves it relative
 # to the CLI's own location and there is no node_modules above it holding the
 # driver. `--db azblob://…` would have degraded to "install the Azure driver"
 # in an image built specifically to contain it.
@@ -120,9 +120,9 @@ LABEL org.opencontainers.image.title="atest" \
 # `npm i ./*.tgz`, so the image exercises the same resolution the tarballs do.
 #
 # ALL of them in one command, for the reason `scripts/pack.ts` documents: each
-# tarball declares `@atest/core@^0.1.0`, and npm satisfies that from the other
+# tarball declares `@aplaytest/core@^0.1.0`, and npm satisfies that from the other
 # tarballs in the same invocation. Ask for one alone against an empty registry
-# cache and you 404 on `@atest/core`.
+# cache and you 404 on `@aplaytest/core`.
 COPY --from=builder /build/dist-pack/*.tgz /tmp/atest/
 # The directory must not be called `atest`: npm refuses to install a package
 # into a project of the same name.
@@ -138,7 +138,7 @@ COPY --from=builder /build/dist-pack/*.tgz /tmp/atest/
 #
 # @playwright/test IS PINNED HERE, not just in package.json. This is a fresh
 # `npm install` of tarballs with no lockfile, so it resolves
-# @atest/runner-playwright's peer range (`>=1.55.0`) against the registry and
+# @aplaytest/runner-playwright's peer range (`>=1.55.0`) against the registry and
 # takes the newest — 1.62.1 today, whatever ships tomorrow. The workspace pin
 # governs the BUILD; only this governs the IMAGE. Without it the playwright
 # target inherits a browser bundle its base does not have, and the version
@@ -151,11 +151,11 @@ RUN mkdir -p /opt/atest-runtime \
     && rm -rf /tmp/atest /root/.npm /root/.cache
 
 # NODE_PATH is for CommonJS callers only — a consumer whose script does
-# `require('@atest/runner-playwright/reporter')` from the mounted workspace.
+# `require('@aplaytest/runner-playwright/reporter')` from the mounted workspace.
 # IT DOES NOT AFFECT ESM: Node's ESM resolver ignores NODE_PATH entirely and
 # resolves bare specifiers relative to the importing module's own URL. That is
 # fine, and is why the install location matters more than this variable — the
-# CLI's `import('@atest/store-azure')` works because the driver is its SIBLING
+# CLI's `import('@aplaytest/store-azure')` works because the driver is its SIBLING
 # in /opt/atest-runtime/node_modules, not because of anything set here.
 ENV NODE_PATH=/opt/atest-runtime/node_modules \
     PATH=/opt/atest-runtime/node_modules/.bin:$PATH
@@ -175,17 +175,17 @@ WORKDIR /workspace
 # ESM ignores NODE_PATH — asserting from there would test the resolution rules,
 # not the image, and the honest question is whether the CLI can reach the
 # driver from where the CLI actually lives.
-RUN atest --help > /dev/null \
+RUN aplaytest --help > /dev/null \
     && node -e "require('node:sqlite')" \
-    && node -e "const r=require('@atest/runner-playwright/reporter'); if (typeof r.default!=='function') throw new Error('CJS reporter did not load')" \
+    && node -e "const r=require('@aplaytest/runner-playwright/reporter'); if (typeof r.default!=='function') throw new Error('CJS reporter did not load')" \
     && cd /opt/atest-runtime \
-    && node --input-type=module -e "const m = await import('@atest/store-azure'); if (typeof m.BlobHistoryStore !== 'function') throw new Error('Azure driver did not load');" \
-    && node --input-type=module -e "const { parseHistoryUrl } = await import('@atest/core'); if (parseHistoryUrl('azblob://acct/atest-history').kind !== 'azure-blob') throw new Error('history URL parsing broken');"
+    && node --input-type=module -e "const m = await import('@aplaytest/store-azure'); if (typeof m.BlobHistoryStore !== 'function') throw new Error('Azure driver did not load');" \
+    && node --input-type=module -e "const { parseHistoryUrl } = await import('@aplaytest/core'); if (parseHistoryUrl('azblob://acct/atest-history').kind !== 'azure-blob') throw new Error('history URL parsing broken');"
 
-# `docker run atest history stats`. GitHub Actions overrides the entrypoint for
+# `docker run aplaytest history stats`. GitHub Actions overrides the entrypoint for
 # `container:` jobs and runs steps through a shell, which this image has, so
 # both usages work from one definition.
-ENTRYPOINT ["atest"]
+ENTRYPOINT ["aplaytest"]
 CMD ["--help"]
 
 # ── playwright ────────────────────────────────────────────────────────────────
@@ -209,9 +209,9 @@ FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble AS playwright
 
 ARG APP_VERSION=0.0.0
 ARG VCS_REF=unknown
-LABEL org.opencontainers.image.title="atest-playwright" \
+LABEL org.opencontainers.image.title="aplaytest-playwright" \
       org.opencontainers.image.description="atest plus browsers: gate, heal, bisect and authoring" \
-      org.opencontainers.image.source="https://github.com/ianoflynnautomation/atest" \
+      org.opencontainers.image.source="https://github.com/ianoflynnautomation/aplaytest" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.licenses="MIT"
@@ -219,9 +219,9 @@ LABEL org.opencontainers.image.title="atest-playwright" \
 # COPIED from the cli stage, not installed again.
 #
 # It was a second `npm install -g` until it was caught: that layout cannot
-# resolve `import('@atest/store-azure')` from the CLI, so this image shipped
+# resolve `import('@aplaytest/store-azure')` from the CLI, so this image shipped
 # with the Azure driver unreachable — and its own smoke test, which only ran
-# `atest --help`, passed anyway. Two stages installing "the same" thing two
+# `aplaytest --help`, passed anyway. Two stages installing "the same" thing two
 # ways is how they drift; copying one tree makes drift impossible and gives
 # both images provably identical atest bits.
 COPY --from=cli /opt/atest-runtime /opt/atest-runtime
@@ -236,11 +236,11 @@ WORKDIR /workspace
 # stage checked less — plus the one thing that is only true here: a browser
 # that actually launches. An image carrying 3 GB of browsers that cannot start
 # one is worth catching at build time.
-RUN atest --help > /dev/null \
+RUN aplaytest --help > /dev/null \
     && node -e "require('node:sqlite')" \
     && cd /opt/atest-runtime \
-    && node --input-type=module -e "const m = await import('@atest/store-azure'); if (typeof m.BlobHistoryStore !== 'function') throw new Error('Azure driver did not load');" \
+    && node --input-type=module -e "const m = await import('@aplaytest/store-azure'); if (typeof m.BlobHistoryStore !== 'function') throw new Error('Azure driver did not load');" \
     && node --input-type=module -e "const { chromium } = await import('playwright'); const b = await chromium.launch(); await b.close();"
 
-ENTRYPOINT ["atest"]
+ENTRYPOINT ["aplaytest"]
 CMD ["--help"]

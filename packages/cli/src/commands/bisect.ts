@@ -1,5 +1,5 @@
 /**
- * `atest flaky bisect` — re-run a test under controlled perturbations.
+ * `aplaytest flaky bisect` — re-run a test under controlled perturbations.
  *
  * Slow by nature: it runs the test dozens of times on purpose. Progress is
  * streamed per probe rather than buffered, because a command that prints
@@ -7,7 +7,7 @@
  * hung command is kill it.
  */
 
-import { DEFAULT_BISECT_OPTIONS, bisect, type BisectDimension } from '@atest/flaky';
+import { DEFAULT_BISECT_OPTIONS, bisect, type BisectDimension } from '@aplaytest/flaky';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style } from '../ui/output.js';
@@ -32,7 +32,7 @@ function parseWorkerLevels(raw: string | undefined): number[] {
 
 export async function flakyBisect(flags: BisectFlags): Promise<ExitCode> {
   if (flags.test === undefined || flags.file === undefined) {
-    throw new UsageError('atest flaky bisect requires --test "<title>" and --file <path>');
+    throw new UsageError('aplaytest flaky bisect requires --test "<title>" and --file <path>');
   }
 
   const repeat = Number.parseInt(flags.repeat ?? String(DEFAULT_BISECT_OPTIONS.repeat), 10);

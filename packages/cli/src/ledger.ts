@@ -20,7 +20,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import type { QuarantineEntry } from '@atest/flaky';
+import type { QuarantineEntry } from '@aplaytest/flaky';
 
 export const DEFAULT_LEDGER_PATH = '.atest/quarantine.json';
 export const LEDGER_SCHEMA_VERSION = 1 as const;

@@ -12,8 +12,8 @@ with `require()`, so the CJS entry is load-bearing, not a courtesy.
 ## Setup
 
 ```sh
-git clone https://github.com/ianoflynnautomation/atest.git
-cd atest
+git clone https://github.com/ianoflynnautomation/aplaytest.git
+cd aplaytest
 npm install
 npm run build
 npm test
@@ -38,9 +38,9 @@ Against a locally running app, see [docs/13-local-testing.md](./docs/13-local-te
 1. **The LLM is never in the pass/fail path.** CI runs in `strict` mode. A
    change that lets a model turn a red test green without a reviewable diff
    will be rejected.
-2. **Engines do not import one another.** They depend on `@atest/core` only.
+2. **Engines do not import one another.** They depend on `@aplaytest/core` only.
    `core` has no Playwright, no network, and no model.
-3. **`@atest/runner-playwright` must not depend on `@atest/llm`.** The reporter
+3. **`@aplaytest/runner-playwright` must not depend on `@aplaytest/llm`.** The reporter
    loads in every test worker; a credential must never be there.
 4. **A reporting failure must never become a test failure.** The reporter
    swallows its own errors to stderr.
@@ -71,12 +71,12 @@ or run records.
 Do this **before** making the repository public, then cut the first tag.
 
 1. **npm.** Create a granular access token on npmjs.com with read-and-write
-   for the `@atest` scope (or a classic token with publish). Add it as the
+   for the `@aplaytest` scope (or a classic token with publish). Add it as the
    repository secret `NPM_TOKEN`. A tag without this secret fails the npm
    job — that is intentional; a release that never reached npm is not a
    release.
 2. **GHCR.** `docker-publish.yml` and `oci-publish.yml` try to mark
-   `atest`, `atest-playwright`, and `atest-packages` public after a
+   `aplaytest`, `aplaytest-playwright`, and `aplaytest-packages` public after a
    successful push. GitHub often refuses that while the repo is still
    private. After you switch the repo to public, either re-run those
    workflows or set each package to Public under
@@ -95,8 +95,8 @@ Publish workflows (independent; none `needs:` another):
 | Workflow | Destination | When |
 | --- | --- | --- |
 | `npm-publish.yml` | registry.npmjs.org | `v*` tags |
-| `oci-publish.yml` | `ghcr.io/…/atest-packages` | `main` and tags |
-| `docker-publish.yml` | `ghcr.io/…/atest` (+ playwright on tags) | `main` and tags |
+| `oci-publish.yml` | `ghcr.io/…/aplaytest-packages` | `main` and tags |
+| `docker-publish.yml` | `ghcr.io/…/aplaytest` (+ playwright on tags) | `main` and tags |
 
 Reusable implementations live in this repository
 (`docker-build-push.yml`, `oci-publish-tarballs.yml`). They do not call

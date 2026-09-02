@@ -20,18 +20,18 @@ archive and run history with no API key, no prompt engineering, and no trust que
 
 | Component | Scope |
 | --- | --- |
-| `@atest/core` | `EvidenceBundle` types, evidence store, `HistoryStore` iface + SQLite driver, deterministic `classify()`, config loading |
-| `@atest/runner-playwright` | Reporter plugin (CJS + ESM), trace reader, fixture capture for ARIA/network/console |
-| `atest` CLI | `init`, `doctor`, `history stats\|ingest\|prune`, `report` |
+| `@aplaytest/core` | `EvidenceBundle` types, evidence store, `HistoryStore` iface + SQLite driver, deterministic `classify()`, config loading |
+| `@aplaytest/runner-playwright` | Reporter plugin (CJS + ESM), trace reader, fixture capture for ARIA/network/console |
+| `aplaytest` CLI | `init`, `doctor`, `history stats\|ingest\|prune`, `report` |
 
-> `run` and `history query` were dropped rather than built. `atest run` would be
+> `run` and `history query` were dropped rather than built. `aplaytest run` would be
 > a wrapper owing permanent exit-code parity with `playwright test`, for no
 > capability — and it contradicts the principle that removing the reporter line
 > removes the framework. `history query` is covered by `flaky report --json`
 > and `history stats --json`.
 
 **Exit criteria**
-- `atest run` is byte-identical in behaviour to `playwright test` — same exit code, same
+- `aplaytest run` is byte-identical in behaviour to `playwright test` — same exit code, same
   duration ±2%, same report.
 - Every failure produces a bundle with a non-null `ariaSnapshot`, `testIdsPresent`, and
   `intent.failingStep`.
@@ -76,7 +76,7 @@ model, and it produces the history that healing later depends on for its
 - Validation harness (scratch worktree, N× re-run, collateral check, typecheck, lint).
 - ts-morph selector patching against `*.constants.ts`.
 - Heal ledger, `heal list | show | apply | revert`, `heal pr`.
-- Tier-1 repair agent behind `--llm`, plus `@atest/llm` with the Anthropic provider.
+- Tier-1 repair agent behind `--llm`, plus `@aplaytest/llm` with the Anthropic provider.
 - Prompt regression corpus (~40 real bundles with known-correct outcomes).
 
 **Exit criteria**
@@ -96,7 +96,7 @@ easy, safe case first.
 
 - ts-morph import graph with transitive closure.
 - Runtime coverage map harvested during `--record-coverage`.
-- `atest impact`, `atest ci plan`, shard planning.
+- `aplaytest impact`, `aplaytest ci plan`, shard planning.
 - Full-suite triggers, `@smoke` always-run, 60% threshold guard.
 
 **Exit criteria**
@@ -112,7 +112,7 @@ easy, safe case first.
 - Ground → Plan → Explore → Synthesize → Verify → Reflect.
 - Full browser tool set with capability gating and the `REPO_DENY` list.
 - Falsifiability gate with mutation generation.
-- `atest agent author | repair | explore`.
+- `aplaytest agent author | repair | explore`.
 - Convention retrieval and exemplar selection.
 
 **Exit criteria**

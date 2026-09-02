@@ -11,7 +11,7 @@
  * Parsing lives in core because it is pure string work that the CLI, the
  * Azure driver and `doctor` all need, and because a typo in a container name
  * should fail with a readable message before any credential is acquired. The
- * network code that acts on the result lives in `@atest/store-azure`.
+ * network code that acts on the result lives in `@aplaytest/store-azure`.
  */
 
 export interface AzureBlobTarget {

@@ -1,5 +1,5 @@
 /**
- * @atest/agent — the model tier.
+ * @aplaytest/agent — the model tier.
  *
  * Two bounded agents, both of which propose rather than decide:
  *   · repair — ranks pre-verified locator candidates; Playwright re-runs the pick

@@ -6,7 +6,7 @@
  * no new runtime machinery, the state is greppable, it travels with the code
  * in review, and deleting the test deletes the quarantine.
  *
- * WHY THIS LIVES IN @atest/flaky AND NOT @atest/core: ts-morph bundles the
+ * WHY THIS LIVES IN @aplaytest/flaky AND NOT @aplaytest/core: ts-morph bundles the
  * TypeScript compiler. `core` is imported by the reporter, which runs inside
  * every test worker — loading a compiler there would be exactly the overhead
  * that makes people switch the tool off. `flaky` is never on that path. When

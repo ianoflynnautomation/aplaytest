@@ -16,8 +16,8 @@
  */
 
 import { z } from 'zod';
-import type { LlmClient } from '@atest/llm';
-import { BudgetGuard, RefusalError } from '@atest/llm';
+import type { LlmClient } from '@aplaytest/llm';
+import { BudgetGuard, RefusalError } from '@aplaytest/llm';
 
 export const RepairChoiceSchema = z.object({
   diagnosis: z.enum([

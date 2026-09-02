@@ -1,5 +1,5 @@
 /**
- * `atest heal` — propose selector heals from captured evidence.
+ * `aplaytest heal` — propose selector heals from captured evidence.
  *
  * Proposes; it does not merge. The output is a reviewable patch plus the
  * record of the re-run that justifies it. `--apply` writes to the working
@@ -18,15 +18,15 @@ import {
   writeRecord,
   type HealProposal,
   type ProposeOptions,
-} from '@atest/heal';
+} from '@aplaytest/heal';
 import {
   ATEST_VERSION,
   formatFailingStep,
   loadRunBundles,
   type EvidenceBundle,
-} from '@atest/core';
-import { BudgetGuard, createLlmClient, type LlmClient } from '@atest/llm';
-import { runRepairAgent } from '@atest/agent';
+} from '@aplaytest/core';
+import { BudgetGuard, createLlmClient, type LlmClient } from '@aplaytest/llm';
+import { runRepairAgent } from '@aplaytest/agent';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, renderDiff, style, warn } from '../ui/output.js';
@@ -250,7 +250,7 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
     const path = await writeRecord(record, flags.healLedger);
     line(style.green(`  applied to ${targetFile}`));
     line(style.dim(`  ledger:  ${path}`));
-    line(style.cyan(`  undo:    atest heal revert ${record.healId}`));
+    line(style.cyan(`  undo:    aplaytest heal revert ${record.healId}`));
   } else {
     line(style.green(`  applied to ${targetFile}`));
   }
@@ -259,7 +259,7 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
     line(
       style.dim(
         `\n  ${accepted.length - 1} further proposal(s) were validated against the file as it ` +
-          'was. Re-run atest heal to regenerate them against the patched file.',
+          'was. Re-run aplaytest heal to regenerate them against the patched file.',
       ),
     );
   }
@@ -297,7 +297,7 @@ export async function healList(flags: HealFlags): Promise<ExitCode> {
 }
 
 export async function healRevert(flags: HealFlags, id: string | undefined): Promise<ExitCode> {
-  if (id === undefined) throw new UsageError('atest heal revert requires a heal id.');
+  if (id === undefined) throw new UsageError('aplaytest heal revert requires a heal id.');
 
   const result = await revertHeal(id, { dir: flags.healLedger, force: flags.force });
 

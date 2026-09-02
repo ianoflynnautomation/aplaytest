@@ -1,4 +1,4 @@
-import { FakeLlmClient, UnavailableLlmClient } from '@atest/llm';
+import { FakeLlmClient, UnavailableLlmClient } from '@aplaytest/llm';
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 

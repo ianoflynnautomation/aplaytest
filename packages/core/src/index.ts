@@ -1,5 +1,5 @@
 /**
- * @atest/core — types, failure taxonomy, locator ranking, and configuration.
+ * @aplaytest/core — types, failure taxonomy, locator ranking, and configuration.
  *
  * This package has no Playwright dependency, makes no network calls, and never
  * touches a model. Everything here must be unit-testable in isolation; that

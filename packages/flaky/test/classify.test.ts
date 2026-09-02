@@ -4,7 +4,7 @@ import { classifyFlake, shouldRetry } from '../src/classify.js';
 import { extractFeatures } from '../src/features.js';
 import { scoreTest } from '../src/score.js';
 import { attempt, NOW, series } from './helpers.js';
-import type { HistoricalAttempt } from '@atest/core';
+import type { HistoricalAttempt } from '@aplaytest/core';
 
 function verdict(scoped: HistoricalAttempt[], all: HistoricalAttempt[] = scoped) {
   const score = scoreTest(scoped, undefined, NOW);

@@ -16,7 +16,7 @@ atest/
 ├── .changeset/                       # release management
 │
 ├── packages/
-│   ├── core/                         # @atest/core       — no LLM, no Playwright
+│   ├── core/                         # @aplaytest/core       — no LLM, no Playwright
 │   │   └── src/
 │   │       ├── config/               #   defineAtestConfig, zod schema, resolution
 │   │       ├── evidence/             #   EvidenceBundle types, store, redaction
@@ -29,15 +29,15 @@ atest/
 │   │       ├── audit/                #   append-only ledger, provenance
 │   │       └── index.ts
 │   │
-│   ├── store-azure/                  # @atest/store-azure — optional peer of the CLI
+│   ├── store-azure/                  # @aplaytest/store-azure — optional peer of the CLI
 │   │   └── src/                      #   Split out so a Playwright run, which loads
-│   │       ├── layout.ts             #   @atest/core in-process, never pays for an
+│   │       ├── layout.ts             #   @aplaytest/core in-process, never pays for an
 │   │       │                         #   8 MB SDK only the analyze job uses.
 │   │       ├── blob-store.ts         #   HistoryStore over an append-only object log
 │   │       ├── backend.ts            #   4-method seam; the unit tests use the memory one
 │   │       └── azure-backend.ts      #   the only file importing an Azure SDK
 │   │
-│   ├── runner-playwright/            # @atest/runner-playwright
+│   ├── runner-playwright/            # @aplaytest/runner-playwright
 │   │   └── src/
 │   │       ├── reporter.ts           #   ⚠ CJS build required (see below)
 │   │       ├── fixtures.ts           #   aria/network/console capture, bindPage wrapper
@@ -45,7 +45,7 @@ atest/
 │   │       ├── trace-reader.ts       #   parse trace.zip → actions, network, snapshots
 │   │       └── replay.ts             #   re-run a single test with locator overrides
 │   │
-│   ├── llm/                          # @atest/llm
+│   ├── llm/                          # @aplaytest/llm
 │   │   └── src/
 │   │       ├── client.ts             #   LlmClient interface
 │   │       ├── providers/            #   anthropic.ts | unavailable.ts (openai/ollama not implemented)
@@ -53,7 +53,7 @@ atest/
 │   │       ├── cache.ts              #   prompt caching + on-disk response cache
 │   │       └── budget.ts             #   token/cost accounting, hard stops
 │   │
-│   ├── agent/                        # @atest/agent
+│   ├── agent/                        # @aplaytest/agent
 │   │   └── src/
 │   │       ├── runtime/              #   loop, budget guard, transcript, tracing
 │   │       ├── tools/                #   browser/ network/ repo/ verify/
@@ -61,7 +61,7 @@ atest/
 │   │       ├── prompts/              #   *.md templates, versioned
 │   │       └── conventions.ts        #   repo-convention retrieval (exemplar selection)
 │   │
-│   ├── heal/                         # @atest/heal
+│   ├── heal/                         # @aplaytest/heal
 │   │   └── src/
 │   │       ├── candidates.ts         #   Tier-0 deterministic generation
 │   │       ├── rank.ts               #   Tier-1 LLM ranking (optional)
@@ -69,7 +69,7 @@ atest/
 │   │       ├── strategies/           #   selector.ts | assertion.ts | flow.ts
 │   │       └── ledger.ts
 │   │
-│   ├── flaky/                        # @atest/flaky
+│   ├── flaky/                        # @aplaytest/flaky
 │   │   └── src/
 │   │       ├── score.ts              #   Wilson bound, recency decay, transitions
 │   │       ├── features.ts           #   deterministic signal extraction
@@ -77,27 +77,27 @@ atest/
 │   │       ├── bisect.ts             #   co-scheduling / worker-count bisection
 │   │       └── quarantine.ts         #   tag codemod, expiry enforcement, budget
 │   │
-│   ├── impact/                       # @atest/impact
+│   ├── impact/                       # @aplaytest/impact
 │   │   └── src/
 │   │       ├── graph.ts              #   ts-morph import graph, spec → deps closure
 │   │       ├── coverage.ts           #   runtime route/testid/api map from traces
 │   │       ├── select.ts             #   changed paths → test set + shard plan
 │   │       └── crossrepo.ts          #   app-repo diff → test set (LLM-assisted)
 │   │
-│   ├── report/                       # @atest/report
+│   ├── report/                       # @aplaytest/report
 │   │   └── src/
 │   │       ├── html/                 #   self-contained SPA build
 │   │       ├── insights.ts           #   run narrative generation (LLM optional)
 │   │       └── merge.ts              #   shard/blob merge → single report
 │   │
-│   ├── mcp/                          # @atest/mcp
+│   ├── mcp/                          # @aplaytest/mcp
 │   │   └── src/
 │   │       ├── server.ts             #   stdio + streamable-http transports
 │   │       ├── tools/                #   one file per tool, zod-schema'd
 │   │       ├── resources/            #   atest:// URI handlers
 │   │       └── safety.ts             #   write-gating, redaction, size caps
 │   │
-│   └── cli/                          # atest  (the published bin)
+│   └── cli/                          # aplaytest  (the published bin)
 │       └── src/
 │           ├── bin.ts
 │           ├── commands/             #   one file per command, thin over engines
@@ -152,7 +152,7 @@ export const proposeHeal = defineTool({
 ## Packaging constraints (real ones, from this repo)
 
 1. **CJS reporter entry.** `bjjeire-tests` is `"type": "commonjs"` and its
-   `activeReporters()` loads reporters by absolute path. `@atest/runner-playwright`
+   `activeReporters()` loads reporters by absolute path. `@aplaytest/runner-playwright`
    must publish `reporter.cjs` alongside ESM. Everything else can be ESM-only —
    the CLI is a bin, and the fixtures are imported by TS that compiles to CJS.
    Build with `tsup --format cjs,esm --dts`.
@@ -166,8 +166,8 @@ export const proposeHeal = defineTool({
    assertPeerVersion('@playwright/test', { min: '1.55.0', warnIfBelow: '1.61.0' });
    ```
 
-3. **No transitive LLM SDK in the run path.** `@atest/runner-playwright` must not
-   depend on `@atest/llm`. The reporter runs inside the test process; pulling an HTTP
+3. **No transitive LLM SDK in the run path.** `@aplaytest/runner-playwright` must not
+   depend on `@aplaytest/llm`. The reporter runs inside the test process; pulling an HTTP
    client and 40MB of SDK into every worker is unacceptable, and it would make a
    credential available where it should not be.
 

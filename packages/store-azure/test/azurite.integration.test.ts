@@ -50,7 +50,7 @@ import { AzuriteContainer, type StartedAzuriteContainer } from '@testcontainers/
 import { BlobServiceClient, StorageSharedKeyCredential } from '@azure/storage-blob';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { RUN_SCHEMA_VERSION, parseHistoryUrl, type AttemptRecord, type RunRecord } from '@atest/core';
+import { RUN_SCHEMA_VERSION, parseHistoryUrl, type AttemptRecord, type RunRecord } from '@aplaytest/core';
 
 import { AzureBlobBackend } from '../src/azure-backend.js';
 import { BlobHistoryStore } from '../src/blob-store.js';

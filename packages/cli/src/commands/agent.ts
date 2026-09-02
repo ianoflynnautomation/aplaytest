@@ -1,8 +1,8 @@
 /**
- * `atest agent author` — ground, plan, synthesize, gate.
+ * `aplaytest agent author` — ground, plan, synthesize, gate.
  *
  * The orchestration lives in the CLI rather than in an engine package because
- * the CLI is the composition root: @atest/author must not import @atest/agent,
+ * the CLI is the composition root: @aplaytest/author must not import @aplaytest/agent,
  * or the deterministic gate would drag the model tier in behind it and stop
  * being installable on its own.
  *
@@ -19,9 +19,9 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
-import { runAuthorAgent, type AuthorGrounding } from '@atest/agent';
-import { falsifiabilityGate, ground } from '@atest/author';
-import { BudgetGuard, createLlmClient, describeAvailability, type LlmClient } from '@atest/llm';
+import { runAuthorAgent, type AuthorGrounding } from '@aplaytest/agent';
+import { falsifiabilityGate, ground } from '@aplaytest/author';
+import { BudgetGuard, createLlmClient, describeAvailability, type LlmClient } from '@aplaytest/llm';
 
 import { EXIT, PolicyError, UsageError, type ExitCode } from '../exit.js';
 import { heading, line, style, warn } from '../ui/output.js';
@@ -91,7 +91,7 @@ export interface AgentDeps {
 
 export async function agentAuthor(flags: AgentFlags, deps: AgentDeps = {}): Promise<ExitCode> {
   if (flags.goal === undefined) {
-    throw new UsageError('atest agent author requires --goal "<what to test>".');
+    throw new UsageError('aplaytest agent author requires --goal "<what to test>".');
   }
   const feature = flags.feature ?? slug(flags.goal).split('-')[0] ?? 'unknown';
   const cwd = resolve(flags.cwd ?? process.cwd());

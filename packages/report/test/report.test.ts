@@ -1,4 +1,4 @@
-import type { AttemptRecord, EvidenceBundle, RunRecord } from '@atest/core';
+import type { AttemptRecord, EvidenceBundle, RunRecord } from '@aplaytest/core';
 import { describe, expect, it } from 'vitest';
 
 import { formatArgs } from '../src/args.js';

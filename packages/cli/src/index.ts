@@ -1,7 +1,7 @@
 /**
  * Programmatic entry point for the commands the CLI and tests invoke.
  *
- * MCP talks to the same engines (`@atest/heal`, `@atest/flaky`, …) rather than
+ * MCP talks to the same engines (`@aplaytest/heal`, `@aplaytest/flaky`, …) rather than
  * importing this package — a façade over engines, not a second copy of the
  * CLI parser.
  */

@@ -13,7 +13,7 @@
  * would be a blank page for the person debugging a failed release.
  */
 
-import type { EvidenceBundle } from '@atest/core';
+import type { EvidenceBundle } from '@aplaytest/core';
 
 import { formatArgs } from './args.js';
 import { formatDuration, type MergedRun } from './merge.js';
@@ -136,7 +136,7 @@ function candidatesBlock(bundle: EvidenceBundle): string {
     .join('');
   return `<div class="row"><span class="label">candidates</span><div>${items}</div></div>
 <div class="row"><span class="label"></span><div class="sub">Ranked by name distance. &ldquo;unverified&rdquo; means no browser
-has resolved it yet &mdash; <code>atest heal</code> checks uniqueness against the live page before proposing.</div></div>`;
+has resolved it yet &mdash; <code>aplaytest heal</code> checks uniqueness against the live page before proposing.</div></div>`;
 }
 
 function failureCard(bundle: EvidenceBundle): string {
@@ -259,7 +259,7 @@ export function renderHtml(input: ReportInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>atest report — ${escapeHtml(run.runId)}</title>
+<title>aplaytest report — ${escapeHtml(run.runId)}</title>
 <style>${STYLES}</style>
 </head>
 <body>

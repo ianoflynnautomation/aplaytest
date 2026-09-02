@@ -10,7 +10,7 @@
  * that calls `test.step()`. No spec changes, no extra reporting channel.
  */
 
-import type { StepRecord } from '@atest/core';
+import type { StepRecord } from '@aplaytest/core';
 
 /** Structural subset of Playwright's TestStep — keeps this unit-testable. */
 export interface StepLike {

@@ -14,7 +14,7 @@
  *      never reach a model.
  */
 
-import { redact } from '@atest/core';
+import { redact } from '@aplaytest/core';
 
 export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   // Reserved names: not registered today. Kept in the gate so a future

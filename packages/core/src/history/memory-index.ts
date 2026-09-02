@@ -250,7 +250,7 @@ export class HistoryIndex {
  *
  * This is what `--db :memory:` should always have meant. Reaching for
  * `new SqliteHistoryStore(':memory:')` to get a throwaway store — as the MCP
- * server and `atest impact` both did — pulls in `node:sqlite`, a schema and a
+ * server and `aplaytest impact` both did — pulls in `node:sqlite`, a schema and a
  * transaction to hold data that is discarded when the process exits.
  */
 export class MemoryHistoryStore implements HistoryStore {
