@@ -61,7 +61,7 @@ afterEach(async () => {
 });
 
 describe('atest agent author', () => {
-  it('DELETES a candidate the gate rejects', async () => {
+  it('given a model producing a vacuous spec the gate rejects -> when agent author runs -> then it exits on the policy violation and no spec is left on disk', { tags: ['@integration', '@cli'] }, async () => {
     // The property the command exists for. A rejected candidate is green and
     // asserts nothing — strictly worse than generating nothing, because it
     // looks like coverage to whoever reviews the diff.
@@ -76,7 +76,7 @@ describe('atest agent author', () => {
     expect(await exists(join(SMOKE, GENERATED))).toBe(false);
   }, 180_000);
 
-  it('keeps it only when explicitly asked to', async () => {
+  it('given a rejected candidate and the keepRejected flag -> when agent author runs -> then it still exits on the policy violation but the spec is kept on disk', { tags: ['@integration', '@cli'] }, async () => {
     const client = new FakeLlmClient([
       { reply: PLAN },
       { reply: { spec: VACUOUS_SPEC, methodsUsed: [], needsNewPageObjectMethod: false, notes: '' } },
@@ -90,14 +90,14 @@ describe('atest agent author', () => {
     expect(await readFile(join(SMOKE, GENERATED), 'utf8')).toContain('generated candidate');
   }, 180_000);
 
-  it('never spends a model call when the grounding is only being inspected', async () => {
+  it('given the dry-run flag -> when agent author runs -> then it exits ok having spent no model call', { tags: ['@integration', '@cli'] }, async () => {
     const client = new FakeLlmClient([]);
     const code = await agentAuthor({ ...BASE, dryRun: true }, { client });
     expect(code).toBe(EXIT.OK);
     expect(client.callCount).toBe(0);
   });
 
-  it('refuses to overwrite an existing spec without --force', async () => {
+  it('given an output path that already exists and no force flag -> when agent author runs -> then it refuses, saying the file already exists', { tags: ['@integration', '@cli'] }, async () => {
     const client = new FakeLlmClient([
       { reply: PLAN },
       { reply: { spec: VACUOUS_SPEC, methodsUsed: [], needsNewPageObjectMethod: false, notes: '' } },
@@ -107,7 +107,7 @@ describe('atest agent author', () => {
     ).rejects.toThrow(/already exists/);
   });
 
-  it('exits 3 without a model rather than pretending a fallback exists', async () => {
+  it('given no model is configured -> when agent author runs -> then it exits unavailable and writes no spec, because no deterministic tier can author one', { tags: ['@integration', '@cli'] }, async () => {
     // There is no deterministic tier that writes a test, so this is the one
     // capability that genuinely cannot degrade.
     const code = await agentAuthor(BASE, { client: new UnavailableLlmClient('no key') });
@@ -115,13 +115,13 @@ describe('atest agent author', () => {
     expect(await exists(join(SMOKE, GENERATED))).toBe(false);
   });
 
-  it('requires a goal', async () => {
+  it('given no goal -> when agent author runs -> then it rejects naming the missing flag', { tags: ['@integration', '@cli'] }, async () => {
     await expect(agentAuthor({ ...BASE, goal: undefined })).rejects.toThrow(/--goal/);
   });
 });
 
 describe('extractTestTitle', () => {
-  it('reads the title the model actually wrote, not the plan title', () => {
+  it('given a spec whose test title differs from the plan title -> when extractTestTitle reads it -> then the title the model actually wrote is returned', { tags: ['@unit', '@cli'] }, () => {
     // REGRESSION GUARD, found on a live run. The gate greps Playwright by
     // title; assuming the spec reuses the plan's title verbatim made a good
     // generated test look like an inconclusive gate run, and it was deleted.
@@ -134,30 +134,30 @@ test('searching by name narrows the gyms directory to only that gym', async ({ g
     expect(extractTestTitle(spec)).toBe('searching by name narrows the gyms directory to only that gym');
   });
 
-  it('handles double quotes and backticks', () => {
+  it('given test titles quoted with double quotes and backticks -> when extractTestTitle reads them -> then each title is recovered', { tags: ['@unit', '@cli'] }, () => {
     expect(extractTestTitle(`test("a gym is found", async () => {});`)).toBe('a gym is found');
     expect(extractTestTitle('test(`a gym is found`, async () => {});')).toBe('a gym is found');
   });
 
-  it('reads through a test modifier', () => {
+  it('given a test declared with a modifier -> when extractTestTitle reads it -> then the title is still recovered', { tags: ['@unit', '@cli'] }, () => {
     expect(extractTestTitle(`test.only('a gym is found', async () => {});`)).toBe('a gym is found');
   });
 
-  it('takes the FIRST test when a spec holds several', () => {
+  it('given a spec holding several tests -> when extractTestTitle reads it -> then the first title is taken', { tags: ['@unit', '@cli'] }, () => {
     const spec = `test('first', async () => {});\ntest('second', async () => {});`;
     expect(extractTestTitle(spec)).toBe('first');
   });
 
-  it('declines an interpolated title rather than greping for a literal that cannot match', () => {
+  it('given a title built by interpolation -> when extractTestTitle reads it -> then it declines rather than returning a literal that cannot match', { tags: ['@unit', '@cli'] }, () => {
     expect(extractTestTitle('test(`gym ${name} is found`, async () => {});')).toBeNull();
   });
 
-  it('is not fooled by the word test inside a describe or a comment', () => {
+  it('given the word test appearing in a describe block or a comment -> when extractTestTitle reads the spec -> then only a real test title is returned', { tags: ['@unit', '@cli'] }, () => {
     const spec = `// this tests the thing\ntest('real title', async () => {});`;
     expect(extractTestTitle(spec)).toBe('real title');
   });
 
-  it('returns null when there is no test at all, so the caller can fall back', () => {
+  it('given a spec holding no test -> when extractTestTitle reads it -> then it returns null so the caller can fall back', { tags: ['@unit', '@cli'] }, () => {
     expect(extractTestTitle('export const x = 1;')).toBeNull();
   });
 });

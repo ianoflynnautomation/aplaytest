@@ -28,7 +28,7 @@ afterEach(() => restore());
 const text = (): string => out.join('');
 
 describe('doctor', () => {
-  it('diagnoses the directory named by --cwd, not the process cwd', async () => {
+  it('given a project directory named by --cwd -> when doctor runs -> then it diagnoses that directory rather than the process cwd', { tags: ['@integration', '@cli'] }, async () => {
     // REGRESSION GUARD: doctor ignored --cwd while every other command honoured
     // it, so `atest doctor --cwd ../suite` reported the wrong repo's Playwright
     // version and every file as missing — the most misleading answer a
@@ -44,7 +44,7 @@ describe('doctor', () => {
     expect(text()).toContain('CLAUDE.md');
   });
 
-  it('warns when no playwright config is discoverable', async () => {
+  it('given a directory holding no Playwright config -> when doctor runs -> then it warns, because the gate, heal and bisect all spawn Playwright', { tags: ['@integration', '@cli'] }, async () => {
     // The gate, heal and bisect all spawn Playwright; without a config they
     // fail several layers away and atest gets the blame.
     const empty = await mkdtemp(join(tmpdir(), 'atest-doctor-empty-'));
@@ -54,7 +54,7 @@ describe('doctor', () => {
     expect(text()).toMatch(/none found/);
   });
 
-  it('names the one capability a missing key actually costs', async () => {
+  it('given no model key configured -> when doctor runs -> then it names the one capability the missing key actually costs', { tags: ['@integration', '@cli'] }, async () => {
     // "deterministic features unaffected" read as "nothing is lost". Authoring
     // is genuinely unavailable without a model, and saying so is the point.
     const empty = await mkdtemp(join(tmpdir(), 'atest-doctor-key-'));
@@ -66,7 +66,7 @@ describe('doctor', () => {
     expect(text()).toContain('gate');
   });
 
-  it('reports grounding for a named feature', async () => {
+  it('given a named feature and a repository holding its files -> when doctor runs -> then the grounding for that feature is reported', { tags: ['@integration', '@cli'] }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'atest-doctor-feat-'));
     await mkdir(join(root, 'src/ui/pages/gyms'), { recursive: true });
     await writeFile(
@@ -81,7 +81,7 @@ describe('doctor', () => {
     expect(text()).toContain('gyms.page.ts');
   });
 
-  it('stays exit 0 on warnings — a warning is not a broken install', async () => {
+  it('given a directory producing only warnings -> when doctor runs -> then the exit code stays 0, because a warning is not a broken install', { tags: ['@integration', '@cli'] }, async () => {
     const empty = await mkdtemp(join(tmpdir(), 'atest-doctor-warn-'));
     expect(await doctor({ runs: '.atest/runs', ledger: '.atest/q.json', cwd: empty })).toBe(EXIT.OK);
   });

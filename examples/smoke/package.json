@@ -7,6 +7,6 @@
     "setup": "playwright install chromium"
   },
   "dependencies": {
-    "@atest/runner-playwright": "0.0.0"
+    "@atest/runner-playwright": "^0.1.0"
   }
 }

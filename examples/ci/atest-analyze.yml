@@ -42,10 +42,19 @@ atest_analyze:
   permissions:
     contents: read
     actions: read
-    packages: read # the atest bundle is pulled from GHCR
-    id-token: write # Azure OIDC
+    packages: read # the atest IMAGE is pulled from GHCR — the job runs in it
+    id-token: write # mints the OIDC token for AZURE_FEDERATED_TOKEN_FILE
     pull-requests: write # only needed with comment-on-pr
-  uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/atest-analyze.yml@v1
+  # Lives in the atest repo, NOT in bjjeire-ci-templates. It runs `npx atest`
+  # and parses atest's verdict JSON, so no other project could call it — and a
+  # shared template repository holding a product-specific workflow makes its
+  # whole catalog untrustworthy to read.
+  #
+  # atest is PRIVATE, so the calling repo must be owned by the same account and
+  # atest's Settings -> Actions -> General -> Access must be "Accessible from
+  # repositories owned by the user". Otherwise this fails at parse time with
+  # "workflow was not found", which reads as a typo rather than a permission.
+  uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@main
   with:
     results-artifact: playwright-json-results # PR: playwright-docker-json-results
     history-account: ${{ vars.ATEST_HISTORY_ACCOUNT }}
@@ -55,7 +64,9 @@ atest_analyze:
     history-window-days: 90
     history-retain-days: 90
     # comment-on-pr: true          # PR only
-    atest-tag: ${{ vars.ATEST_VERSION != '' && vars.ATEST_VERSION || 'latest' }}
+    # `main` until atest cuts a release — docker-publish.yml only moves
+    # `latest` on a version tag, so it does not exist yet.
+    atest-tag: ${{ vars.ATEST_VERSION != '' && vars.ATEST_VERSION || 'main' }}
   secrets:
     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     # Read-only on the history account. Used off main.

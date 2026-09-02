@@ -50,7 +50,10 @@ export function resolveHistoryUrl(flag: string | undefined, env: NodeJS.ProcessE
   return ':memory:';
 }
 
-async function openBlobStore(target: Extract<HistoryTarget, { kind: 'azure-blob' }>) {
+async function openBlobStore(
+  target: Extract<HistoryTarget, { kind: 'azure-blob' }>,
+  env: NodeJS.ProcessEnv,
+) {
   let module: typeof import('@atest/store-azure');
   try {
     module = await import('@atest/store-azure');
@@ -63,7 +66,15 @@ async function openBlobStore(target: Extract<HistoryTarget, { kind: 'azure-blob'
         '  the test process, never pays for an SDK only the analyze job uses.',
     );
   }
-  return module.openBlobHistoryStore(target);
+  // AZURE_STORAGE_KEY is an EMULATOR affordance, read here rather than in the
+  // driver so that env access stays in the CLI layer alongside
+  // ATEST_HISTORY_URL. Against a real account it is inert: shared keys are
+  // disabled server-side, so the request fails at Azure regardless.
+  const accountKey = env['AZURE_STORAGE_KEY'];
+  return module.openBlobHistoryStore(
+    target,
+    accountKey === undefined || accountKey === '' ? {} : { accountKey },
+  );
 }
 
 export async function openHistoryStore(
@@ -80,7 +91,7 @@ export async function openHistoryStore(
     case 'sqlite':
       return { store: new SqliteHistoryStore(target.path), target, description };
     case 'azure-blob':
-      return { store: await openBlobStore(target), target, description };
+      return { store: await openBlobStore(target, env), target, description };
   }
 }
 

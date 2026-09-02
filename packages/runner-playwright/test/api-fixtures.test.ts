@@ -34,21 +34,21 @@ describe('atestApiFixtures — must not pull in a browser', () => {
    * passed in 24ms under these. Across three API shards the UI fixtures are
    * pure cost, and a behaviour change to a pipeline that launched nothing.
    */
-  it('declares no dependency on page', () => {
+  it('given the API request fixture -> when its declared dependencies are read -> then page is absent, so no browser is launched', { tags: ['@unit', '@runner'] }, () => {
     expect(declaredDependencies(atestApiFixtures.request)).not.toContain('page');
   });
 
-  it('depends on request, which is what it wraps', () => {
+  it('given the API request fixture -> when its declared dependencies are read -> then it depends on request, which is what it wraps', { tags: ['@unit', '@runner'] }, () => {
     expect(declaredDependencies(atestApiFixtures.request)).toContain('request');
   });
 
-  it('the UI fixture DOES depend on page — the two are not interchangeable', () => {
+  it('given the UI capture fixture -> when its declared dependencies are read -> then it does depend on page, so the two fixtures are not interchangeable', { tags: ['@unit', '@runner'] }, () => {
     // Stated as a test so the split cannot be quietly collapsed back into one.
     const [uiFixture] = atestFixtures.atestCapture;
     expect(declaredDependencies(uiFixture)).toContain('page');
   });
 
-  it('overrides request rather than adding a fixture specs must name', () => {
+  it('given the API fixtures object -> when its keys are read -> then it overrides request alone rather than adding a fixture specs must name', { tags: ['@unit', '@runner'] }, () => {
     expect(Object.keys(atestApiFixtures)).toEqual(['request']);
   });
 });
@@ -56,7 +56,7 @@ describe('atestApiFixtures — must not pull in a browser', () => {
 describe('recordingContext', () => {
   const stubResponse = (status: number) => ({ status: () => status }) as never;
 
-  it('records the method, url and status of each call', async () => {
+  it('given a recording context wrapping a successful GET -> when a request is made -> then the method, url and status are recorded and the route drops its query string', { tags: ['@unit', '@runner'] }, async () => {
     const calls: Parameters<typeof recordingContext>[1] = [];
     const routes = new Set<string>();
     const ctx = recordingContext(
@@ -75,7 +75,7 @@ describe('recordingContext', () => {
     expect([...routes]).toEqual(['/gyms']);
   });
 
-  it('reads the method from options on fetch, not from the response', async () => {
+  it('given a fetch call carrying a lowercase method option -> when the recording context records it -> then the method comes from the options, uppercased, not from the response', { tags: ['@unit', '@runner'] }, async () => {
     // A redirect would make the response report the final hop's method.
     const calls: Parameters<typeof recordingContext>[1] = [];
     const ctx = recordingContext(
@@ -89,7 +89,7 @@ describe('recordingContext', () => {
     expect(calls[0]?.method).toBe('POST');
   });
 
-  it('records a failed call and RETHROWS — never swallows a transport error', async () => {
+  it('given a request that throws a transport error -> when the recording context wraps it -> then the failure is recorded and the error is rethrown', { tags: ['@unit', '@runner'] }, async () => {
     const calls: Parameters<typeof recordingContext>[1] = [];
     const ctx = recordingContext(
       {
@@ -106,14 +106,14 @@ describe('recordingContext', () => {
     expect(calls[0]).toMatchObject({ status: null, failureText: 'ECONNREFUSED' });
   });
 
-  it('caps the ledger so a chatty test cannot exhaust worker memory', async () => {
+  it('given a recording context capped at two requests -> when five calls are made -> then only two are retained', { tags: ['@unit', '@runner'] }, async () => {
     const calls: Parameters<typeof recordingContext>[1] = [];
     const ctx = recordingContext({ get: async () => stubResponse(200) } as never, calls, new Set(), 2);
     for (let i = 0; i < 5; i += 1) await ctx.get(`http://api.test/${i}`);
     expect(calls).toHaveLength(2);
   });
 
-  it('passes through methods it does not record, unchanged', async () => {
+  it('given a context method the wrapper does not record -> when it is called -> then it passes through unchanged', { tags: ['@unit', '@runner'] }, async () => {
     // The APIRequestContext surface grows between Playwright versions; a
     // wrapper that enumerates today's methods silently drops tomorrow's.
     const ctx = recordingContext(
@@ -127,7 +127,7 @@ describe('recordingContext', () => {
     );
   });
 
-  it('is constructible with options', () => {
+  it('given a maxRequests option -> when createApiCaptureFixture builds the fixture -> then a fixture function is returned', { tags: ['@unit', '@runner'] }, () => {
     expect(typeof createApiCaptureFixture({ maxRequests: 5 })).toBe('function');
   });
 });

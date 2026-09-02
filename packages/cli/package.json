@@ -1,6 +1,6 @@
 {
-  "name": "atest",
-  "version": "0.0.0",
+  "name": "@atest/cli",
+  "version": "0.1.0",
   "description": "The atest binary: flaky analysis, quarantine policy, and diagnostics",
   "license": "MIT",
   "type": "module",
@@ -16,17 +16,17 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "@atest/core": "0.0.0",
-    "@atest/flaky": "0.0.0",
-    "@atest/heal": "0.0.0",
-    "@atest/impact": "0.0.0",
-    "@atest/llm": "0.0.0",
-    "@atest/agent": "0.0.0",
-    "@atest/report": "0.0.0",
-    "@atest/author": "0.0.0"
+    "@atest/core": "^0.1.0",
+    "@atest/flaky": "^0.1.0",
+    "@atest/heal": "^0.1.0",
+    "@atest/impact": "^0.1.0",
+    "@atest/llm": "^0.1.0",
+    "@atest/agent": "^0.1.0",
+    "@atest/report": "^0.1.0",
+    "@atest/author": "^0.1.0"
   },
   "peerDependencies": {
-    "@atest/store-azure": "0.0.0"
+    "@atest/store-azure": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@atest/store-azure": {
@@ -38,5 +38,17 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "bugs": {
+    "url": "https://github.com/ianoflynnautomation/atest/issues"
   }
 }

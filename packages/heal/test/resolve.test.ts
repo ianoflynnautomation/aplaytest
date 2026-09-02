@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { classifyHealTarget, globToRegExp, resolveSelectorSource } from '../src/resolve.js';
 
 describe('classifyHealTarget', () => {
-  it('prefers the reviewable file, matching the bjjeire layout', () => {
+  it('given constants, page object, section and spec paths -> when classifyHealTarget reads each -> then every path is classified to its reviewable kind', { tags: ['@unit', '@heal'] }, () => {
     expect(classifyHealTarget('src/ui/pages/gyms/gyms.constants.ts')).toBe('constants');
     expect(classifyHealTarget('src/ui/pages/gyms/gyms.page.ts')).toBe('page-object');
     expect(classifyHealTarget('src/ui/sections/footer.section.ts')).toBe('page-object');
@@ -16,7 +16,7 @@ describe('classifyHealTarget', () => {
 });
 
 describe('globToRegExp', () => {
-  it('matches the default heal.targets globs', () => {
+  it('given the default heal.targets globs -> when globToRegExp compiles them -> then constants and spec paths match while a page object does not', { tags: ['@unit', '@heal'] }, () => {
     const constants = globToRegExp('src/**/*.constants.ts');
     expect(constants.test('src/ui/pages/gyms/gyms.constants.ts')).toBe(true);
     expect(constants.test('src/ui/pages/gyms/gyms.page.ts')).toBe(false);
@@ -27,7 +27,7 @@ describe('globToRegExp', () => {
 });
 
 describe('resolveSelectorSource', () => {
-  it('prefers the constants file when the literal also appears in a spec', async () => {
+  it('given a literal present in both a constants file and a spec -> when resolveSelectorSource runs -> then the constants file is preferred', { tags: ['@integration', '@heal'] }, async () => {
     const root = await mkdir(join(tmpdir(), `atest-resolve-${Date.now()}`), { recursive: true });
     await mkdir(join(root, 'src/ui/pages/gyms'), { recursive: true });
     await mkdir(join(root, 'tests/features/gyms'), { recursive: true });
@@ -48,7 +48,7 @@ describe('resolveSelectorSource', () => {
     expect(resolved?.file).toBe('src/ui/pages/gyms/gyms.constants.ts');
   });
 
-  it('falls back to a spec-inline locator when there is no constants file', async () => {
+  it('given a literal present only inline in a spec -> when resolveSelectorSource runs -> then the spec is resolved with an anonymous binding path', { tags: ['@integration', '@heal'] }, async () => {
     const root = await mkdir(join(tmpdir(), `atest-resolve-spec-${Date.now()}`), { recursive: true });
     await mkdir(join(root, 'tests/features/gyms'), { recursive: true });
     await writeFile(

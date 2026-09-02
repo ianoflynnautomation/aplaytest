@@ -50,7 +50,7 @@ async function store(): Promise<SqliteHistoryStore> {
 }
 
 describe('SqliteHistoryStore', () => {
-  it('round-trips a run and its attempts', async () => {
+  it('given a run carrying one attempt -> when the store ingests it and attempts are read back -> then the run metadata is joined onto the attempt', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(run());
 
@@ -72,7 +72,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('is idempotent — re-ingesting a run does not double-count', async () => {
+  it('given the same run ingested three times -> when runCount and attempts are read -> then one run and one attempt are held', { tags: ['@integration', '@history-store'] }, async () => {
     // CI re-runs, shard merges and repeated artifact ingestion all replay the
     // same run id. Double-counting would silently corrupt every derived score.
     const db = await store();
@@ -85,7 +85,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('replaces the attempts of a run on re-ingest rather than appending', async () => {
+  it('given a run re-ingested with fewer attempts than before -> when attempts are read -> then the previous attempts are replaced rather than appended', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(run({ attempts: [attempt(), attempt({ testId: 'test-2', retry: 0 })] }));
     await db.ingest(run({ attempts: [attempt()] }));
@@ -94,7 +94,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('keeps retries as distinct attempts', async () => {
+  it('given one run holding retry 0 and retry 1 of a test -> when attempts are read -> then both retries are kept as distinct attempts', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(
       run({
@@ -111,7 +111,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('filters by test, project and time window', async () => {
+  it('given an old run and a recent run spanning two projects -> when attempts are filtered by testId, project and since -> then only the matching attempts are returned', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(
       run({
@@ -134,7 +134,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('returns attempts newest-first', async () => {
+  it('given two runs with different start times -> when attempts are read -> then the attempt from the newest run comes first', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(run({ runId: 'a', startedAt: '2026-08-01T00:00:00.000Z' }));
     await db.ingest(run({ runId: 'b', startedAt: '2026-08-10T00:00:00.000Z' }));
@@ -144,7 +144,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('lists distinct test/project keys', async () => {
+  it('given one run holding the same test on two projects -> when testKeys is read -> then both distinct test and project keys are listed', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(
       run({
@@ -161,7 +161,7 @@ describe('SqliteHistoryStore', () => {
     await db.close();
   });
 
-  it('prunes runs older than a cutoff, cascading to their attempts', async () => {
+  it('given an old run and a recent run -> when prune runs with a cutoff between them -> then the old run is removed and the delete cascades to its attempts', { tags: ['@integration', '@history-store'] }, async () => {
     const db = await store();
     await db.ingest(run({ runId: 'old', startedAt: '2026-01-01T00:00:00.000Z' }));
     await db.ingest(run({ runId: 'new', startedAt: '2026-08-15T00:00:00.000Z' }));
@@ -190,7 +190,7 @@ describe('ingest robustness', () => {
    * that surfaces as flake scoring reporting "insufficient data" forever,
    * which looks like the engine working rather than the engine broken.
    */
-  it('ingests a record whose optional fields are ABSENT rather than null', async () => {
+  it('given a run whose optional attempt fields are ABSENT rather than null -> when the store ingests it -> then the run and its attempt persist instead of failing to bind', { tags: ['@integration', '@history-store'] }, async () => {
     const store = new SqliteHistoryStore(':memory:');
     const bare = {
       schemaVersion: RUN_SCHEMA_VERSION,
@@ -218,7 +218,7 @@ describe('ingest robustness', () => {
     await store.close();
   });
 
-  it('accumulates across separate ingests — the whole point of a file database', async () => {
+  it('given three distinct run ids ingested separately -> when runCount and attempts are read -> then all three accumulate, which is the whole point of a file database', { tags: ['@integration', '@history-store'] }, async () => {
     const store = new SqliteHistoryStore(':memory:');
     for (const runId of ['r1', 'r2', 'r3']) {
       await store.ingest(run({ runId }));
@@ -228,7 +228,7 @@ describe('ingest robustness', () => {
     await store.close();
   });
 
-  it('re-ingesting one run replaces it rather than double-counting', async () => {
+  it('given one run id ingested twice -> when runCount and attempts are read -> then the second ingest replaces the first rather than double-counting', { tags: ['@integration', '@history-store'] }, async () => {
     // Shard artifacts get re-downloaded on a re-run; counting twice inflates
     // every statistic derived from them.
     const store = new SqliteHistoryStore(':memory:');
@@ -258,7 +258,7 @@ describe('sharded ingest', () => {
    */
   const shardOf = (current: number, total: number) => ({ current, total });
 
-  it('accumulates attempts across shards of one run', async () => {
+  it('given three shards of one run ingested separately -> when runCount and attempts are read -> then one run accumulates all three attempts', { tags: ['@integration', '@history-store'] }, async () => {
     const store = new SqliteHistoryStore(':memory:');
     await store.ingest(
       run({ runId: 'r', shard: shardOf(1, 3), attempts: [attempt({ testId: 'a' })] }),
@@ -275,7 +275,7 @@ describe('sharded ingest', () => {
     await store.close();
   });
 
-  it('re-ingesting ONE shard replaces only that shard', async () => {
+  it('given a two-shard run where ONE shard is re-ingested -> when attempts are read -> then only the attempts of that shard are replaced', { tags: ['@integration', '@history-store'] }, async () => {
     const store = new SqliteHistoryStore(':memory:');
     await store.ingest(
       run({ runId: 'r', shard: shardOf(1, 2), attempts: [attempt({ testId: 'a' })] }),
@@ -293,7 +293,7 @@ describe('sharded ingest', () => {
     await store.close();
   });
 
-  it('still replaces wholesale when the run is not sharded', async () => {
+  it('given an unsharded run ingested twice -> when attempts are read -> then the second ingest replaces the first wholesale', { tags: ['@integration', '@history-store'] }, async () => {
     const store = new SqliteHistoryStore(':memory:');
     await store.ingest(run({ runId: 'r', shard: null, attempts: [attempt({ testId: 'a' })] }));
     await store.ingest(run({ runId: 'r', shard: null, attempts: [attempt({ testId: 'b' })] }));

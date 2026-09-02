@@ -1,0 +1,27 @@
+rules:
+  unpinned-images:
+    ignore:
+      - atest-analyze.yml
+
+  adhoc-packages:
+    ignore:
+      # The verify step installs the tarballs this run just packed, into a
+      # throwaway project, to prove they import before anything is published to
+      # npm — where a bad version can be deprecated but never replaced. There
+      # cannot be a lockfile for artifacts built ninety seconds ago, and the
+      # finding describes precisely the check that makes the publish safe.
+      - publish.yml
+
+  cache-poisoning:
+    ignore:
+      # The substantive fix is already applied: this workflow's publish job
+      # passes NO `cache:` input, so setup-node restores nothing and there is
+      # no cache for a less-trusted context to poison. What remains flagged is
+      # the action's mere presence in a workflow that publishes artifacts —
+      # zizmor reports it at LOW confidence, and setting `cache: ""` does not
+      # clear it either (measured).
+      #
+      # Re-examine if a `cache:` input is ever added here. A publish job is the
+      # one place where restoring something the run did not produce would be
+      # baked into an immutable, signed release.
+      - publish.yml

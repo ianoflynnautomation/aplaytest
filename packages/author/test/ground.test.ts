@@ -58,12 +58,12 @@ test.describe('Events', { tag: ['@ui'] }, () => {
 });
 
 describe('featureKeyOf', () => {
-  it('reads the feature from a tests/features/<name>/ path', () => {
+  it('given a path under tests/features/<name>/ -> when featureKeyOf reads it -> then the feature directory name is returned', { tags: ['@unit', '@author'] }, () => {
     expect(featureKeyOf('tests/features/gyms/gyms.ui.acceptance.spec.ts')).toBe('gyms');
     expect(featureKeyOf('/abs/tests/features/events/x.spec.ts')).toBe('events');
   });
 
-  it('falls back to the filename prefix', () => {
+  it('given a path outside tests/features -> when featureKeyOf reads it -> then the feature falls back to the filename prefix', { tags: ['@unit', '@author'] }, () => {
     expect(featureKeyOf('e2e/stores.ui.spec.ts')).toBe('stores');
   });
 });
@@ -74,7 +74,7 @@ describe('ground — page object selection', () => {
     bundle = await ground({ cwd: root, feature: 'gyms' });
   });
 
-  it('picks the page object, not a sibling that sorts before it', () => {
+  it('given a feature whose page object has siblings sorting before it -> when ground selects the page object -> then it picks gyms.page.ts rather than the mapper', { tags: ['@integration', '@author'] }, () => {
     // REGRESSION GUARD, found against the real repo: first-match-by-name
     // returned `gyms.card.mapper.ts` and handed the agent one DTO mapper in
     // place of the entire page-object API.
@@ -82,11 +82,11 @@ describe('ground — page object selection', () => {
     expect(bundle.pageObjectPath).not.toContain('mapper');
   });
 
-  it('exposes the real methods a goal would need', () => {
+  it('given a page object exporting several methods -> when ground builds the bundle -> then the page-object API lists the real method signatures', { tags: ['@integration', '@author'] }, () => {
     expect(bundle.pageObjectApi.join()).toContain('filterByCounty');
   });
 
-  it('finds the conventions file and the seeded fixtures', () => {
+  it('given a repo with CLAUDE.md and seeded testdata -> when ground builds the bundle -> then the conventions and seeded fixture paths are resolved', { tags: ['@integration', '@author'] }, () => {
     expect(bundle.conventionsPath).toBe('CLAUDE.md');
     expect(bundle.seededDataPath).toContain('gyms.ts');
     expect(bundle.conventions).toContain('Web-first');
@@ -99,11 +99,11 @@ describe('ground — exemplar selection', () => {
     bundle = await ground({ cwd: root, feature: 'gyms' });
   });
 
-  it('takes the first exemplar from the SAME feature', () => {
+  it('given a repo holding specs for several features -> when ground selects exemplars -> then the first comes from the same feature', { tags: ['@integration', '@author'] }, () => {
     expect(bundle.exemplars[0]?.path).toContain('gyms');
   });
 
-  it('takes the second from a genuinely different feature', () => {
+  it('given a repo holding specs for several features -> when ground selects exemplars -> then the second comes from a genuinely different feature', { tags: ['@integration', '@author'] }, () => {
     // REGRESSION GUARD: ranking `gyms.api.acceptance.spec.ts` below the
     // same-feature threshold made it look like another feature's file, so the
     // agent got two gyms specs while being told the second showed
@@ -113,7 +113,7 @@ describe('ground — exemplar selection', () => {
     expect(featureKeyOf(second!.path)).not.toBe('gyms');
   });
 
-  it('does not offer a scaffold when a real spec exists', () => {
+  it('given a repo holding both a _template scaffold and real specs -> when ground selects exemplars -> then no scaffold is offered', { tags: ['@integration', '@author'] }, () => {
     // Templates are deliberately minimal; a two-step placeholder teaches no
     // idiom. Against the real repo `_template` tied on kind and won on
     // alphabetical order.
@@ -122,13 +122,13 @@ describe('ground — exemplar selection', () => {
     }
   });
 
-  it('hands over source, not a summary of it', () => {
+  it('given a selected exemplar -> when ground builds the bundle -> then the verbatim spec source is carried, not a summary', { tags: ['@integration', '@author'] }, () => {
     expect(bundle.exemplars[0]?.source).toContain('test(');
   });
 });
 
 describe('ground — a repository it knows nothing about', () => {
-  it('reports what is missing instead of inventing it', async () => {
+  it('given an empty repository -> when ground builds the bundle -> then the page object, conventions and exemplars are absent and the gaps are named', { tags: ['@integration', '@author'] }, async () => {
     const empty = await mkdtemp(join(tmpdir(), 'atest-ground-empty-'));
     const bundle = await ground({ cwd: empty, feature: 'gyms' });
 

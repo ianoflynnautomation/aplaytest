@@ -15,7 +15,7 @@ test('a gym can be found', async ({ gymsPage }) => {
 `;
 
 describe('buildMutants', () => {
-  it('produces every mutant with runnable-looking code', () => {
+  it('given the default options -> when buildMutants runs -> then three mutants are produced, each registering a beforeEach route hook', { tags: ['@unit', '@author'] }, () => {
     const mutants = buildMutants();
     expect(mutants).toHaveLength(3);
     for (const mutant of mutants) {
@@ -24,12 +24,12 @@ describe('buildMutants', () => {
     }
   });
 
-  it('honours a custom api pattern', () => {
+  it('given a custom apiPattern -> when buildMutants runs -> then the generated code routes that pattern', { tags: ['@unit', '@author'] }, () => {
     const [first] = buildMutants({ apiPattern: '**/graphql' });
     expect(first?.code).toContain('**/graphql');
   });
 
-  it('does not fulfill a Response after reading its body', () => {
+  it('given the empty-page mutant -> when its generated code is inspected -> then it refetches rather than fulfilling a Response whose body was already read', { tags: ['@unit', '@author'] }, () => {
     // Playwright disposes the body after json()/text(). Passing that Response
     // to route.fulfill throws, the test fails, and the gate treats a vacuous
     // test as falsifiable.
@@ -104,7 +104,7 @@ describe('buildMutants', () => {
     const teardown = new Error('Target page, context or browser has been closed');
 
     for (const mutant of buildMutants()) {
-      it(`${mutant.name} swallows a teardown error once the page is gone`, async () => {
+      it(`given the ${mutant.name} mutant and a page already closed -> when its route handler hits a teardown error -> then the error is swallowed`, { tags: ['@unit', '@author'] }, async () => {
         expect(await invokeHandler(mutant.code, { pageClosed: true, error: teardown })).toBe(
           'swallowed',
         );
@@ -115,7 +115,7 @@ describe('buildMutants', () => {
        * genuinely broken mutant, which reports "killed 0/3" and blames the test
        * — a quieter version of the same lie.
        */
-      it(`${mutant.name} still throws while the page is open`, async () => {
+      it(`given the ${mutant.name} mutant and a page still open -> when its route handler hits a real failure -> then the error is thrown rather than swallowed`, { tags: ['@unit', '@author'] }, async () => {
         expect(
           await invokeHandler(mutant.code, { pageClosed: false, error: new Error('real failure') }),
         ).toBe('threw');
@@ -123,7 +123,7 @@ describe('buildMutants', () => {
     }
   });
 
-  it('classes http-500 as liveness only', () => {
+  it('given the built mutants -> when their classes are inspected -> then http-500 is liveness and only content and discrimination count as meaningful', { tags: ['@unit', '@author'] }, () => {
     // Measured against the live app: a deliberately vacuous test was killed by
     // http-500 and nothing else. Counting that as falsifiability would certify
     // a test whose only assertion is that a header rendered.
@@ -136,7 +136,7 @@ describe('buildMutants', () => {
 });
 
 describe('applyMutant', () => {
-  it('injects AFTER the imports', () => {
+  it('given a spec whose mutant block references its own test binding -> when applyMutant injects the block -> then it lands after the imports and before the first test', { tags: ['@unit', '@author'] }, () => {
     // The block references the spec's own `test` binding. Injecting above the
     // import hits the temporal dead zone and throws a ReferenceError, which
     // the gate would misread as the mutant killing the test — certifying a
@@ -153,7 +153,7 @@ describe('applyMutant', () => {
     expect(injected).toBeLessThan(firstTest);
   });
 
-  it('handles a multi-line import block', () => {
+  it('given a spec whose import statement spans several lines -> when applyMutant injects the block -> then it lands after the closing import line', { tags: ['@unit', '@author'] }, () => {
     const source = `import {
   expect,
   test,
@@ -165,7 +165,7 @@ test('x', async () => {});
     expect(out.indexOf("} from './fixtures.js';")).toBeLessThan(out.indexOf('test.beforeEach'));
   });
 
-  it('is not fooled by the word import inside a leading block comment', () => {
+  it('given a spec whose leading block comment contains the word import -> when applyMutant injects the block -> then it lands after the real import', { tags: ['@unit', '@author'] }, () => {
     const source = `/**
  * This spec is important.
  */
@@ -177,7 +177,7 @@ test('x', async () => {});
     expect(out.indexOf("import { test }")).toBeLessThan(out.indexOf('test.beforeEach'));
   });
 
-  it('round-trips exactly, so a restore cannot leave residue', () => {
+  it('given a spec carrying an applied mutant -> when stripMutant restores it -> then the source matches the original exactly and no mutant is detected', { tags: ['@unit', '@author'] }, () => {
     const out = applyMutant(SPEC, buildMutants()[0]!);
     expect(hasMutant(out)).toBe(true);
     expect(stripMutant(out)).toBe(SPEC);
@@ -186,7 +186,7 @@ test('x', async () => {});
 });
 
 describe('extractSignatures', () => {
-  it('returns signatures, not bodies', () => {
+  it('given a page object exporting two functions -> when extractSignatures reads it -> then the signatures are returned without their bodies', { tags: ['@unit', '@author'] }, () => {
     const source = `
 export async function goTo(page: Page): Promise<void> {
   await page.goto('/gyms');
@@ -201,7 +201,7 @@ export async function expectCardData(page: Page, expected: { name: string }): Pr
     expect(signatures.join()).not.toContain('page.goto');
   });
 
-  it('flattens a signature that spans several lines', () => {
+  it('given an exported signature spanning several lines -> when extractSignatures reads it -> then the signature is flattened to one line', { tags: ['@unit', '@author'] }, () => {
     const source = `export async function search(
   page: Page,
   term: string,
@@ -209,7 +209,7 @@ export async function expectCardData(page: Page, expected: { name: string }): Pr
     expect(extractSignatures(source)[0]).toBe('search(page: Page, term: string): Promise<void>');
   });
 
-  it('ignores non-exported helpers', () => {
+  it('given a non-exported helper function -> when extractSignatures reads it -> then no signature is returned', { tags: ['@unit', '@author'] }, () => {
     expect(extractSignatures('function helper(x: number): void {}')).toHaveLength(0);
   });
 });
@@ -225,7 +225,7 @@ describe('evaluateGate — the verdict rule', () => {
 
   const stable = [{ name: 'stability' as const, ok: true, detail: 'passed 3/3' }];
 
-  it('REJECTS a test killed only by the liveness mutant', () => {
+  it('given a test killed only by the liveness mutant -> when evaluateGate scores it -> then the verdict is REJECTED', { tags: ['@unit', '@author'] }, () => {
     // The exact result a deliberately vacuous test produced against the live
     // app: navigate, assert the header, survive every data mutant.
     const result = evaluateGate({
@@ -242,7 +242,7 @@ describe('evaluateGate — the verdict rule', () => {
     expect(result.summary).toContain('REJECTED');
   });
 
-  it('accepts a test killed by a content mutant', () => {
+  it('given a test killed by a content mutant -> when evaluateGate scores it -> then the gate passes', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: stable,
       outcomes: [
@@ -256,7 +256,7 @@ describe('evaluateGate — the verdict rule', () => {
     expect(result.passed).toBe(true);
   });
 
-  it('still names the data mutants that survived', () => {
+  it('given a passing test that survived the unfiltered mutant -> when evaluateGate scores it -> then the summary still names the survivor', { tags: ['@unit', '@author'] }, () => {
     // The real "search narrows the list" test survived `unfiltered`: the card
     // is present in the full dataset too, so the test never proved narrowing.
     // Passing the gate must not hide that.
@@ -273,7 +273,7 @@ describe('evaluateGate — the verdict rule', () => {
     expect(result.summary).toContain('survived unfiltered');
   });
 
-  it('rejects when nothing was killed at all', () => {
+  it('given a test no mutant killed -> when evaluateGate scores it -> then the gate fails', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: stable,
       outcomes: [outcome('empty-page', 'content', false)],
@@ -283,7 +283,7 @@ describe('evaluateGate — the verdict rule', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('cannot pass on falsifiability alone when stability failed', () => {
+  it('given a killed content mutant but a failed stability check -> when evaluateGate scores it -> then the gate still fails', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: [{ name: 'stability', ok: false, detail: 'passed 2/3' }],
       outcomes: [outcome('empty-page', 'content', true)],
@@ -317,7 +317,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
    * asserts nothing look falsifiable, which is the single thing the gate exists
    * to catch.
    */
-  it('does not treat an unreadable data mutant as a kill', () => {
+  it('given data mutants that could not be read -> when evaluateGate scores them -> then no unreadable mutant counts as a kill', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: stable,
       outcomes: [
@@ -331,7 +331,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     expect(result.passed).toBe(false);
   });
 
-  it('reports UNDECIDABLE rather than blaming the test', () => {
+  it('given one unreadable data mutant and one survivor -> when evaluateGate scores them -> then the verdict is UNDECIDABLE rather than REJECTED', { tags: ['@unit', '@author'] }, () => {
     // Rejecting on runs that never executed would say "this test asserts
     // nothing" when the truth is "we did not find out".
     const result = evaluateGate({
@@ -348,7 +348,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     expect(result.summary).not.toContain('REJECTED');
   });
 
-  it('still REJECTS when every data mutant was read and none killed', () => {
+  it('given every data mutant read and none killing -> when evaluateGate scores them -> then the verdict is REJECTED and not undecidable', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: stable,
       outcomes: [
@@ -363,7 +363,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     expect(result.summary).toContain('REJECTED');
   });
 
-  it('a positive kill stands even when another mutant was unreadable', () => {
+  it('given one killed content mutant and one unreadable mutant -> when evaluateGate scores them -> then the gate passes and is not undecidable', { tags: ['@unit', '@author'] }, () => {
     // Evidence of falsifiability is evidence, whatever happened elsewhere.
     const result = evaluateGate({
       checks: stable,
@@ -378,7 +378,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     expect(result.undecidable).toBe(false);
   });
 
-  it('does not treat a connection-refused failure as a data kill', () => {
+  it('given a content mutant inconclusive because the app was unreachable -> when evaluateGate scores it -> then the verdict is UNDECIDABLE rather than REJECTED', { tags: ['@unit', '@author'] }, () => {
     const result = evaluateGate({
       checks: stable,
       outcomes: [
@@ -401,7 +401,7 @@ describe('evaluateGate — an unreadable mutant run is not evidence', () => {
     expect(result.summary).not.toContain('REJECTED');
   });
 
-  it('an unreadable LIVENESS mutant does not make the gate undecidable', () => {
+  it('given an unreadable liveness mutant alongside read data mutants -> when evaluateGate scores them -> then the gate is not undecidable and reports REJECTED', { tags: ['@unit', '@author'] }, () => {
     // http-500 never counts towards the verdict, so failing to read it
     // changes nothing.
     const result = evaluateGate({

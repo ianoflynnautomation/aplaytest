@@ -5,7 +5,7 @@ import { attempt, series } from './helpers.js';
 import type { HistoricalAttempt } from '@atest/core';
 
 describe('workerLoadDelta', () => {
-  it('measures the load dependency the correlation understates', () => {
+  it('given a test never failing at 1 worker and failing a third of the time at 8 -> when extractFeatures runs -> then workerLoadDelta measures the dependency the correlation understates', { tags: ['@unit', '@flaky'] }, () => {
     // Never fails at 1 worker, fails a third of the time at 8. Unmistakable —
     // yet point-biserial r is only ~0.41 because the outcome is rare, which is
     // why the rule gates on this delta and not on the correlation.
@@ -21,7 +21,7 @@ describe('workerLoadDelta', () => {
     expect(features.workerCorrelation).toBeLessThan(0.5);
   });
 
-  it('survives a skewed worker distribution', () => {
+  it('given a worker distribution skewed so the median sits at the busiest setting -> when extractFeatures runs -> then the load delta still registers rather than zeroing out', { tags: ['@unit', '@flaky'] }, () => {
     // REGRESSION GUARD. Splitting at the median used to zero this signal
     // silently: with 18 of 30 attempts at 8 workers the median IS 8, so
     // "above the median" was empty and a real load dependency read as 0.
@@ -39,7 +39,7 @@ describe('workerLoadDelta', () => {
     expect(features.workerLoadDelta).toBeGreaterThan(0.15);
   });
 
-  it('reports no signal when every attempt ran at the same worker count', () => {
+  it('given every attempt recorded at one worker count -> when extractFeatures runs -> then workerCountVaried is false and the load delta is 0', { tags: ['@unit', '@flaky'] }, () => {
     const features = extractFeatures(series('PPFPPFPPFPPFPPFP', { workers: 4 }));
     expect(features.workerCountVaried).toBe(false);
     expect(features.workerLoadDelta).toBe(0);
@@ -47,22 +47,22 @@ describe('workerLoadDelta', () => {
 });
 
 describe('correlation', () => {
-  it('returns 0 rather than NaN when a variable never moves', () => {
+  it('given a series in which one variable never moves -> when correlation scores it -> then the result is 0 rather than NaN', { tags: ['@unit', '@flaky'] }, () => {
     expect(correlation([4, 4, 4, 4], [0, 1, 0, 1])).toBe(0);
     expect(correlation([1, 2, 3, 4], [1, 1, 1, 1])).toBe(0);
   });
 
-  it('needs at least two points', () => {
+  it('given a single data point -> when correlation scores it -> then the result is 0', { tags: ['@unit', '@flaky'] }, () => {
     expect(correlation([1], [1])).toBe(0);
   });
 
-  it('finds a positive relationship', () => {
+  it('given two series that rise together -> when correlation scores them -> then the coefficient exceeds 0.7', { tags: ['@unit', '@flaky'] }, () => {
     expect(correlation([1, 2, 3, 4, 5], [0, 0, 1, 1, 1])).toBeGreaterThan(0.7);
   });
 });
 
 describe('projectConcentration', () => {
-  it('is 1 when every failure lands in one project', () => {
+  it('given failures confined to one project while others stay green -> when extractFeatures runs -> then projectConcentration is 1', { tags: ['@unit', '@flaky'] }, () => {
     const firefox = Array.from({ length: 10 }, (_, i) =>
       attempt({ outcome: i % 2 === 0 ? 'failed' : 'passed', daysAgo: 10 - i, project: 'firefox-desktop' }, i),
     );
@@ -73,7 +73,7 @@ describe('projectConcentration', () => {
     expect(extractFeatures(firefox, [...firefox, ...chromium]).projectConcentration).toBe(1);
   });
 
-  it('splits when failures are spread across projects', () => {
+  it('given failures split evenly across two projects -> when extractFeatures runs -> then projectConcentration is 0.5', { tags: ['@unit', '@flaky'] }, () => {
     const all = [
       ...Array.from({ length: 4 }, (_, i) =>
         attempt({ outcome: 'failed', daysAgo: 10 - i, project: 'firefox-desktop' }, i),
@@ -87,7 +87,7 @@ describe('projectConcentration', () => {
 });
 
 describe('retryFlips', () => {
-  it('counts a failed-then-passed retry inside one run', () => {
+  it('given a failure and a passing retry within one run -> when extractFeatures runs -> then one retry flip is counted', { tags: ['@unit', '@flaky'] }, () => {
     // The strongest possible flake signal: same commit, same environment,
     // different outcome, minutes apart.
     const attempts: HistoricalAttempt[] = [
@@ -97,7 +97,7 @@ describe('retryFlips', () => {
     expect(extractFeatures(attempts).retryFlips).toBe(1);
   });
 
-  it('does not count a run that simply failed on every attempt', () => {
+  it('given a run that failed on every retry -> when extractFeatures runs -> then no retry flip is counted', { tags: ['@unit', '@flaky'] }, () => {
     const attempts: HistoricalAttempt[] = [
       attempt({ outcome: 'failed', daysAgo: 1, retry: 0, runId: 'run-x' }),
       attempt({ outcome: 'failed', daysAgo: 1, retry: 1, runId: 'run-x' }),
@@ -107,7 +107,7 @@ describe('retryFlips', () => {
 });
 
 describe('durationRatio', () => {
-  it('is high when failing runs wait far longer than passing ones', () => {
+  it('given failing runs lasting five times as long as passing ones -> when extractFeatures runs -> then durationRatio is 5', { tags: ['@unit', '@flaky'] }, () => {
     const attempts = [
       ...Array.from({ length: 8 }, (_, i) =>
         attempt({ outcome: 'passed', daysAgo: 10 - i, durationMs: 1_000 }, i),

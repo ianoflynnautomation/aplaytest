@@ -1,0 +1,161 @@
+name: Publish Image
+
+# Publishes the atest container images to GHCR.
+#
+# ── Why an image at all, when tarballs are already published ──────────────────
+# They serve different consumers and both are needed:
+#
+#   tarballs (publish.yml)  a Node repo installing atest as a DEPENDENCY,
+#                           because the reporter loads inside the Playwright
+#                           process and cannot come from a container
+#   image (this)            a CI job that only wants to RUN the CLI, in any
+#                           language's repo
+#
+# The second is what atest-analyze.yml consumes. Before it existed, bjjeire — a
+# Java repository — ran setup-node, oras login, oras pull, untar and npm
+# install to invoke one command.
+#
+# ── Two images, published on different schedules ──────────────────────────────
+#   atest             ~0.5 GB   the analyze surface. Every main push.
+#   atest-playwright  ~3.9 GB   adds gate/heal/bisect/authoring, which spawn
+#                               browsers. TAGS AND DISPATCH ONLY — eight times
+#                               the storage and build time, for commands a
+#                               pipeline runs rarely. Pushing 3.9 GB on every
+#                               merge is a bill, not a feature.
+#
+# ── PRs build without pushing ─────────────────────────────────────────────────
+# `push: false` on pull requests. That is not ceremony: the Dockerfile's own
+# smoke tests are where a broken image gets caught — the global-install layout
+# that made the Azure driver unreachable, and a Playwright base whose browser
+# build did not match the npm package, were both found by the build refusing
+# to complete. Running that on a PR is the cheapest place to find the next one.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+    # Only when something that lands in the image changes. A docs-only PR
+    # rebuilding a 500 MB image teaches people to ignore the check.
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'packages/**'
+      - 'scripts/**'
+      - '.github/workflows/docker-publish.yml'
+  workflow_dispatch:
+    inputs:
+      publish-playwright:
+        description: "Also build and push the browser image (~3.9 GB)."
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: atest (cli)
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      security-events: write
+    uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/docker-build-push.yml@e30dc28dd2e56f9830b74187f7504d50ee7a593a  # v1.7.0
+    with:
+      image-name: atest
+      dockerfile: Dockerfile
+      target: cli
+      platforms: linux/amd64
+      push: ${{ github.event_name != 'pull_request' }}
+      sign: ${{ github.event_name != 'pull_request' }}
+      attest: ${{ github.event_name != 'pull_request' }}
+      scan: true
+      trivy-exit-code: "0"
+      tags: |
+        type=ref,event=branch
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=sha,format=short
+        type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+      # PLAYWRIGHT_VERSION governs both the base image tag and the npm version
+      # installed into the image; they must agree or the browser refuses to
+      # start. Left unset it takes the Dockerfile default. Stated here so the
+      # value is visible to anyone reading the pipeline rather than only to
+      # someone reading the Dockerfile.
+      build-args: |
+        PLAYWRIGHT_VERSION=1.61.0
+        VCS_REF=${{ github.sha }}
+
+  playwright:
+    name: atest-playwright (browsers)
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish-playwright
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      security-events: write
+    uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/docker-build-push.yml@e30dc28dd2e56f9830b74187f7504d50ee7a593a  # v1.7.0
+    with:
+      image-name: atest-playwright
+      dockerfile: Dockerfile
+      target: playwright
+      platforms: linux/amd64
+      push: true
+      sign: true
+      attest: true
+      scan: false
+      tags: |
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=sha,format=short
+        type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+      build-args: |
+        PLAYWRIGHT_VERSION=1.61.0
+        VCS_REF=${{ github.sha }}
+
+  summary:
+    name: Publish summary
+    needs: [cli, playwright]
+    if: always() && needs.cli.result == 'success' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write what was published
+        env:
+          CLI_REF: ${{ needs.cli.outputs.image-ref }}
+          CLI_TAG: ${{ needs.cli.outputs.image-tag }}
+          CLI_DIGEST: ${{ needs.cli.outputs.image-digest }}
+          PW_TAG: ${{ needs.playwright.outputs.image-tag }}
+          PW_RESULT: ${{ needs.playwright.result }}
+        shell: bash
+        run: |
+          {
+            echo "### atest images"
+            echo ""
+            echo "| image | tag | digest |"
+            echo "|---|---|---|"
+            echo "| \`${CLI_REF:-atest}\` | \`${CLI_TAG:-—}\` | \`${CLI_DIGEST:-—}\` |"
+            if [ "${PW_RESULT}" = "success" ]; then
+              echo "| atest-playwright | \`${PW_TAG:-—}\` | published |"
+            else
+              echo "| atest-playwright | — | skipped (tags and dispatch only) |"
+            fi
+            echo ""
+            echo "Consume the analyze image with:"
+            echo ""
+            echo '```yaml'
+            echo "container:"
+            echo "  image: ${CLI_REF:-ghcr.io/${{ github.repository_owner }}/atest}:${CLI_TAG:-latest}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

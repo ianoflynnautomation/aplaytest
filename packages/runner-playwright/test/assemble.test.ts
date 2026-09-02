@@ -53,7 +53,7 @@ function result(partial: Partial<TestResultLike> = {}): TestResultLike {
 }
 
 describe('assembleBundle', () => {
-  it('produces a deterministic id — the same failure always resolves to the same bundle', () => {
+  it('given the same test and result assembled twice -> when assembleBundle runs -> then both bundles carry the same prefixed id', { tags: ['@unit', '@runner'] }, () => {
     // Ids must survive re-analysis on another machine, or the heal ledger and
     // CI artifacts cannot be joined after the fact.
     const a = assembleBundle({ test: TEST, result: result(), sidecars: EMPTY_SIDECARS, context: CONTEXT });
@@ -62,13 +62,13 @@ describe('assembleBundle', () => {
     expect(a.id).toMatch(/^ev_[0-9a-f]{12}$/);
   });
 
-  it('gives a retry its own bundle', () => {
+  it('given the same test on retry 0 and retry 1 -> when assembleBundle runs -> then the two bundles carry different ids', { tags: ['@unit', '@runner'] }, () => {
     const first = assembleBundle({ test: TEST, result: result({ retry: 0 }), sidecars: EMPTY_SIDECARS, context: CONTEXT });
     const second = assembleBundle({ test: TEST, result: result({ retry: 1 }), sidecars: EMPTY_SIDECARS, context: CONTEXT });
     expect(first.id).not.toBe(second.id);
   });
 
-  it('classifies the failure and carries the parsed assertion detail', () => {
+  it('given a toBeVisible failure reporting element(s) not found -> when assembleBundle runs -> then the kind, matcher and locator are all carried', { tags: ['@unit', '@runner'] }, () => {
     const bundle = assembleBundle({
       test: TEST,
       result: result({
@@ -93,7 +93,7 @@ describe('assembleBundle', () => {
     expect(bundle.intent.selector).toBe("getByTestId('gym-card-name')");
   });
 
-  it('records the failing page-object call as the intent', () => {
+  it('given a failing step titled as a bound page-object call -> when assembleBundle runs -> then the method and its domain arguments are recorded as the intent', { tags: ['@unit', '@runner'] }, () => {
     const bundle = assembleBundle({
       test: TEST,
       result: result({
@@ -116,7 +116,7 @@ describe('assembleBundle', () => {
     expect(bundle.intent.failingStep?.args).toEqual(['Blackwater Valley BJJ']);
   });
 
-  it('prefers the fixture-recorded selector over one parsed from error prose', () => {
+  it('given both a fixture-recorded selector and one in the error prose -> when assembleBundle runs -> then the fixture selector wins and its source aliases are carried', { tags: ['@unit', '@runner'] }, () => {
     // The fixture knows which locator the page object actually built; the
     // error text is only a best-effort fallback.
     const bundle = assembleBundle({
@@ -141,7 +141,7 @@ describe('assembleBundle', () => {
     expect(bundle.intent.selectorSource?.aliases).toContain('GYM_CARD_TEST_IDS.name');
   });
 
-  it('degrades to a usable bundle when no fixtures are installed', () => {
+  it('given a reporter-only run with no fixtures installed -> when assembleBundle runs -> then the failure is still classified and the page sections are empty rather than missing', { tags: ['@unit', '@runner'] }, () => {
     // The reporter alone must be enough. Adding fixtures is an upgrade, not a
     // precondition — otherwise adoption stops being a one-line change.
     const bundle = assembleBundle({
@@ -156,7 +156,7 @@ describe('assembleBundle', () => {
     expect(bundle.page.testIdsPresent).toEqual([]);
   });
 
-  it('marks reporter-seeded candidates as unverified rather than claiming uniqueness', () => {
+  it('given candidates seeded by the reporter with no browser available -> when assembleBundle runs -> then every candidate is marked unverified rather than claiming uniqueness', { tags: ['@unit', '@runner'] }, () => {
     // No browser is available in the reporter, so matchCount is -1 to say
     // "not checked" instead of asserting a uniqueness nobody measured.
     const bundle = assembleBundle({
@@ -170,7 +170,7 @@ describe('assembleBundle', () => {
     expect(bundle.page.candidates.every(c => c.matchCount === -1)).toBe(true);
   });
 
-  it('ranks candidates by distance and drops the unrelated ones', () => {
+  it('given a page carrying six test ids of varying similarity -> when assembleBundle ranks them -> then they are ordered by distance and the unrelated ones are dropped', { tags: ['@unit', '@runner'] }, () => {
     // Verified against a live page: a real route carries ~36 test ids. Handing
     // over all of them is noise that pushes the cost of choosing downstream.
     const bundle = assembleBundle({
@@ -200,7 +200,7 @@ describe('assembleBundle', () => {
     expect(Math.max(...distances)).toBeLessThanOrEqual(0.4);
   });
 
-  it('caps the candidate list so a large page cannot flood the bundle', () => {
+  it('given a page carrying forty similar test ids -> when assembleBundle ranks them -> then the candidate list is capped at ten', { tags: ['@unit', '@runner'] }, () => {
     const many = Array.from({ length: 40 }, (_, i) => `gym-card-name${i}`);
     const bundle = assembleBundle({
       test: TEST,
@@ -211,7 +211,7 @@ describe('assembleBundle', () => {
     expect(bundle.page.candidates.length).toBeLessThanOrEqual(10);
   });
 
-  it('computes the share of the time budget consumed', () => {
+  it('given a result that consumed its whole timeout -> when assembleBundle runs -> then the budget used ratio is 1', { tags: ['@unit', '@runner'] }, () => {
     const bundle = assembleBundle({
       test: TEST,
       result: result({ duration: 30_000 }),
@@ -221,7 +221,7 @@ describe('assembleBundle', () => {
     expect(bundle.timing.budgetUsedRatio).toBe(1);
   });
 
-  it('links artifacts by attachment name', () => {
+  it('given attachments named trace and screenshot -> when assembleBundle runs -> then each is linked by name and the absent video stays null', { tags: ['@unit', '@runner'] }, () => {
     const bundle = assembleBundle({
       test: TEST,
       result: result({

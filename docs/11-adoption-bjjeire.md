@@ -56,18 +56,26 @@ success on nothing.
 ## Step 2 — Install atest
 
 It is not on any registry. `npm run pack` in the atest repo emits a tarball per
-package; copy the two the test process needs into `bjjeire-tests` and install
-them **in one command** — `@atest/core` is on no registry, so the reporter
-tarball cannot resolve it alone.
+package. That is the path for testing UNRELEASED edits; for anything else
+install from npm, where the packages carry real semver on each other:
+
+```sh
+# in bjjeire-tests
+npm i -D @atest/runner-playwright
+```
+
+To pin a build that was never released, copy the tarballs and install them
+**in one command** — each declares `@atest/core@^0.1.0`, and asking for one
+alone resolves that against the registry, giving you the last released core
+rather than the one you just built.
 
 ```sh
 # in atest
 npm run pack
-cp dist-pack/atest-core-0.0.0.tgz dist-pack/atest-runner-playwright-0.0.0.tgz \
-   ~/Sources/bjjeire-tests/vendor/
+cp dist-pack/*.tgz ~/Sources/bjjeire-tests/vendor/
 
 # in bjjeire-tests
-npm i ./vendor/atest-core-0.0.0.tgz ./vendor/atest-runner-playwright-0.0.0.tgz
+npm i ./vendor/*.tgz
 ```
 
 `file:` specifiers survive `npm ci`, so the runner image needs no change beyond

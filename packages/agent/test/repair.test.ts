@@ -27,14 +27,14 @@ const choice = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('runRepairAgent — without a model', () => {
-  it('reports unavailable rather than failing, leaving Tier 0 to stand', async () => {
+  it('given no model is configured -> when runRepairAgent runs -> then status is unavailable, leaving the Tier 0 ranking to stand', { tags: ['@unit', '@agent'] }, async () => {
     // The deterministic ranking is already correct in most cases; a missing
     // key must reduce scope, never correctness.
     const outcome = await runRepairAgent(new UnavailableLlmClient('no key'), INPUT);
     expect(outcome.status).toBe('unavailable');
   });
 
-  it('does not call a model when there is nothing to rank', async () => {
+  it('given an empty candidate list -> when runRepairAgent runs -> then status is unavailable and no model call is made', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([]);
     const outcome = await runRepairAgent(client, { ...INPUT, candidates: [] });
     expect(outcome.status).toBe('unavailable');
@@ -43,7 +43,7 @@ describe('runRepairAgent — without a model', () => {
 });
 
 describe('runRepairAgent — choosing', () => {
-  it('returns the chosen candidate', async () => {
+  it('given a model choosing an offered candidate -> when runRepairAgent runs -> then status is chose and the choice is that candidate', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice() }]);
     const outcome = await runRepairAgent(client, INPUT);
 
@@ -51,7 +51,7 @@ describe('runRepairAgent — choosing', () => {
     if (outcome.status === 'chose') expect(outcome.choice.chosen).toBe('gym-card-title');
   });
 
-  it('REJECTS a choice outside the offered candidates', async () => {
+  it('given a model choosing a selector outside the offered candidates -> when runRepairAgent validates it -> then status is invalid, naming the Tier-0 ranking', { tags: ['@unit', '@agent'] }, async () => {
     // The safety property of Tier 1 is that it may only pick options Tier 0
     // verified against the live page. A selector the model invented has never
     // been checked against anything.
@@ -65,13 +65,13 @@ describe('runRepairAgent — choosing', () => {
     }
   });
 
-  it('treats declining as a correct answer, not a failure', async () => {
+  it('given a model declining with low confidence -> when runRepairAgent runs -> then status is declined rather than a failure', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice({ chosen: null, confidence: 0.2 }) }]);
     const outcome = await runRepairAgent(client, INPUT);
     expect(outcome.status).toBe('declined');
   });
 
-  it('surfaces "this is a real bug" as a first-class outcome', async () => {
+  it('given a model reporting the failure is a real bug -> when runRepairAgent runs -> then status is real-bug, a first-class outcome', { tags: ['@unit', '@agent'] }, async () => {
     // The most valuable thing the agent can say. Making it a normal answer is
     // what stops it rationalising a patch for a genuine application defect.
     const client = new FakeLlmClient([
@@ -83,7 +83,7 @@ describe('runRepairAgent — choosing', () => {
 });
 
 describe('runRepairAgent — prompt construction', () => {
-  it('puts the invariant block in `system`, so it is the cache prefix', async () => {
+  it('given a repair request -> when runRepairAgent builds the prompt -> then the invariant block is the system prefix and carries no per-failure detail', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice() }]);
     await runRepairAgent(client, INPUT);
 
@@ -93,7 +93,7 @@ describe('runRepairAgent — prompt construction', () => {
     expect(request?.system).not.toContain('Blackwater');
   });
 
-  it('sends the intent and the candidate list, not a raw selector alone', async () => {
+  it('given a repair input carrying an intent and candidates -> when runRepairAgent builds the prompt -> then the intent, the candidates and the missing test id are all sent', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice() }]);
     await runRepairAgent(client, INPUT);
 
@@ -103,7 +103,7 @@ describe('runRepairAgent — prompt construction', () => {
     expect(message).toContain('MISSING TEST ID: gym-card-name');
   });
 
-  it('truncates a huge ARIA snapshot rather than blowing the budget', async () => {
+  it('given an ARIA snapshot far past the character budget -> when runRepairAgent builds the prompt -> then the snapshot is truncated and the message stays small', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice() }]);
     await runRepairAgent(client, { ...INPUT, ariaSnapshot: 'x'.repeat(50_000) }, { ariaCharBudget: 500 });
 
@@ -112,7 +112,7 @@ describe('runRepairAgent — prompt construction', () => {
     expect(message.length).toBeLessThan(2_000);
   });
 
-  it('uses the heal role, so it runs on the mid-tier model', async () => {
+  it('given a repair request -> when runRepairAgent calls the client -> then the request carries the heal role, so it runs on the mid-tier model', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: choice() }]);
     await runRepairAgent(client, INPUT);
     expect(client.requests[0]?.role).toBe('heal');
@@ -120,7 +120,7 @@ describe('runRepairAgent — prompt construction', () => {
 });
 
 describe('runRepairAgent — budget', () => {
-  it('refuses to spend past the pool and says so', async () => {
+  it('given a budget guard already past its pool -> when runRepairAgent runs -> then status is unavailable and no call is made', { tags: ['@unit', '@agent'] }, async () => {
     const guard = new BudgetGuard({ perCallUsd: 1, totalUsd: 0.01, maxCalls: 10 });
     guard.record({
       inputTokens: 0,
@@ -138,7 +138,7 @@ describe('runRepairAgent — budget', () => {
     expect(client.callCount).toBe(0);
   });
 
-  it('survives a malformed response without crashing the heal run', async () => {
+  it('given a model returning unparseable output twice -> when runRepairAgent runs -> then status is unavailable rather than a crash', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: 'not json' }, { reply: 'still not json' }]);
     const outcome = await runRepairAgent(client, INPUT);
     expect(outcome.status).toBe('unavailable');

@@ -65,7 +65,7 @@ async function writeReport(report: unknown): Promise<string> {
 }
 
 describe('ingestPlaywrightJson', () => {
-  it('turns a Playwright JSON report into history attempts', async () => {
+  it('given a Playwright JSON report with one passing and one failing spec -> when ingestPlaywrightJson runs -> then one run and two attempts are stored and the failure is classified as assertion_value_mismatch', { tags: ['@integration', '@history-ingest'] }, async () => {
     const path = await writeReport(REPORT);
 
     const store = new SqliteHistoryStore(':memory:');
@@ -92,7 +92,7 @@ describe('ingestPlaywrightJson', () => {
    * opted out of that guarantee without saying so, and re-running a CI analyze
    * job was enough to trigger it.
    */
-  it('is idempotent across repeated ingestion of the same artifact', async () => {
+  it('given the same report artifact ingested twice -> when ingestPlaywrightJson runs both times -> then the store still holds two attempts', { tags: ['@integration', '@history-ingest'] }, async () => {
     const path = await writeReport(REPORT);
 
     const store = new SqliteHistoryStore(':memory:');
@@ -104,7 +104,7 @@ describe('ingestPlaywrightJson', () => {
     expect(attempts).toHaveLength(2);
   });
 
-  it('reads run identity from the report rather than the ingesting job', async () => {
+  it('given a report carrying its own CI commit, start time and worker metadata -> when ingestPlaywrightJson runs under a different ingesting identity -> then the attempts keep the identity from the report', { tags: ['@integration', '@history-ingest'] }, async () => {
     const path = await writeReport({
       ...REPORT,
       config: {
@@ -137,7 +137,7 @@ describe('ingestPlaywrightJson', () => {
    * one collision rolled back the entire run: on a real 8-shard acceptance
    * report it cost all 120 attempts, and the only symptom was one warning line.
    */
-  it('keeps the rest of the run when an id-less report repeats a test', async () => {
+  it('given an id-less report that repeats one setup test -> when ingestPlaywrightJson runs -> then the rest of the run survives and the collapsed duplicate is reported as skipped', { tags: ['@integration', '@history-ingest'] }, async () => {
     const setup = (status: string) => ({
       title: 'auth.api.setup.ts',
       file: 'tests/auth.api.setup.ts',
@@ -172,7 +172,7 @@ describe('ingestPlaywrightJson', () => {
     expect(setupRows[0]?.outcome).toBe('failed');
   });
 
-  it('reports an unreadable or malformed report instead of throwing', async () => {
+  it('given a missing report path and a malformed JSON report -> when ingestPlaywrightJson runs -> then each is reported as unreadable or not valid JSON instead of throwing', { tags: ['@integration', '@history-ingest'] }, async () => {
     const dir = await mkdtemp(join(tmpdir(), 'atest-pwjson-bad-'));
     const bad = join(dir, 'report.json');
     await writeFile(bad, '{ not json', 'utf8');

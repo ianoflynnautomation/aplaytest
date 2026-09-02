@@ -1,6 +1,6 @@
 {
   "name": "@atest/report",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shard merge, PR comment, and the self-contained HTML report",
   "license": "MIT",
   "type": "module",
@@ -14,12 +14,24 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "0.0.0"
+    "@atest/core": "^0.1.0"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "directory": "packages/report"
+  },
+  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "bugs": {
+    "url": "https://github.com/ianoflynnautomation/atest/issues"
   }
 }

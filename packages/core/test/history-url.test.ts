@@ -7,7 +7,7 @@ import {
 } from '../src/history/url.js';
 
 describe('parseHistoryUrl', () => {
-  it('treats :memory: and the empty string as throwaway', () => {
+  it('given :memory: or an empty string -> when parseHistoryUrl runs -> then kind is memory', { tags: ['@unit', '@history-url'] }, () => {
     expect(parseHistoryUrl(':memory:').kind).toBe('memory');
     expect(parseHistoryUrl('').kind).toBe('memory');
   });
@@ -17,7 +17,7 @@ describe('parseHistoryUrl', () => {
    * parses as a URL with scheme `c:`, so "reject unrecognised schemes" would
    * break the case the flag was built for.
    */
-  it('treats anything unrecognised as a file path, including Windows paths', () => {
+  it('given an unrecognised target such as a relative path or a Windows drive path -> when parseHistoryUrl runs -> then kind is sqlite with the path preserved verbatim', { tags: ['@unit', '@history-url'] }, () => {
     expect(parseHistoryUrl('.atest/history.sqlite')).toEqual({
       kind: 'sqlite',
       path: '.atest/history.sqlite',
@@ -28,7 +28,7 @@ describe('parseHistoryUrl', () => {
     });
   });
 
-  it('expands the azblob shorthand to a blob endpoint', () => {
+  it('given an azblob shorthand target -> when parseHistoryUrl runs -> then it expands to the commercial blob endpoint with an empty prefix', { tags: ['@unit', '@history-url'] }, () => {
     expect(parseHistoryUrl('azblob://bjjeireatest/atest-history')).toEqual({
       kind: 'azure-blob',
       serviceUrl: 'https://bjjeireatest.blob.core.windows.net',
@@ -40,20 +40,20 @@ describe('parseHistoryUrl', () => {
     });
   });
 
-  it('normalises a multi-segment prefix to end with a slash', () => {
+  it('given an azblob target with a multi-segment prefix -> when parseHistoryUrl runs -> then the prefix is normalised to end with a slash', { tags: ['@unit', '@history-url'] }, () => {
     const target = parseHistoryUrl('azblob://acct/atest-history/bjjeire/java');
     expect(target).toMatchObject({ prefix: 'bjjeire/java/' });
   });
 
   /** Sovereign clouds have different suffixes; hard coding one resolves nowhere. */
-  it('honours a non-commercial endpoint suffix', () => {
+  it('given a non-commercial endpointSuffix -> when parseHistoryUrl runs -> then serviceUrl is built from that suffix', { tags: ['@unit', '@history-url'] }, () => {
     const target = parseHistoryUrl('azblob://acct/hist', {
       endpointSuffix: 'blob.core.usgovcloudapi.net',
     });
     expect(target).toMatchObject({ serviceUrl: 'https://acct.blob.core.usgovcloudapi.net' });
   });
 
-  it('accepts a fully qualified blob URL and takes the account from the subdomain', () => {
+  it('given a fully qualified blob URL -> when parseHistoryUrl runs -> then the account comes from the subdomain and the container and prefix from the path', { tags: ['@unit', '@history-url'] }, () => {
     const target = parseHistoryUrl('https://bjjeireatest.blob.core.windows.net/atest-history/x');
     expect(target).toMatchObject({
       kind: 'azure-blob',
@@ -65,7 +65,7 @@ describe('parseHistoryUrl', () => {
   });
 
   /** Azurite serves every account from one host, so the account is in the path. */
-  it('reads the emulator form, with the account as the first path segment', () => {
+  it('given an Azurite emulator URL -> when parseHistoryUrl runs -> then the account is read from the first path segment and kept in serviceUrl', { tags: ['@unit', '@history-url'] }, () => {
     const target = parseHistoryUrl('http://127.0.0.1:10000/devstoreaccount1/atest-history');
     expect(target).toMatchObject({
       kind: 'azure-blob',
@@ -75,7 +75,7 @@ describe('parseHistoryUrl', () => {
     });
   });
 
-  it('parses the read and window modifiers', () => {
+  it('given window and readonly query modifiers -> when parseHistoryUrl runs -> then windowDays and readOnly reflect them, with a bare readonly flag meaning true', { tags: ['@unit', '@history-url'] }, () => {
     expect(parseHistoryUrl('azblob://acct/hist?window=30&readonly=1')).toMatchObject({
       windowDays: 30,
       readOnly: true,
@@ -86,7 +86,7 @@ describe('parseHistoryUrl', () => {
     expect(parseHistoryUrl('azblob://acct/hist?readonly=false')).toMatchObject({ readOnly: false });
   });
 
-  it('rejects a malformed target before any credential is acquired', () => {
+  it('given a malformed azblob target -> when parseHistoryUrl runs -> then it throws HistoryUrlError naming the offending part, before any credential is acquired', { tags: ['@unit', '@history-url'] }, () => {
     expect(() => parseHistoryUrl('azblob://acct')).toThrow(HistoryUrlError);
     expect(() => parseHistoryUrl('azblob://acct/Not_A_Container')).toThrow(/container name/);
     expect(() => parseHistoryUrl('azblob://xy/container')).toThrow(/storage account name/);
@@ -95,11 +95,11 @@ describe('parseHistoryUrl', () => {
 });
 
 describe('describeHistoryTarget', () => {
-  it('says plainly that memory is discarded, which is the whole trap', () => {
+  it('given a memory target -> when describeHistoryTarget renders it -> then the description says the history is discarded', { tags: ['@unit', '@history-url'] }, () => {
     expect(describeHistoryTarget(parseHistoryUrl(':memory:'))).toContain('discarded');
   });
 
-  it('marks a read-only store, so a PR log says why nothing was written', () => {
+  it('given a read-only blob target -> when describeHistoryTarget renders it -> then the description says read-only, so a PR log explains why nothing was written', { tags: ['@unit', '@history-url'] }, () => {
     expect(describeHistoryTarget(parseHistoryUrl('azblob://acct/hist?readonly=1'))).toContain(
       'read-only',
     );

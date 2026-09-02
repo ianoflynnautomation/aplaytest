@@ -8,14 +8,14 @@ import { BudgetExceededError, LlmUnavailableError, RefusalError } from '../src/e
 import { checkCacheable, costUsd, DEFAULT_MODELS, MODELS, specFor } from '../src/pricing.js';
 
 describe('degradation — no key is not a crash', () => {
-  it('resolves to an unavailable client rather than throwing at startup', () => {
+  it('given an environment with no API key -> when createLlmClient builds a client -> then the client reports unavailable rather than throwing at startup', { tags: ['@unit', '@llm'] }, () => {
     // Every deterministic feature must keep working; only paths that genuinely
     // need a model may fail.
     const client = createLlmClient({ env: {} });
     expect(client.available).toBe(false);
   });
 
-  it('throws a NAMED error, never returns empty output', async () => {
+  it('given an unavailable client -> when complete is called -> then it rejects with LlmUnavailableError rather than returning empty output', { tags: ['@unit', '@llm'] }, async () => {
     // Silently degrading to a worse answer that looks normal is the failure
     // mode the whole contract exists to prevent.
     const client = createLlmClient({ env: {} });
@@ -24,25 +24,25 @@ describe('degradation — no key is not a crash', () => {
     );
   });
 
-  it('names the reason so the CLI can print something actionable', async () => {
+  it('given an environment with no API key -> when complete is called -> then the rejection names the missing ANTHROPIC_API_KEY', { tags: ['@unit', '@llm'] }, async () => {
     const client = createLlmClient({ env: {} });
     await expect(
       client.complete({ role: 'heal', system: 's', messages: [] }),
     ).rejects.toThrow(/ANTHROPIC_API_KEY is not set/);
   });
 
-  it('honours an explicit disable over a present key', () => {
+  it('given a present API key and an explicit disable -> when createLlmClient builds a client -> then the client reports unavailable', { tags: ['@unit', '@llm'] }, () => {
     const client = createLlmClient({ env: { ANTHROPIC_API_KEY: 'sk-test' }, disabled: true });
     expect(client.available).toBe(false);
   });
 
-  it('builds a real client when a key exists', () => {
+  it('given an environment carrying an API key -> when createLlmClient builds a client -> then the client is available and maps the heal role to its model', { tags: ['@unit', '@llm'] }, () => {
     const client = createLlmClient({ env: { ANTHROPIC_API_KEY: 'sk-test' } });
     expect(client.available).toBe(true);
     expect(client.modelFor('heal')).toBe('claude-sonnet-5');
   });
 
-  it('still reports which models it would use, so doctor can say so', () => {
+  it('given an unavailable client -> when describeAvailability renders it -> then the description says deterministic tier only', { tags: ['@unit', '@llm'] }, () => {
     expect(describeAvailability(createLlmClient({ env: {} }), ['heal'])).toContain(
       'deterministic tier only',
     );
@@ -50,13 +50,13 @@ describe('degradation — no key is not a crash', () => {
 });
 
 describe('model selection', () => {
-  it('splits roles by job shape, not by a vague quality axis', () => {
+  it('given the default model map -> when the roles are inspected -> then classify, heal and author map to Haiku, Sonnet and Opus respectively', { tags: ['@unit', '@llm'] }, () => {
     expect(DEFAULT_MODELS.classify).toBe('claude-haiku-4-5');
     expect(DEFAULT_MODELS.heal).toBe('claude-sonnet-5');
     expect(DEFAULT_MODELS.author).toBe('claude-opus-5');
   });
 
-  it('knows every default model', () => {
+  it('given every default model -> when specFor looks each up -> then all of them carry a pricing entry', { tags: ['@unit', '@llm'] }, () => {
     for (const model of Object.values(DEFAULT_MODELS)) {
       expect(specFor(model), `${model} has no pricing entry`).not.toBeNull();
     }
@@ -64,7 +64,7 @@ describe('model selection', () => {
 });
 
 describe('cost accounting', () => {
-  it('computes cost from real per-token rates', () => {
+  it('given one million input tokens on Opus 5 -> when costUsd prices them -> then the cost is 5 dollars', { tags: ['@unit', '@llm'] }, () => {
     // Opus 5: $5/MTok in, $25/MTok out.
     const cost = costUsd('claude-opus-5', {
       inputTokens: 1_000_000,
@@ -75,7 +75,7 @@ describe('cost accounting', () => {
     expect(cost).toBeCloseTo(5, 6);
   });
 
-  it('prices cache reads at a tenth of base input', () => {
+  it('given the same token count as base input and as cache reads -> when costUsd prices both -> then the cache read costs a tenth of base input', { tags: ['@unit', '@llm'] }, () => {
     const base = costUsd('claude-sonnet-5', {
       inputTokens: 100_000,
       outputTokens: 0,
@@ -91,7 +91,7 @@ describe('cost accounting', () => {
     expect(cached).toBeCloseTo(base * 0.1, 6);
   });
 
-  it('returns zero for an unknown model rather than guessing a price', () => {
+  it('given a model with no pricing entry -> when costUsd prices it -> then the cost is 0 rather than a guess', { tags: ['@unit', '@llm'] }, () => {
     expect(
       costUsd('some-future-model', {
         inputTokens: 1000,
@@ -104,7 +104,7 @@ describe('cost accounting', () => {
 });
 
 describe('cache prefix minimums', () => {
-  it('encodes that the minimum is NOT monotonic across models', () => {
+  it('given the cache prefix minimums for Opus, Sonnet and Haiku -> when they are compared -> then the minimum rises rather than tracking model size', { tags: ['@unit', '@llm'] }, () => {
     // The trap: a prefix that caches on Opus 5 silently does not on Haiku 4.5,
     // and Haiku is where the high-volume classify path runs.
     expect(MODELS['claude-opus-5']?.minCacheablePrefix).toBe(512);
@@ -112,7 +112,7 @@ describe('cache prefix minimums', () => {
     expect(MODELS['claude-haiku-4-5']?.minCacheablePrefix).toBe(4096);
   });
 
-  it('warns for one model and not another on the SAME prefix', () => {
+  it('given one prefix above the Opus and Sonnet minimums but below the Haiku one -> when checkCacheable checks each model -> then only Haiku warns that caching is silently ignored', { tags: ['@unit', '@llm'] }, () => {
     // ~2000 tokens: comfortably above Opus 5 (512) and Sonnet 5 (1024), well
     // below Haiku 4.5 (4096). The identical conventions block therefore caches
     // on the heal path and silently does not on the high-volume classify path.
@@ -127,13 +127,13 @@ describe('cache prefix minimums', () => {
     expect(warning?.minimum).toBe(4096);
   });
 
-  it('is quiet when the prefix clears the bar', () => {
+  it('given a prefix well above the Haiku minimum -> when checkCacheable checks it -> then no warning is returned', { tags: ['@unit', '@llm'] }, () => {
     expect(checkCacheable('claude-haiku-4-5', 'x'.repeat(20_000))).toBeNull();
   });
 });
 
 describe('BudgetGuard', () => {
-  it('throws BEFORE a call, so the limit is enforced rather than observed', () => {
+  it('given a budget guard already past its total -> when assertCanSpend runs -> then it throws BudgetExceededError before the call is made', { tags: ['@unit', '@llm'] }, () => {
     const guard = new BudgetGuard({ perCallUsd: 1, totalUsd: 0.1, maxCalls: 100 });
     guard.record({
       inputTokens: 0,
@@ -145,7 +145,7 @@ describe('BudgetGuard', () => {
     expect(() => guard.assertCanSpend()).toThrow(BudgetExceededError);
   });
 
-  it('caps call count as well as spend, to stop a runaway loop', () => {
+  it('given a budget guard at its call limit -> when assertCanSpend runs -> then it throws naming the call count and limit', { tags: ['@unit', '@llm'] }, () => {
     const guard = new BudgetGuard({ perCallUsd: 1, totalUsd: 100, maxCalls: 2 });
     for (let i = 0; i < 2; i++) {
       guard.record({
@@ -159,7 +159,7 @@ describe('BudgetGuard', () => {
     expect(() => guard.assertCanSpend()).toThrow(/2 calls, limit 2/);
   });
 
-  it('discloses usage in one line, including whether the cache was hit', () => {
+  it('given a guard with one recorded call that hit the cache -> when summary renders it -> then one line reports the call count, cached tokens and spend', { tags: ['@unit', '@llm'] }, () => {
     const guard = new BudgetGuard();
     expect(guard.summary()).toBe('no model calls');
 
@@ -175,7 +175,7 @@ describe('BudgetGuard', () => {
     expect(guard.summary()).toContain('$0.0120');
   });
 
-  it('says plainly when nothing was cached', () => {
+  it('given a guard with one recorded call that missed the cache -> when summary renders it -> then it says no cache hits', { tags: ['@unit', '@llm'] }, () => {
     const guard = new BudgetGuard();
     guard.record({
       inputTokens: 100,
@@ -191,7 +191,7 @@ describe('BudgetGuard', () => {
 describe('FakeLlmClient — structured output', () => {
   const Schema = z.object({ choice: z.string(), confidence: z.number() });
 
-  it('decodes a valid response', async () => {
+  it('given a scripted response matching the schema -> when completeStructured decodes it -> then the value is returned and no repair is recorded', { tags: ['@unit', '@llm'] }, async () => {
     const client = new FakeLlmClient([{ reply: { choice: 'gym-card-title', confidence: 0.9 } }]);
     const result = await client.completeStructured(
       { role: 'heal', system: 's', messages: [] },
@@ -201,7 +201,7 @@ describe('FakeLlmClient — structured output', () => {
     expect(result.repaired).toBe(false);
   });
 
-  it('repairs a malformed response exactly once', async () => {
+  it('given a malformed response followed by a valid one -> when completeStructured decodes them -> then the repair succeeds after exactly two calls', { tags: ['@unit', '@llm'] }, async () => {
     const client = new FakeLlmClient([
       { reply: 'not json at all' },
       { reply: { choice: 'gym-card-title', confidence: 0.9 } },
@@ -214,7 +214,7 @@ describe('FakeLlmClient — structured output', () => {
     expect(client.callCount).toBe(2);
   });
 
-  it('gives up after one repair instead of looping on a stuck model', async () => {
+  it('given two consecutive malformed responses -> when completeStructured decodes them -> then it rejects after two calls rather than looping', { tags: ['@unit', '@llm'] }, async () => {
     const client = new FakeLlmClient([{ reply: 'garbage' }, { reply: 'still garbage' }]);
     await expect(
       client.completeStructured({ role: 'heal', system: 's', messages: [] }, Schema),
@@ -222,7 +222,7 @@ describe('FakeLlmClient — structured output', () => {
     expect(client.callCount).toBe(2);
   });
 
-  it('surfaces a refusal as a typed error rather than empty text', async () => {
+  it('given a response carrying a refusal stop reason -> when completeStructured decodes it -> then it rejects with RefusalError rather than empty text', { tags: ['@unit', '@llm'] }, async () => {
     // A refusal is HTTP 200 with stop_reason "refusal"; code that reads
     // content[0] without checking breaks on it.
     const client = new FakeLlmClient([{ reply: '', refused: true, refusalCategory: 'cyber' }]);
@@ -231,7 +231,7 @@ describe('FakeLlmClient — structured output', () => {
     ).rejects.toThrow(RefusalError);
   });
 
-  it('fails loudly when the code makes more calls than the script expects', async () => {
+  it('given a fake client scripted for one call -> when a second call is made -> then it rejects saying the script ran out', { tags: ['@unit', '@llm'] }, async () => {
     const client = new FakeLlmClient([{ reply: '{}' }]);
     await client.complete({ role: 'heal', system: 's', messages: [] });
     await expect(client.complete({ role: 'heal', system: 's', messages: [] })).rejects.toThrow(

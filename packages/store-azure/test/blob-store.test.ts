@@ -91,7 +91,7 @@ class CountingBackend implements BlobBackend {
 }
 
 describe('BlobHistoryStore', () => {
-  it('round-trips a run through the container', async () => {
+  it('given a run written to the container -> when a second store reads it back -> then the attempt carries its joined run metadata', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const writer = store(backend);
     await writer.ingest(run());
@@ -110,7 +110,7 @@ describe('BlobHistoryStore', () => {
     });
   });
 
-  it('writes exactly one object per run and shard', async () => {
+  it('given two shards of one run -> when both are ingested -> then exactly one object is written per run and shard', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const writer = store(backend);
     await writer.ingest(run({ runId: 'r', shard: { current: 1, total: 2 } }));
@@ -126,7 +126,7 @@ describe('BlobHistoryStore', () => {
    * The property the SQLite driver needed a scoped DELETE and an UPSERT to get,
    * and got wrong twice. Here it is a consequence of the name.
    */
-  it('re-ingesting a shard overwrites it instead of duplicating it', async () => {
+  it('given a two-shard run where one shard is re-ingested -> when the container is read back -> then the shard is overwritten rather than duplicated', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const writer = store(backend);
     await writer.ingest(run({ runId: 'r', shard: { current: 1, total: 2 }, attempts: [attempt({ testId: 'a' })] }));
@@ -146,7 +146,7 @@ describe('BlobHistoryStore', () => {
    * design could not survive: one lost the ETag race and either failed the
    * step or discarded the other's attempts. Different names, no race.
    */
-  it('keeps both of two runs that write concurrently', async () => {
+  it('given two runs writing concurrently -> when the container is read back -> then both runs and their attempts survive', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const a = store(backend);
     const b = store(backend);
@@ -160,7 +160,7 @@ describe('BlobHistoryStore', () => {
     expect((await reader.attempts()).map(a2 => a2.testId).sort()).toEqual(['a', 'b']);
   });
 
-  it('counts runs from the listing alone, with no downloads', async () => {
+  it('given three runs in the container -> when runCount is read -> then the count comes from the listing with no downloads', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new CountingBackend();
     const writer = store(backend);
     for (const runId of ['r1', 'r2', 'r3']) await writer.ingest(run({ runId }));
@@ -175,7 +175,7 @@ describe('BlobHistoryStore', () => {
    * `analyzeAll` calls attempts() twice per (test, project). A store that went
    * to the network per call would take minutes; the window is fetched once.
    */
-  it('downloads the window once however many queries follow', async () => {
+  it('given three runs and three successive queries -> when the store answers them -> then the window is listed once and each object downloaded once', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new CountingBackend();
     const writer = store(backend);
     for (const runId of ['r1', 'r2', 'r3']) await writer.ingest(run({ runId }));
@@ -190,7 +190,7 @@ describe('BlobHistoryStore', () => {
     expect(backend.lists).toBe(1);
   });
 
-  it('reads only within the window, so the load does not grow forever', async () => {
+  it('given an ancient run and a recent one -> when a 30-day window is read -> then only the recent run is returned and the old record is skipped rather than deleted', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const writer = store(backend, { windowDays: null });
     await writer.ingest(run({ runId: 'ancient', startedAt: '2025-01-01T00:00:00.000Z' }));
@@ -213,7 +213,7 @@ describe('BlobHistoryStore', () => {
      * the PR identity holds Reader — but as a 403 per shard file after four
      * retries each, which turns a correct policy into a slow job.
      */
-    it('never writes, but still scores the run against the baseline', async () => {
+    it('given a read-only store and an existing baseline -> when a branch run is ingested -> then it is scored against the baseline and nothing is written', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       const trunk = store(backend);
       await trunk.ingest(run({ runId: 'main-1', attempts: [attempt({ testId: 'baseline' })] }));
@@ -230,14 +230,14 @@ describe('BlobHistoryStore', () => {
       expect(backend.names()).toEqual(['v1/runs/2026/08/30/main-1/all.json.gz']);
     });
 
-    it('refuses to prune rather than deleting nothing and reporting success', async () => {
+    it('given a read-only store -> when prune is called -> then it rejects rather than reporting a success that deleted nothing', { tags: ['@unit', '@store-azure'] }, async () => {
       const pr = store(new MemoryBlobBackend(), { readOnly: true });
       await expect(pr.prune('2026-01-01T00:00:00.000Z')).rejects.toThrow(/read-only/);
     });
   });
 
   describe('prune', () => {
-    it('deletes whole days older than the cutoff', async () => {
+    it('given an old run and a recent one -> when prune runs with a cutoff between them -> then the old day is deleted and the recent run survives', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       const writer = store(backend, { windowDays: null });
       await writer.ingest(run({ runId: 'old', startedAt: '2026-01-01T00:00:00.000Z' }));
@@ -251,7 +251,7 @@ describe('BlobHistoryStore', () => {
       expect(backend.size).toBe(1);
     });
 
-    it('counts a sharded run as one run removed', async () => {
+    it('given three shards of one old run -> when prune removes them -> then one run is reported removed and every object is gone', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       const writer = store(backend, { windowDays: null });
       for (const current of [1, 2, 3]) {
@@ -273,7 +273,7 @@ describe('BlobHistoryStore', () => {
      * a store quietly reading less than it holds is indistinguishable from one
      * that is simply young, and both say "insufficient data".
      */
-    it('skips a corrupt object and reports it, rather than failing the read', async () => {
+    it('given a corrupt object beside a good one -> when the store reads the window -> then the good run is returned and the corrupt object is reported as skipped', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       const writer = store(backend);
       await writer.ingest(run({ runId: 'good' }));
@@ -290,7 +290,7 @@ describe('BlobHistoryStore', () => {
       expect(reader.skipped[0]?.name).toContain('corrupt');
     });
 
-    it('skips an object written by an incompatible schema version', async () => {
+    it('given an object written under a future schema version -> when the store reads the window -> then it is skipped and the reason names schemaVersion', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       await backend.put(
         runBlobName('', '2026-08-30T00:00:00.000Z', 'future', 'all'),
@@ -303,7 +303,7 @@ describe('BlobHistoryStore', () => {
     });
 
     /** Hand-uploaded records, and anything written before compression existed. */
-    it('reads an uncompressed object as well as a gzipped one', async () => {
+    it('given an object stored without compression -> when the store reads the window -> then it is read alongside the gzipped ones', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       await backend.put(
         runBlobName('', '2026-08-30T00:00:00.000Z', 'plain', 'all'),
@@ -313,7 +313,7 @@ describe('BlobHistoryStore', () => {
       expect(await store(backend).attempts()).toHaveLength(1);
     });
 
-    it('tolerates an object pruned between the listing and the download', async () => {
+    it('given an object that vanishes between the listing and the download -> when the store reads the window -> then no attempts and no skips are reported', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       const writer = store(backend);
       await writer.ingest(run({ runId: 'vanishing' }));
@@ -331,7 +331,7 @@ describe('BlobHistoryStore', () => {
       expect(reader.skipped).toEqual([]);
     });
 
-    it('ignores unrelated objects sharing the container', async () => {
+    it('given unrelated objects sharing the container -> when the store counts runs -> then only run records are counted', { tags: ['@unit', '@store-azure'] }, async () => {
       const backend = new MemoryBlobBackend();
       await backend.put('README.txt', new TextEncoder().encode('not a run record'));
       await backend.put('v1/runs/notes.md', new TextEncoder().encode('nor this'));
@@ -343,7 +343,7 @@ describe('BlobHistoryStore', () => {
       expect(await store(backend).runCount()).toBe(1);
     });
 
-    it('refuses a record whose start time has no date, naming the file', async () => {
+    it('given a run whose start time is not a readable date -> when it is ingested -> then the write is refused naming the ISO 8601 requirement', { tags: ['@unit', '@store-azure'] }, async () => {
       const writer = store(new MemoryBlobBackend());
       await expect(
         writer.ingest(run({ startedAt: 'whenever' })),
@@ -351,7 +351,7 @@ describe('BlobHistoryStore', () => {
     });
   });
 
-  it('keeps records under a prefix separate from records beside them', async () => {
+  it('given two stores writing under different prefixes -> when each is read back -> then neither sees the records of the other', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
     const java = store(backend, { prefix: 'bjjeire-java/' });
     const tests = store(backend, { prefix: 'bjjeire-tests/' });

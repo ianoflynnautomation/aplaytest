@@ -14,7 +14,7 @@ async function generate(flags: Parameters<typeof ciGenerate>[0] = { dryRun: fals
 }
 
 describe('ci generate — the security constraint', () => {
-  it('keeps model credentials OUT of the job that runs branch code', async () => {
+  it('given a generated workflow -> when the test job is inspected -> then it carries no model credential and no secrets reference', { tags: ['@integration', '@cli'] }, async () => {
     // This is the whole reason the workflow has this shape. On a pull request
     // the test job executes specs, fixtures and the Playwright config from the
     // branch — a key there is one commit from exfiltration.
@@ -25,7 +25,7 @@ describe('ci generate — the security constraint', () => {
     expect(testJob).not.toContain('secrets.');
   });
 
-  it('puts the credential in the analyze job, which runs no application code', async () => {
+  it('given a generated workflow -> when the analyze job is inspected -> then the model credential lives there, where no branch code runs', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const analyzeJob = yaml.slice(yaml.indexOf('  analyze:'), yaml.indexOf('  policy:'));
 
@@ -33,13 +33,13 @@ describe('ci generate — the security constraint', () => {
     expect(analyzeJob).not.toContain('playwright test');
   });
 
-  it('makes analyze best-effort so an outage cannot turn red into an incident', async () => {
+  it('given a generated workflow -> when the analyze job is inspected -> then it is best-effort, so an outage cannot turn a red build into an incident', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const analyzeJob = yaml.slice(yaml.indexOf('  analyze:'), yaml.indexOf('  policy:'));
     expect(analyzeJob).toContain('continue-on-error: true');
   });
 
-  it('does NOT make the policy gate best-effort — quarantine hygiene must bite', async () => {
+  it('given a generated workflow -> when the policy job is inspected -> then it is not best-effort, so quarantine hygiene still bites', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const policyJob = yaml.slice(yaml.indexOf('  policy:'));
     expect(policyJob).not.toContain('continue-on-error');
@@ -48,14 +48,14 @@ describe('ci generate — the security constraint', () => {
 });
 
 describe('ci generate — conventions', () => {
-  it('sets persist-credentials: false on every checkout', async () => {
+  it('given a generated workflow -> when every checkout step is inspected -> then each sets persist-credentials to false', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const checkouts = (yaml.match(/actions\/checkout/g) ?? []).length;
     const guards = (yaml.match(/persist-credentials: false/g) ?? []).length;
     expect(guards).toBe(checkouts);
   });
 
-  it('lets actions/* float by tag and hash-pins every third-party action', async () => {
+  it('given a generated workflow -> when the action references are inspected -> then first-party actions float by tag and every third-party action is hash-pinned', { tags: ['@integration', '@cli'] }, async () => {
     // Mirrors a real zizmor policy: actions/* may float, everything else must
     // be hash-pinned. Emitting an unpinned third-party action would fail the
     // consumer's own workflow lint.
@@ -76,7 +76,7 @@ describe('ci generate — conventions', () => {
     }
   });
 
-  it('gives every job a timeout', async () => {
+  it('given a generated workflow -> when every job is inspected -> then each declares a timeout', { tags: ['@integration', '@cli'] }, async () => {
     // Scoped to the jobs section: two-space keys also appear under `on:`
     // (pull_request, push, workflow_dispatch), which would over-count.
     const yaml = await generate();
@@ -87,7 +87,7 @@ describe('ci generate — conventions', () => {
     expect((yaml.match(/timeout-minutes:/g) ?? []).length).toBe(jobs);
   });
 
-  it('ends with exactly one newline, so it passes yamllint', async () => {
+  it('given a generated workflow -> when the file ending is inspected -> then it ends with exactly one newline', { tags: ['@integration', '@cli'] }, async () => {
     // A trailing blank line fails yamllint — and in a repo that lints its own
     // workflows, the generated file would break the build it was made for.
     const yaml = await generate();
@@ -95,37 +95,37 @@ describe('ci generate — conventions', () => {
     expect(yaml.endsWith('\n\n')).toBe(false);
   });
 
-  it('shares one run id across shards so analyze can merge them', async () => {
+  it('given a generated workflow -> when the shard jobs are inspected -> then they share one run id so analyze can merge them', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     expect(yaml).toContain('ATEST_RUN_ID');
   });
 });
 
 describe('ci generate — options', () => {
-  it('honours the shard count', async () => {
+  it('given a requested shard count -> when the workflow is generated -> then that many shards are emitted', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate({ shards: '3', dryRun: false });
     expect(yaml).toContain('shard: [1, 2, 3]');
     expect(yaml).toContain('--shard=${{ matrix.shard }}/3');
   });
 
-  it('emits a gitlab pipeline with the same split', async () => {
+  it('given the gitlab provider -> when the pipeline is generated -> then it carries the same test and analyze split', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate({ provider: 'gitlab', dryRun: false });
     expect(yaml).toContain('stages: [test, analyze, policy]');
     const testStage = yaml.slice(yaml.indexOf('test:'), yaml.indexOf('analyze:'));
     expect(testStage).not.toContain('ANTHROPIC_API_KEY');
   });
 
-  it('rejects an unknown provider rather than emitting something wrong', async () => {
+  it('given an unknown provider -> when generation runs -> then it is rejected rather than emitting something wrong', { tags: ['@integration', '@cli'] }, async () => {
     await expect(generate({ provider: 'jenkins', dryRun: false })).rejects.toThrow(/Unknown provider/);
   });
 
-  it('rejects a nonsense shard count', async () => {
+  it('given a nonsense shard count -> when generation runs -> then it is rejected', { tags: ['@integration', '@cli'] }, async () => {
     await expect(generate({ shards: '0', dryRun: false })).rejects.toThrow(/positive integer/);
   });
 });
 
 describe('ci generate — reporting', () => {
-  it('builds the merged report in analyze, not per shard', async () => {
+  it('given a generated workflow -> when the report step is located -> then the merged report is built in analyze rather than per shard', { tags: ['@integration', '@cli'] }, async () => {
     // Merging is the whole point; running it per shard would report each
     // quarter of the run as if it were the run.
     const yaml = await generate();
@@ -135,7 +135,7 @@ describe('ci generate — reporting', () => {
     expect(test).not.toContain('atest report');
   });
 
-  it('writes the comment to a FILE, never redirects stdout into one', async () => {
+  it('given a generated workflow -> when the comment step is inspected -> then the comment is written to a file rather than redirected from stdout', { tags: ['@integration', '@cli'] }, async () => {
     // `atest report > comment.md` would capture the human summary too. The
     // command puts diagnostics on stderr, but the workflow must not rely on
     // that being true forever.
@@ -144,23 +144,23 @@ describe('ci generate — reporting', () => {
     expect(yaml).not.toMatch(/atest report[^\n]*>\s*\S+\.md/);
   });
 
-  it('posts a comment only on a pull request', async () => {
+  it('given a generated workflow -> when the comment step is inspected -> then it is conditioned on a pull request', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const step = yaml.slice(yaml.indexOf('Comment on the pull request'));
     expect(step).toContain("github.event_name == 'pull_request'");
   });
 
-  it('updates its previous comment instead of posting one per push', async () => {
+  it('given a generated workflow -> when the comment step is inspected -> then it updates the previous comment rather than posting one per push', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     expect(yaml).toContain('--edit-last');
   });
 
-  it('uploads the html report as an artifact', async () => {
+  it('given a generated workflow -> when the artifact steps are inspected -> then the html report is uploaded', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     expect(yaml).toContain('report.html');
   });
 
-  it('grants pull-requests: write only to the job that comments', async () => {
+  it('given a generated workflow -> when the job permissions are inspected -> then pull-requests write is granted only to the commenting job', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const test = yaml.slice(yaml.indexOf('  test:'), yaml.indexOf('  analyze:'));
     expect(test).not.toContain('pull-requests: write');
@@ -171,7 +171,7 @@ describe('ci generate — history persistence', () => {
   const analyzeJob = (yaml: string): string =>
     yaml.slice(yaml.indexOf('  analyze:'), yaml.indexOf('  policy:'));
 
-  it('gives flaky analysis a PERSISTENT store, not the in-memory default', async () => {
+  it('given a configured storage account -> when the workflow is generated -> then analyze points at a persistent store rather than the in-memory default', { tags: ['@integration', '@cli'] }, async () => {
     // With :memory: each run ingests only its own shards, sees one attempt per
     // test, and reports "insufficient data" forever — the engine looks like it
     // works and never says anything.
@@ -188,7 +188,7 @@ describe('ci generate — history persistence', () => {
    * layout writes one immutable object per run and shard instead, so if a
    * download/upload pair ever reappears here, the race came back with it.
    */
-  it('has no download/upload round trip at all — the store IS the container', async () => {
+  it('given a generated workflow -> when the history steps are inspected -> then no download or upload round trip exists, because the container is the store', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     expect(yaml).not.toContain('az storage blob download');
     expect(yaml).not.toContain('az storage blob upload');
@@ -208,7 +208,7 @@ describe('ci generate — history persistence', () => {
    * The fix is to select the read-only case with the POSITIVE condition, so
    * the truthy branch is the non-empty string.
    */
-  it('does not select read-only with an empty-string branch, which would apply it always', async () => {
+  it('given a workflow condition on the branch name -> when an empty branch string is considered -> then read-only is not selected, so it cannot apply always', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     // Scoped to the expression itself. The comment above it in the template
     // quotes the broken form as the thing not to write, and a whole-file match
@@ -218,7 +218,7 @@ describe('ci generate — history persistence', () => {
     expect(line).toContain("&& '?readonly=1' || ''");
   });
 
-  it('opens the store read-only off main, so a pull request cannot amend the baseline', async () => {
+  it('given a generated workflow -> when the analyze step is inspected off main -> then the store is opened read-only so a pull request cannot amend the baseline', { tags: ['@integration', '@cli'] }, async () => {
     // A flake baseline describes trunk. A pull request that introduces an
     // unstable test must not enter the baseline before anyone merges it. Said
     // up front rather than left to a 403 per shard file.
@@ -227,14 +227,14 @@ describe('ci generate — history persistence', () => {
     expect(analyzeJob(yaml)).toContain("github.ref == 'refs/heads/main'");
   });
 
-  it('still scores pull requests, rather than skipping analysis off main', async () => {
+  it('given a generated workflow -> when the analyze job is inspected off main -> then analysis still runs rather than being skipped', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const analysis = yaml.slice(yaml.indexOf('- name: Flaky analysis'));
     // The step itself is unconditional; only the URL it is given differs.
     expect(analysis.slice(0, analysis.indexOf('run:'))).not.toContain('if:');
   });
 
-  it('prunes only from main, where the store is writable', async () => {
+  it('given a generated workflow -> when the prune step is inspected -> then it runs only from main, where the store is writable', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     const trim = yaml.slice(yaml.indexOf('- name: Trim history'));
     expect(trim).toContain("github.ref == 'refs/heads/main'");
@@ -242,7 +242,7 @@ describe('ci generate — history persistence', () => {
     expect(trim).toContain('history prune');
   });
 
-  it('uses the main-only writer identity for main, and the PR identity otherwise', async () => {
+  it('given a generated workflow -> when the analyze credentials are inspected -> then main uses the writer identity and other branches use the pull-request identity', { tags: ['@integration', '@cli'] }, async () => {
     // The two are different user-assigned identities on purpose: only the
     // main-branch one is granted Contributor, so "pull requests cannot write
     // history" is enforced by Entra rather than by this YAML file.
@@ -252,13 +252,13 @@ describe('ci generate — history persistence', () => {
     expect(login).toContain('AZURE_CLIENT_ID');
   });
 
-  it('degrades to no history when the storage account is not configured', async () => {
+  it('given no configured storage account -> when the workflow is generated -> then it degrades to no history rather than emitting a broken store URL', { tags: ['@integration', '@cli'] }, async () => {
     // Everything else must still work on a repo that has not set this up.
     const yaml = await generate();
     expect(yaml).toContain("vars.ATEST_HISTORY_ACCOUNT != ''");
   });
 
-  it('grants id-token to analyze for OIDC, and never to the test job', async () => {
+  it('given a generated workflow -> when the job permissions are inspected -> then id-token is granted to analyze for OIDC and never to the test job', { tags: ['@integration', '@cli'] }, async () => {
     const yaml = await generate();
     expect(analyzeJob(yaml)).toContain('id-token: write');
     const test = yaml.slice(yaml.indexOf('  test:'), yaml.indexOf('  analyze:'));

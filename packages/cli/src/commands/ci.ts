@@ -342,7 +342,11 @@ export async function ciGenerate(flags: CiFlags): Promise<ExitCode> {
         ? []
         : flags.projects.split(',').map(p => p.trim()).filter(Boolean),
     nodeVersion: flags.nodeVersion ?? '22',
-    playwrightImage: flags.playwrightImage ?? 'mcr.microsoft.com/playwright:v1.56.0-noble',
+    // Kept in step with the version this repo pins (package.json) and the
+    // base of the `playwright` Docker target. A generated workflow whose
+    // image predates the reporter's Playwright fails at browser launch with
+    // "Executable doesn't exist", naming a tag the reader did not choose.
+    playwrightImage: flags.playwrightImage ?? 'mcr.microsoft.com/playwright:v1.61.0-noble',
   };
 
   const content = provider === 'github' ? githubWorkflow(options) : gitlabWorkflow(options);

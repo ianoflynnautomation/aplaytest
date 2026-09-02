@@ -114,21 +114,26 @@ APP_ENV=local BASE_URL=http://localhost:8080 API_URL=http://localhost:8080 \
   npm run test:smoke
 ```
 
-To use the atest you are editing (not a stale tarball):
+To use the atest you are editing (not a released version):
 
 ```sh
 # in atest
 npm run pack
 mkdir -p /path/to/bjjeire-tests/vendor
-cp dist-pack/atest-core-0.0.0.tgz \
-   dist-pack/atest-runner-playwright-0.0.0.tgz \
-   dist-pack/atest-0.0.0.tgz \
-   /path/to/bjjeire-tests/vendor/
+cp dist-pack/*.tgz /path/to/bjjeire-tests/vendor/
 
-# in bjjeire-tests
-npm i ./vendor/atest-core-0.0.0.tgz \
-      ./vendor/atest-runner-playwright-0.0.0.tgz \
-      ./vendor/atest-0.0.0.tgz
+# in bjjeire-tests — ALL of them in one command. Each declares
+# @atest/core@^0.1.0, and npm satisfies that from its siblings in the same
+# invocation. Ask for one alone and it resolves against the registry, which
+# gives you the last RELEASED core rather than the one you just built.
+npm i ./vendor/*.tgz
+```
+
+For anything other than testing local edits, install from npm instead — the
+packages are published under the `@atest` scope with real semver between them:
+
+```sh
+npm i -D @atest/runner-playwright @atest/cli
 ```
 
 The reporter is not wired until you add it. `src/shared/config/playwright.ts`

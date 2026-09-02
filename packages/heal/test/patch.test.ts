@@ -19,7 +19,7 @@ export const TEST_IDS = {
 const FILE = 'src/ui/pages/gyms/gyms.constants.ts';
 
 describe('patchConstant', () => {
-  it('updates EVERY constant sharing the literal', () => {
+  it('given one literal bound to two exported constants -> when patchConstant renames it -> then both bindings are updated and the old literal is gone', { tags: ['@unit', '@heal'] }, () => {
     // The trap this exists for: 'gym-card-name' is bound to both
     // GYM_CARD_TEST_IDS.name and TEST_IDS.cardName, read by different page
     // objects. A regex fixes one and produces a patch that passes its own
@@ -39,7 +39,7 @@ describe('patchConstant', () => {
     expect((result.after ?? '').match(/gym-card-title/g)).toHaveLength(2);
   });
 
-  it('says how many constants it touched', () => {
+  it('given a literal shared by two constants -> when patchConstant renames it -> then the message reports how many constants were touched', { tags: ['@unit', '@heal'] }, () => {
     const result = patchConstant(CONSTANTS, {
       file: FILE,
       from: 'gym-card-name',
@@ -48,7 +48,7 @@ describe('patchConstant', () => {
     expect(result.message).toContain('2 constants sharing that literal');
   });
 
-  it('leaves near-miss literals alone', () => {
+  it('given constants holding near-miss literals -> when patchConstant renames one -> then the near misses survive unchanged', { tags: ['@unit', '@heal'] }, () => {
     // gym-card-county must survive a rename of gym-card-name.
     const result = patchConstant(CONSTANTS, {
       file: FILE,
@@ -59,13 +59,13 @@ describe('patchConstant', () => {
     expect(result.after).toContain("searchInput: 'search-input'");
   });
 
-  it('reports not-found rather than editing something adjacent', () => {
+  it('given a literal that appears nowhere in the file -> when patchConstant runs -> then the status is not-found and nothing is rewritten', { tags: ['@unit', '@heal'] }, () => {
     const result = patchConstant(CONSTANTS, { file: FILE, from: 'missing-id', to: 'x' });
     expect(result.status).toBe('not-found');
     expect(result.after).toBeNull();
   });
 
-  it('refuses a no-op replacement', () => {
+  it('given a replacement identical to the original literal -> when patchConstant runs -> then the status is unchanged', { tags: ['@unit', '@heal'] }, () => {
     const result = patchConstant(CONSTANTS, {
       file: FILE,
       from: 'gym-card-name',
@@ -74,7 +74,7 @@ describe('patchConstant', () => {
     expect(result.status).toBe('unchanged');
   });
 
-  it('records the line of each change', () => {
+  it('given a literal bound to two constants -> when patchConstant renames it -> then every recorded change carries its line number', { tags: ['@unit', '@heal'] }, () => {
     const result = patchConstant(CONSTANTS, {
       file: FILE,
       from: 'gym-card-name',
@@ -83,7 +83,7 @@ describe('patchConstant', () => {
     expect(result.touched.every(t => t.line > 0)).toBe(true);
   });
 
-  it('handles a bare exported constant, not just object properties', () => {
+  it('given a bare exported string constant -> when patchConstant renames it -> then the constant is rewritten and its path recorded', { tags: ['@unit', '@heal'] }, () => {
     const source = `export const SEARCH_INPUT = 'search-input';`;
     const result = patchConstant(source, { file: FILE, from: 'search-input', to: 'search-field' });
 
@@ -94,7 +94,7 @@ describe('patchConstant', () => {
 });
 
 describe('patchConstant — page objects and specs', () => {
-  it('rewrites an inline getByTestId in a spec, the snapshot-test shape', () => {
+  it('given a spec calling getByTestId inline -> when patchConstant renames the id -> then the inline call is rewritten', { tags: ['@unit', '@heal'] }, () => {
     const source = `await expect(page.getByTestId('gyms-page-header')).toHaveScreenshot('gyms-header.png');\n`;
     const result = patchConstant(source, {
       file: 'tests/features/gyms/gyms.snapshot.acceptance.spec.ts',
@@ -105,7 +105,7 @@ describe('patchConstant — page objects and specs', () => {
     expect(result.after).toContain("getByTestId('gyms-header')");
   });
 
-  it('rewrites a getByRole name in a page object', () => {
+  it('given a page object naming a role accessible name -> when patchConstant renames it -> then the accessible name is rewritten', { tags: ['@unit', '@heal'] }, () => {
     const source = `const typeFilterButton = (page: Page, label: string) => filters(page).getByRole('button', { name: 'Seminars', exact: true });\n`;
     const result = patchConstant(source, {
       file: 'src/ui/pages/events/events.page.ts',
@@ -118,7 +118,7 @@ describe('patchConstant — page objects and specs', () => {
 });
 
 describe('findConstant', () => {
-  it('locates a selector without changing anything', () => {
+  it('given a literal bound to two constants -> when findConstant locates it -> then both binding paths are reported and nothing is changed', { tags: ['@unit', '@heal'] }, () => {
     // The difference between "the selector broke" and "the selector broke,
     // here is the line".
     const found = findConstant(CONSTANTS, FILE, 'gym-card-name');
@@ -126,13 +126,13 @@ describe('findConstant', () => {
     expect(found.map(f => f.path).sort()).toEqual(['GYM_CARD_TEST_IDS.name', 'TEST_IDS.cardName']);
   });
 
-  it('returns empty for an unknown value', () => {
+  it('given a value bound to no constant -> when findConstant locates it -> then the result is empty', { tags: ['@unit', '@heal'] }, () => {
     expect(findConstant(CONSTANTS, FILE, 'nope')).toEqual([]);
   });
 });
 
 describe('patchConstant — style preservation', () => {
-  it('keeps the quote style the file already uses', () => {
+  it('given a single-quoted constants file -> when patchConstant rewrites a literal -> then single quotes are preserved', { tags: ['@unit', '@heal'] }, () => {
     // A patch that switches a single-quoted file to double quotes fights the
     // formatter and turns a one-word change into a noisy diff.
     const result = patchConstant(CONSTANTS, {
@@ -144,13 +144,13 @@ describe('patchConstant — style preservation', () => {
     expect(result.after).not.toContain('"gym-card-title"');
   });
 
-  it('keeps double quotes when that is what the file uses', () => {
+  it('given a double-quoted constants file -> when patchConstant rewrites a literal -> then double quotes are preserved', { tags: ['@unit', '@heal'] }, () => {
     const source = `export const IDS = { name: "gym-card-name" };`;
     const result = patchConstant(source, { file: FILE, from: 'gym-card-name', to: 'gym-card-title' });
     expect(result.after).toContain('"gym-card-title"');
   });
 
-  it('escapes a quote that appears inside the replacement', () => {
+  it('given a replacement value containing an apostrophe -> when patchConstant rewrites the literal -> then the apostrophe is escaped', { tags: ['@unit', '@heal'] }, () => {
     const source = `export const IDS = { label: 'plain' };`;
     const result = patchConstant(source, { file: FILE, from: 'plain', to: "it's" });
     expect(result.after).toContain("'it\\'s'");

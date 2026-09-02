@@ -54,13 +54,13 @@ describe('the real flake from TODO.md', () => {
     ),
   ];
 
-  it('scores it as flaky', () => {
+  it('given the firefox-under-load history from TODO.md -> when scoreTest scores it -> then the data is sufficient and the score clears the flake threshold', { tags: ['@unit', '@flaky'] }, () => {
     const { score } = verdict(firefoxUnderLoad, [...firefoxUnderLoad, ...otherProjects]);
     expect(score.insufficientData).toBe(false);
     expect(score.score).toBeGreaterThan(0.15);
   });
 
-  it('classifies it as resource-contention, with the load correlation as evidence', () => {
+  it('given a test failing only at high worker counts on one project -> when classifyFlake runs -> then the class is resource-contention, evidenced by the worker-count delta', { tags: ['@unit', '@flaky'] }, () => {
     const { classification, features } = verdict(firefoxUnderLoad, [
       ...firefoxUnderLoad,
       ...otherProjects,
@@ -76,21 +76,21 @@ describe('the real flake from TODO.md', () => {
     expect(classification.evidence.join(' ')).toMatch(/worker count/);
   });
 
-  it('does NOT mistake it for a regression', () => {
+  it('given a test failing only under parallel load -> when classifyFlake runs -> then the class is not genuine-regression', { tags: ['@unit', '@flaky'] }, () => {
     // A regression verdict would send someone bisecting for a commit that
     // does not exist.
     const { classification } = verdict(firefoxUnderLoad, [...firefoxUnderLoad, ...otherProjects]);
     expect(classification.class).not.toBe('genuine-regression');
   });
 
-  it('does NOT route it to healing — the selector is fine', () => {
+  it('given a load-related flake whose selectors resolved -> when features are extracted -> then no locator_not_found kind is recorded, so healing is not invoked', { tags: ['@unit', '@flaky'] }, () => {
     const { features } = verdict(firefoxUnderLoad);
     expect(features.failureKinds['locator_not_found']).toBeUndefined();
   });
 });
 
 describe('classifyFlake — regressions must not be filed as flake', () => {
-  it('identifies a clean commit boundary as a genuine regression', () => {
+  it('given ten passes on one commit followed by ten failures on the next -> when classifyFlake runs -> then the class is genuine-regression and retry is refused', { tags: ['@unit', '@flaky'] }, () => {
     const attempts: HistoricalAttempt[] = [
       ...Array.from({ length: 10 }, (_, i) =>
         attempt({ outcome: 'passed', daysAgo: 20 - i, commit: 'good-sha' }, i),
@@ -106,7 +106,7 @@ describe('classifyFlake — regressions must not be filed as flake', () => {
     expect(shouldRetry(classification)).toBe(false);
   });
 
-  it('does not call a single-commit window a regression', () => {
+  it('given intermittent failures all recorded against one commit -> when features are extracted -> then no commit boundary is detected', { tags: ['@unit', '@flaky'] }, () => {
     // With only one commit there is no boundary to detect; treating it as a
     // regression would silence every flake on a quiet branch.
     const attempts = series('PPPPPFPPFPPPFPPPPFPP', { commit: 'only-sha' });
@@ -116,7 +116,7 @@ describe('classifyFlake — regressions must not be filed as flake', () => {
 });
 
 describe('classifyFlake — the other classes', () => {
-  it('detects test pollution from a co-scheduling lift', () => {
+  it('given failures interleaved with a co-scheduled polluter -> when classifyFlake runs -> then the class is test-pollution, the polluter is named and retry is refused', { tags: ['@unit', '@flaky'] }, () => {
     // Pollution INTERLEAVES: the test fails on the runs where the polluter
     // happened to share its worker, and passes otherwise. Failures that
     // instead start at one point and persist are a regression, and the
@@ -143,7 +143,7 @@ describe('classifyFlake — the other classes', () => {
     expect(shouldRetry(classification)).toBe(false);
   });
 
-  it('classifies value mismatches as data-dependency and refuses to retry them', () => {
+  it('given intermittent assertion_value_mismatch failures across projects -> when classifyFlake runs -> then the class is data-dependency and retry is refused', { tags: ['@unit', '@flaky'] }, () => {
     const attempts = series('PPFPPFPPPFPPFPPPFPPF', {
       failureKind: 'assertion_value_mismatch',
       workers: 4,
@@ -154,7 +154,7 @@ describe('classifyFlake — the other classes', () => {
     expect(shouldRetry(classification)).toBe(false);
   });
 
-  it('classifies not-actionable failures as animation', () => {
+  it('given intermittent locator_not_actionable failures -> when classifyFlake runs -> then the class is animation and retry is advised', { tags: ['@unit', '@flaky'] }, () => {
     const attempts = series('PPFPFPPFPPFPPFPPPFPP', {
       failureKind: 'locator_not_actionable',
       workers: 4,
@@ -165,7 +165,7 @@ describe('classifyFlake — the other classes', () => {
     expect(shouldRetry(classification)).toBe(true);
   });
 
-  it('classifies network failures as retryable', () => {
+  it('given intermittent network_error failures -> when classifyFlake runs -> then the class is network and retry is advised', { tags: ['@unit', '@flaky'] }, () => {
     const attempts = series('PPFPFPPFPPFPPFPPPFPP', {
       failureKind: 'network_error',
       workers: 4,
@@ -176,7 +176,7 @@ describe('classifyFlake — the other classes', () => {
     expect(shouldRetry(classification)).toBe(true);
   });
 
-  it('says "needs more data" rather than guessing', () => {
+  it('given only three recorded attempts -> when classifyFlake runs -> then the class is unclassified and the prescription is needs-more-data', { tags: ['@unit', '@flaky'] }, () => {
     const { classification } = verdict(series('PFP'));
     expect(classification.class).toBe('unclassified');
     expect(classification.prescription).toBe('needs-more-data');
@@ -184,7 +184,7 @@ describe('classifyFlake — the other classes', () => {
 });
 
 describe('classifyFlake — a broken test is not a flaky test', () => {
-  it('calls an always-failing test consistently-failing, not a flake class', () => {
+  it('given a test that failed all 20 runs -> when classifyFlake runs -> then the class is consistently-failing with a fix-or-delete prescription and retry refused', { tags: ['@unit', '@flaky'] }, () => {
     // REGRESSION GUARD from a real run: a 12-of-12 failure was previously
     // handed the `timing` class with "retry helps: yes", which sends someone
     // tuning waits on a test that is simply broken.
@@ -196,7 +196,7 @@ describe('classifyFlake — a broken test is not a flaky test', () => {
     expect(classification.evidence.join(' ')).toContain('deterministic, not flaky');
   });
 
-  it('still prefers the regression verdict when the failures have a commit boundary', () => {
+  it('given persistent failures that begin at a clean commit boundary -> when classifyFlake runs -> then genuine-regression outranks consistently-failing', { tags: ['@unit', '@flaky'] }, () => {
     // Knowing WHEN it broke is more actionable than knowing THAT it is broken.
     const attempts: HistoricalAttempt[] = [
       ...Array.from({ length: 10 }, (_, i) =>

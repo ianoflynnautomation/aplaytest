@@ -85,7 +85,7 @@ const BASE = {
 };
 
 describe('proposeHeal — the hard guards', () => {
-  it('refuses a schema violation outright', async () => {
+  it('given a schema_violation failure -> when proposeHeal runs -> then it refuses as never-heal and produces no patch', { tags: ['@unit', '@heal'] }, async () => {
     // The wire contract broke. "Repairing" it deletes the most valuable signal
     // the suite produces.
     const result = await proposeHeal(bundle({ kind: 'schema_violation' }), BASE);
@@ -93,19 +93,19 @@ describe('proposeHeal — the hard guards', () => {
     expect(result.patch).toBeNull();
   });
 
-  it('refuses an uncaught application error', async () => {
+  it('given an app_error failure -> when proposeHeal runs -> then it refuses as never-heal', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle({ kind: 'app_error' }), BASE);
     expect(result.status).toBe('refused-never-heal');
   });
 
-  it('refuses network and navigation failures', async () => {
+  it('given network, navigation, http status or infra failures -> when proposeHeal runs on each -> then every one is refused as never-heal', { tags: ['@unit', '@heal'] }, async () => {
     for (const kind of ['network_error', 'navigation_failure', 'http_status', 'infra'] as const) {
       const result = await proposeHeal(bundle({ kind }), BASE);
       expect(result.status).toBe('refused-never-heal');
     }
   });
 
-  it('refuses to heal a known flaky test', async () => {
+  it('given a test whose flake score is above the threshold -> when proposeHeal runs -> then it refuses as flaky and advises bisecting first', { tags: ['@unit', '@heal'] }, async () => {
     // Healing a flake is the worst outcome available: a permanent code change
     // made to chase noise, with the flake still there afterwards.
     const result = await proposeHeal(bundle(), { ...BASE, flakeScore: 0.4 });
@@ -113,14 +113,14 @@ describe('proposeHeal — the hard guards', () => {
     expect(result.reason).toContain('Bisect it first');
   });
 
-  it('proceeds when the test is below the flake threshold', async () => {
+  it('given a test whose flake score is below the threshold -> when proposeHeal runs -> then a heal is proposed', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle(), { ...BASE, flakeScore: 0.02 });
     expect(result.status).toBe('proposed');
   });
 });
 
 describe('proposeHeal — eligibility', () => {
-  it('refuses when the test id IS present, because that is not a rename', async () => {
+  it('given a page where the missing test id is actually present -> when proposeHeal runs -> then it refuses as ineligible, because that is not a rename', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(
       bundle({ testIds: ['gym-card-name', 'gym-card-county'] }),
       BASE,
@@ -129,19 +129,19 @@ describe('proposeHeal — eligibility', () => {
     expect(result.reason).toContain('IS present');
   });
 
-  it('refuses when no test-id index was captured, and says how to fix it', async () => {
+  it('given a bundle carrying no captured test-id index -> when proposeHeal runs -> then it refuses as ineligible and names the capture fixtures', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle({ testIds: [] }), BASE);
     expect(result.status).toBe('refused-ineligible');
     expect(result.reason).toContain('capture fixtures');
   });
 
-  it('refuses a nameless getByRole rather than guessing', async () => {
+  it('given a nameless getByRole selector -> when proposeHeal runs -> then it refuses as ineligible rather than guessing a name', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle({ selector: "getByRole('heading')" }), BASE);
     expect(result.status).toBe('refused-ineligible');
     expect(result.reason).toContain('without a name');
   });
 
-  it('heals a named role from the accessibility tree when test ids are not involved', async () => {
+  it('given a named getByRole selector and an aria snapshot holding a near match -> when proposeHeal runs -> then a role heal is proposed from the accessibility tree', { tags: ['@unit', '@heal'] }, async () => {
     const pageObject = `const typeFilter = (page: Page) => filters(page).getByRole('button', { name: 'Seminars', exact: true });\n`;
     const result = await proposeHeal(
       {
@@ -165,7 +165,7 @@ describe('proposeHeal — eligibility', () => {
     expect(result.patch?.after).toContain("name: 'Seminar'");
   });
 
-  it('reports element-removed rather than forcing a bad rename', async () => {
+  it('given a page whose test ids resemble nothing in the failing selector -> when proposeHeal runs -> then it reports no candidates and says the element was probably removed', { tags: ['@unit', '@heal'] }, async () => {
     // Nothing on the page resembles the missing id. That is a real change,
     // and inventing a heal for it would hide a deletion.
     const result = await proposeHeal(
@@ -178,7 +178,7 @@ describe('proposeHeal — eligibility', () => {
 });
 
 describe('proposeHeal — the proposal', () => {
-  it('chooses the closest rename and patches every constant bound to it', async () => {
+  it('given a renamed test id present on the page -> when proposeHeal runs -> then the closest rename is chosen and every constant bound to the literal is patched', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle(), BASE);
 
     expect(result.status).toBe('proposed');
@@ -187,14 +187,14 @@ describe('proposeHeal — the proposal', () => {
     expect(result.patch?.after).toContain("county: 'gym-card-county'");
   });
 
-  it('never claims validation it did not perform', async () => {
+  it('given validation is skipped -> when proposeHeal produces a proposal -> then no validation record is attached and the reason says NOT VALIDATED', { tags: ['@unit', '@heal'] }, async () => {
     // A dry run must not produce a record that reads as verified.
     const result = await proposeHeal(bundle(), BASE);
     expect(result.validation).toBeNull();
     expect(result.reason).toContain('NOT VALIDATED');
   });
 
-  it('ranks the sibling field below the rename', async () => {
+  it('given a page holding a rename, a sibling field and an unrelated id -> when generateCandidates ranks them -> then the rename leads, the sibling follows and the unrelated id is excluded', { tags: ['@unit', '@heal'] }, async () => {
     const candidates = generateCandidates(bundle());
     expect(candidates[0]?.value).toBe('gym-card-title');
     expect(candidates.map(c => c.value)).toContain('gym-card-county');
@@ -203,7 +203,7 @@ describe('proposeHeal — the proposal', () => {
 });
 
 describe('proposeHeal — resolves the source when --constants is omitted', () => {
-  it('finds a constants file under the default target globs', async () => {
+  it('given no constants file is named and one exists under the default globs -> when proposeHeal resolves the source -> then it finds that file and patches it', { tags: ['@integration', '@heal'] }, async () => {
     const { mkdir, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
@@ -231,7 +231,7 @@ describe('proposeHeal — resolves the source when --constants is omitted', () =
 });
 
 describe('assessBundle', () => {
-  it('explains a refusal instead of returning a bare boolean', () => {
+  it('given a bundle with no captured test ids -> when assessBundle judges it -> then it reports ineligible with a reason rather than a bare boolean', { tags: ['@unit', '@heal'] }, () => {
     const assessment = assessBundle(bundle({ testIds: [] }));
     expect(assessment.eligible).toBe(false);
     expect(assessment.reason.length).toBeGreaterThan(20);
@@ -251,7 +251,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     realBug,
   });
 
-  it('is never consulted for a NEVER_HEAL failure', async () => {
+  it('given a schema_violation failure and a Tier 1 ranker -> when proposeHeal runs -> then it refuses as never-heal without consulting the ranker', { tags: ['@unit', '@heal'] }, async () => {
     // The hard guard runs first. A model must not get the chance to argue
     // that a schema violation is a renamed selector.
     let called = false;
@@ -267,7 +267,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     expect(called).toBe(false);
   });
 
-  it('is never consulted for a known flaky test', async () => {
+  it('given a known flaky test and a Tier 1 ranker -> when proposeHeal runs -> then the ranker is never consulted', { tags: ['@unit', '@heal'] }, async () => {
     let called = false;
     await proposeHeal(bundle(), {
       ...BASE,
@@ -280,7 +280,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     expect(called).toBe(false);
   });
 
-  it('can reorder the choice among verified candidates', async () => {
+  it('given a Tier 1 ranker choosing another verified candidate -> when proposeHeal runs -> then that candidate is chosen and the change of choice is recorded', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle(), {
       ...BASE,
       rankCandidates: ranker('gym-card-county'),
@@ -291,7 +291,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     expect(result.patch?.after).toContain("cardName: 'gym-card-county'");
   });
 
-  it('ignores a choice outside the candidate set and keeps Tier 0', async () => {
+  it('given a Tier 1 ranker choosing a selector outside the verified set -> when proposeHeal runs -> then the Tier 0 choice stands', { tags: ['@unit', '@heal'] }, async () => {
     // Tier 1 ranks; it does not invent. Anything not in the verified list has
     // never been checked against the page.
     const result = await proposeHeal(bundle(), {
@@ -302,7 +302,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     expect(result.chosen?.value).toBe('gym-card-title');
   });
 
-  it('refuses the heal outright when Tier 1 says it is a real bug', async () => {
+  it('given a Tier 1 ranker reporting a real bug -> when proposeHeal runs -> then the heal is refused, the reason says to file a bug and no patch is produced', { tags: ['@unit', '@heal'] }, async () => {
     const result = await proposeHeal(bundle(), {
       ...BASE,
       rankCandidates: ranker(null, true),
@@ -313,7 +313,7 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     expect(result.patch).toBeNull();
   });
 
-  it('records which tier produced the choice, for the ledger', async () => {
+  it('given runs with and without a Tier 1 ranker -> when proposeHeal produces each proposal -> then the tier and model are recorded only when the ranker ran', { tags: ['@unit', '@heal'] }, async () => {
     const withModel = await proposeHeal(bundle(), { ...BASE, rankCandidates: ranker('gym-card-title') });
     expect(withModel.tierOne?.used).toBe(true);
     expect(withModel.tierOne?.model).toBe('claude-sonnet-5');

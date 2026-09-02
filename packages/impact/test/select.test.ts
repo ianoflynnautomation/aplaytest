@@ -18,12 +18,12 @@ const FEATURE_GRAPH = graph(['tests/gyms.spec.ts', 'tests/events.spec.ts'], {
 });
 
 describe('affectedSpecs', () => {
-  it('walks imports backwards to the specs', () => {
+  it('given a changed constants file two imports below a spec -> when affectedSpecs walks the graph -> then that spec is selected', { tags: ['@unit', '@impact'] }, () => {
     const affected = affectedSpecs(FEATURE_GRAPH, ['src/gyms.constants.ts']);
     expect([...affected.keys()]).toEqual(['tests/gyms.spec.ts']);
   });
 
-  it('records the chain that selected each spec', () => {
+  it('given a changed constants file two imports below a spec -> when affectedSpecs walks the graph -> then the import chain that selected the spec is recorded', { tags: ['@unit', '@impact'] }, () => {
     // "Why did this run?" must be answerable from the output.
     const affected = affectedSpecs(FEATURE_GRAPH, ['src/gyms.constants.ts']);
     expect(affected.get('tests/gyms.spec.ts')).toEqual([
@@ -33,19 +33,19 @@ describe('affectedSpecs', () => {
     ]);
   });
 
-  it('selects nothing for an unrelated file', () => {
+  it('given a changed file no spec imports -> when affectedSpecs walks the graph -> then nothing is selected', { tags: ['@unit', '@impact'] }, () => {
     expect(affectedSpecs(FEATURE_GRAPH, ['README.md']).size).toBe(0);
   });
 });
 
 describe('selectTests — the guards', () => {
-  it('runs everything when a trigger file changes', () => {
+  it('given a change to a trigger file such as package.json -> when selectTests runs -> then the mode is full and the reason names that file', { tags: ['@unit', '@impact'] }, () => {
     const selection = selectTests(FEATURE_GRAPH, ['package.json']);
     expect(selection.mode).toBe('full');
     expect(selection.fullSuiteReason).toContain('package.json');
   });
 
-  it('runs everything above the threshold rather than skipping a handful', () => {
+  it('given a change affecting more specs than the full-suite threshold -> when selectTests runs -> then the mode is full and the reason names the threshold', { tags: ['@unit', '@impact'] }, () => {
     const wide = graph(['a.spec.ts', 'b.spec.ts', 'c.spec.ts'], {
       'src/shared.ts': ['a.spec.ts', 'b.spec.ts'],
     });
@@ -58,7 +58,7 @@ describe('selectTests — the guards', () => {
     expect(selection.fullSuiteReason).toContain('threshold');
   });
 
-  it('never drops a spec the graph cannot attribute', () => {
+  it('given a spec the import graph cannot attribute -> when selectTests runs -> then that spec is still selected', { tags: ['@unit', '@impact'] }, () => {
     // Silently losing an accessibility sweep that reads its routes from an
     // array is the failure mode that makes teams distrust selection.
     const withOrphan = graph(['tests/gyms.spec.ts', 'tests/a11y.spec.ts'], {
@@ -73,7 +73,7 @@ describe('selectTests — the guards', () => {
     expect(selection.selected).toContain('tests/a11y.spec.ts');
   });
 
-  it('honours always-run patterns', () => {
+  it('given an always-run pattern naming an unaffected spec -> when selectTests runs -> then that spec is selected with reason always-run', { tags: ['@unit', '@impact'] }, () => {
     const selection = selectTests(FEATURE_GRAPH, ['src/gyms.constants.ts'], {
       ...DEFAULT_SELECTION_CONFIG,
       alwaysRun: ['tests/events.spec.ts'],
@@ -95,25 +95,25 @@ describe('hub detection', () => {
     'src/gyms.page.ts': ['src/config.ts'],
   });
 
-  it('ignores a "hub" in a project too small for the notion to mean anything', () => {
+  it('given a two-spec project where one file reaches both -> when hubFiles looks for hubs -> then none is reported, because the notion is meaningless at that size', { tags: ['@unit', '@impact'] }, () => {
     // In a two-spec project anything reaching one spec is 50%. Calling that a
     // hub would suppress selection entirely on tiny suites.
     const tiny = graph(['a.spec.ts', 'b.spec.ts'], { 'src/x.ts': ['a.spec.ts', 'b.spec.ts'] });
     expect(hubFiles(tiny)).toEqual([]);
   });
 
-  it('finds the file nearly every spec depends on', () => {
+  it('given a config file every spec transitively imports -> when hubFiles looks for hubs -> then that file is reported with full reach', { tags: ['@unit', '@impact'] }, () => {
     const hubs = hubFiles(HUBBED);
     expect(hubs[0]?.file).toBe('src/config.ts');
     expect(hubs[0]?.reach).toBe(1);
   });
 
-  it('detects when a change reaches specs only through a hub', () => {
+  it('given a change reaching every spec only through the config hub -> when reachesOnlyViaHubs checks the paths -> then it reports true', { tags: ['@unit', '@impact'] }, () => {
     const paths = affectedSpecs(HUBBED, ['src/gyms.page.ts']);
     expect(reachesOnlyViaHubs(paths, hubFiles(HUBBED))).toBe(true);
   });
 
-  it('runs the full suite and SAYS WHY rather than reporting a hollow selection', () => {
+  it('given a change reaching every spec only through a hub -> when selectTests runs -> then the mode is full and the reason names the hub and runtime coverage', { tags: ['@unit', '@impact'] }, () => {
     // Presenting "3/3 selected" as narrowing would be a number that looks
     // like insight and is not.
     const selection = selectTests(HUBBED, ['src/gyms.page.ts']);
@@ -123,7 +123,7 @@ describe('hub detection', () => {
     expect(selection.hubs.length).toBeGreaterThan(0);
   });
 
-  it('still narrows when the path avoids the hub', () => {
+  it('given a change reaching one spec without passing through the hub -> when selectTests runs -> then the mode is partial and only that spec is selected', { tags: ['@unit', '@impact'] }, () => {
     const mixed = graph(ALL, {
       'src/config.ts': ALL,
       'tests/data.ts': ['a.spec.ts'],
@@ -157,7 +157,7 @@ describe('route-based selection — narrowing past a fixture barrel', () => {
     ['tests/events.spec.ts', new Set(['/events'])],
   ]);
 
-  it('narrows to the spec that visited the affected route', () => {
+  it('given a fixture barrel every spec imports and route coverage per spec -> when selectTests runs -> then it narrows to the spec that visited the affected route', { tags: ['@unit', '@impact'] }, () => {
     const selection = selectTests(
       BARRELLED,
       ['src/gyms.page.ts'],
@@ -171,7 +171,7 @@ describe('route-based selection — narrowing past a fixture barrel', () => {
     expect(selection.reasons[0]?.via).toEqual(['/gyms']);
   });
 
-  it('never selects a spec the suite does not contain', () => {
+  it('given coverage naming a spec the suite no longer contains -> when selectTests runs -> then that spec is not selected and the count stays within the suite', { tags: ['@unit', '@impact'] }, () => {
     // Coverage can name a deleted file or a path in another form. Selecting it
     // is how "3/2 specs selected" happens.
     const stale = new Map(coverage);
@@ -187,7 +187,7 @@ describe('route-based selection — narrowing past a fixture barrel', () => {
     expect(selection.selected).not.toContain('tests/deleted.spec.ts');
   });
 
-  it('always runs a spec with no recorded coverage', () => {
+  it('given a spec with no recorded route coverage -> when selectTests runs -> then it is selected with reason no-coverage', { tags: ['@unit', '@impact'] }, () => {
     const partial = new Map([['tests/gyms.spec.ts', new Set(['/gyms'])]]);
     const selection = selectTests(
       BARRELLED,
@@ -199,7 +199,7 @@ describe('route-based selection — narrowing past a fixture barrel', () => {
     expect(selection.reasons.find(r => r.spec === 'tests/events.spec.ts')?.reason).toBe('no-coverage');
   });
 
-  it('falls back to the import graph when the diff owns no route', () => {
+  it('given a changed file owning no route -> when selectTests runs -> then no spec is selected by visited-route and the import graph decides', { tags: ['@unit', '@impact'] }, () => {
     // "No spec matched" and "this method does not apply" are different answers.
     const selection = selectTests(
       BARRELLED,
@@ -212,13 +212,13 @@ describe('route-based selection — narrowing past a fixture barrel', () => {
 });
 
 describe('normaliseRoute', () => {
-  it('reduces a URL to its path', () => {
+  it('given absolute and relative URLs carrying query strings -> when normaliseRoute reads them -> then each reduces to its path', { tags: ['@unit', '@impact'] }, () => {
     expect(normaliseRoute('http://localhost:8080/gyms?q=x')).toBe('/gyms');
     expect(normaliseRoute('/gyms?q=1')).toBe('/gyms');
     expect(normaliseRoute('/gyms')).toBe('/gyms');
   });
 
-  it('rejects non-http schemes rather than inventing a route', () => {
+  it('given about:blank or a data URL -> when normaliseRoute reads it -> then the result is null rather than an invented route', { tags: ['@unit', '@impact'] }, () => {
     // about:blank normalised to the pathname "blank" and was recorded as
     // though the test had visited a page by that name.
     expect(normaliseRoute('about:blank')).toBeNull();

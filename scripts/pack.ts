@@ -1,22 +1,23 @@
 /**
  * Produce installable tarballs for every package.
  *
- * atest is a workspace monorepo, and until this existed it was not installable
- * at all: `npm pack` on `@atest/runner-playwright` yields a tarball whose
- * `@atest/core@0.0.0` dependency resolves against the public registry, where
- * it does not exist. Measured, in a clean project:
+ * These exist for the NO-REGISTRY path — an air-gapped runner, a fork that
+ * cannot authenticate, a consumer pinning a build that was never released.
+ * The normal path is `npm install @atest/runner-playwright`, because the
+ * packages are published to npm under the `@atest` scope with real semver
+ * dependencies on each other.
+ *
+ * Install every tarball in ONE command. Each declares `@atest/core@^0.1.0`,
+ * and npm satisfies that from the other tarballs in the same invocation; ask
+ * for one alone and — if the version is not yet on the registry — you get:
  *
  *   npm error 404 Not Found - GET https://registry.npmjs.org/@atest%2fcore
- *
- * npm resolves that fine when every workspace tarball is installed in the same
- * command, so the answer is to emit all of them together rather than to publish
- * a registry or bundle core into the reporter.
  *
  * The consumer flow this enables, with no registry and no auth:
  *
  *   npm run pack                       # here
  *   cp dist-pack/*.tgz <repo>/vendor/  # there
- *   npm i ./vendor/atest-core-0.0.0.tgz ./vendor/atest-runner-playwright-0.0.0.tgz
+ *   npm i ./vendor/atest-core-0.1.0.tgz ./vendor/atest-runner-playwright-0.1.0.tgz
  *
  * `file:` specifiers survive `npm ci`, so a Dockerfile that copies `vendor/`
  * before installing works unchanged — which is what the bjjeire-tests runner
@@ -33,9 +34,9 @@ const OUT = join(ROOT, 'dist-pack');
 /**
  * Only what a consumer installs into their own test process or CI job.
  *
- * `@atest/mcp` and `@atest/agent` are deliberately absent: the MCP server is
- * run from a checkout, and the agent is reached through the CLI. Shipping
- * fewer tarballs means fewer things whose versions have to agree.
+ * `@atest/mcp` is deliberately absent — the MCP server is run from a checkout —
+ * and `packages/mcp/package.json` now carries `"private": true` so that
+ * decision is enforced by npm rather than by this list staying in step with it.
  */
 const PUBLISHABLE = [
   'core',

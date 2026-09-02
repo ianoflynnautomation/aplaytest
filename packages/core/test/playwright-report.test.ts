@@ -47,7 +47,7 @@ function report(overrides: Partial<JsonReport> = {}): JsonReport {
 }
 
 describe('mapPlaywrightReport — identity', () => {
-  it("uses Playwright's stable spec.id so history joins to the reporter's rows", () => {
+  it('given a report whose spec carries a stable spec.id -> when mapPlaywrightReport runs -> then the attempt testId is that spec.id, so history joins to the reporter rows', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(report());
 
     expect(run.attempts[0]?.testId).toBe('a3c878af9c85c5ed06b8-985fc0085fd7523ef44f');
@@ -55,7 +55,7 @@ describe('mapPlaywrightReport — identity', () => {
 
   // Two tests with the same title in different describe blocks of one file are
   // distinct tests. A `file::title` id would merge their histories.
-  it('falls back to a title-path id when the report predates spec.id', () => {
+  it('given a report predating spec.id that repeats one title across two describe blocks -> when mapPlaywrightReport runs -> then each attempt gets a distinct title-path testId', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map({
       suites: [
         {
@@ -84,11 +84,11 @@ describe('mapPlaywrightReport — identity', () => {
 describe('mapPlaywrightReport — run id', () => {
   // store.ingest is idempotent BY RUN ID. A clock-derived id opts out of that
   // silently and double-counts every attempt on a re-ingest.
-  it('derives the same run id from the same report', () => {
+  it('given the same report mapped twice -> when mapPlaywrightReport runs -> then both mappings derive the same runId', { tags: ['@unit', '@history-report'] }, () => {
     expect(map(report()).run.runId).toBe(map(report()).run.runId);
   });
 
-  it('prefers the CI build URL as the natural key', () => {
+  it('given a report carrying a CI buildHref -> when mapPlaywrightReport runs -> then the runId is derived from that build URL and differs from the report without one', { tags: ['@unit', '@history-report'] }, () => {
     const withBuild = map(
       report({
         config: {
@@ -102,7 +102,7 @@ describe('mapPlaywrightReport — run id', () => {
     expect(withBuild).not.toBe(map(report()).run.runId);
   });
 
-  it('distinguishes runs that differ only in their results', () => {
+  it('given two reports differing only in a result duration -> when mapPlaywrightReport runs -> then the two runIds differ', { tags: ['@unit', '@history-report'] }, () => {
     const slower = report();
     slower.suites![0]!.specs![0]!.tests![0]!.results![0] = {
       ...slower.suites![0]!.specs![0]!.tests![0]!.results![0]!,
@@ -116,20 +116,20 @@ describe('mapPlaywrightReport — run id', () => {
 describe('mapPlaywrightReport — run metadata', () => {
   // Recency decay weights by startedAt. Ingest time would make a replayed
   // archive weigh as heavily as this morning's run.
-  it('takes the run window from the attempts, not the clock', () => {
+  it('given a report whose attempts carry start times -> when mapPlaywrightReport runs -> then startedAt and finishedAt come from the attempts rather than the clock', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(report());
 
     expect(run.startedAt).toBe('2026-08-29T13:10:56.550Z');
     expect(run.finishedAt).toBe('2026-08-29T13:10:57.750Z');
   });
 
-  it('falls back to the clock only when no attempt carries a timestamp', () => {
+  it('given a report where no attempt carries a timestamp -> when mapPlaywrightReport runs -> then startedAt falls back to the injected clock', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map({ suites: [{ specs: [{ title: 't', tests: [{ results: [{}] }] }] }] });
 
     expect(run.startedAt).toBe('2026-01-01T00:00:00.000Z');
   });
 
-  it('prefers the commit the tests ran against over the ingesting environment', () => {
+  it('given a report carrying CI commit and branch metadata -> when mapPlaywrightReport runs under a different ingesting identity -> then the commit and branch from the report win and ci is true', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(
       report({
         config: { version: '1.61.0', metadata: { ci: { commitHash: '7cbe7c3', branch: 'main' } } },
@@ -142,7 +142,7 @@ describe('mapPlaywrightReport — run metadata', () => {
     expect(run.ci).toBe(true);
   });
 
-  it('falls back to the environment when the report carries no CI metadata', () => {
+  it('given a report carrying no CI metadata -> when mapPlaywrightReport runs with an environment identity -> then commit, appEnv and ci fall back to the environment', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(report(), { ...IDENTITY, commit: 'abc123', appEnv: 'staging', ci: true });
 
     expect(run.commit).toBe('abc123');
@@ -150,7 +150,7 @@ describe('mapPlaywrightReport — run metadata', () => {
     expect(run.ci).toBe(true);
   });
 
-  it('records the workers actually used and the shard', () => {
+  it('given a report declaring actualWorkers and a shard -> when mapPlaywrightReport runs -> then the workers actually used, the shard and the Playwright version are recorded', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(
       report({
         config: {
@@ -195,7 +195,7 @@ describe('mapPlaywrightReport — classification', () => {
   // `locator.not-found` deliberately outranks `assertion.visibility` here —
   // "element(s) not found" means the address resolved to nothing, which is a
   // different problem from an element that was present but not yet visible.
-  it('routes a real toBeVisible timeout instead of shrugging at it', () => {
+  it('given a failed attempt reporting a toBeVisible timeout with element(s) not found -> when mapPlaywrightReport runs -> then failureKind is locator_not_found rather than unknown', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(
       failing(
         [
@@ -214,7 +214,7 @@ describe('mapPlaywrightReport — classification', () => {
   });
 
   // The sixth: the element resolved, then never became actionable.
-  it('separates "found but not actionable" from "never found"', () => {
+  it('given a failed attempt whose call log resolved the locator before the click timed out -> when mapPlaywrightReport runs -> then failureKind is locator_not_actionable rather than not-found', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(
       failing(
         [
@@ -233,19 +233,19 @@ describe('mapPlaywrightReport — classification', () => {
 
   // The one that matters most: doc 06 requires infra attempts to be excluded
   // from flake statistics, which a hard-coded 'unknown' could never do.
-  it('recognises infra failures so they stay out of the flake statistics', () => {
+  it('given a failed attempt reporting a missing browser executable -> when mapPlaywrightReport runs -> then failureKind is infra, so it stays out of the flake statistics', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(failing('browserType.launch: Executable doesn\'t exist at /ms-playwright'));
 
     expect(run.attempts[0]?.failureKind).toBe('infra');
   });
 
-  it('leaves a failure with no error text as unknown rather than guessing', () => {
+  it('given a failed attempt carrying no error text -> when mapPlaywrightReport runs -> then failureKind is unknown rather than a guess', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(failing(''));
 
     expect(run.attempts[0]?.failureKind).toBe('unknown');
   });
 
-  it('does not classify a passing attempt', () => {
+  it('given a passing attempt -> when mapPlaywrightReport runs -> then failureKind is null', { tags: ['@unit', '@history-report'] }, () => {
     expect(map(report()).run.attempts[0]?.failureKind).toBeNull();
   });
 });
@@ -266,21 +266,21 @@ describe('mapPlaywrightReport — duplicate attempts', () => {
   };
   type JsonSuiteLike = NonNullable<JsonReport['suites']>[number];
 
-  it('keeps the more severe outcome so a pass cannot mask a failure', () => {
+  it('given an id-less report repeating one test as passed then failed -> when mapPlaywrightReport runs -> then one attempt survives carrying the more severe outcome', { tags: ['@unit', '@history-report'] }, () => {
     const { run } = map(twice('passed', 'failed'));
 
     expect(run.attempts).toHaveLength(1);
     expect(run.attempts[0]?.outcome).toBe('failed');
   });
 
-  it('reports what it collapsed instead of discarding it silently', () => {
+  it('given an id-less report repeating one test as passed then failed -> when mapPlaywrightReport runs -> then the collapsed attempt is reported by title rather than discarded silently', { tags: ['@unit', '@history-report'] }, () => {
     const { collapsed } = map(twice('passed', 'failed'));
 
     expect(collapsed).toHaveLength(1);
     expect(collapsed[0]).toContain('warm the token cache');
   });
 
-  it('collapses nothing when the report carries real spec ids', () => {
+  it('given a report whose repeated titles carry distinct spec ids -> when mapPlaywrightReport runs -> then nothing is collapsed and both attempts survive', { tags: ['@unit', '@history-report'] }, () => {
     const { run, collapsed } = map({
       suites: [
         {

@@ -17,7 +17,7 @@ function probe(overrides: Partial<BisectProbe> & { setting: string }): BisectPro
 }
 
 describe('interpret — the footer flake shape', () => {
-  it('reads a monotonic rise with worker count as resource contention', () => {
+  it('given probes whose failure rate rises monotonically with worker count -> when interpret reads them -> then the class is resource-contention with high confidence and healing is ruled out', { tags: ['@unit', '@flaky'] }, () => {
     // This is the measurement bisect exists to produce: the classifier can
     // only infer load dependency from history, whereas these numbers came from
     // running the test.
@@ -34,7 +34,7 @@ describe('interpret — the footer flake shape', () => {
     expect(verdict.recommendation).toContain('Healing is not applicable');
   });
 
-  it('lowers confidence when the rise is not monotonic', () => {
+  it('given probes whose failure rate rises but not monotonically -> when interpret reads them -> then the class is resource-contention with confidence lowered to medium', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ setting: 'workers=1', failed: 0 }),
       probe({ setting: 'workers=4', failed: 8 }),
@@ -45,7 +45,7 @@ describe('interpret — the footer flake shape', () => {
     expect(verdict.confidence).toBe('medium');
   });
 
-  it('does not claim contention when load changes nothing', () => {
+  it('given probes whose failure rate is unchanged by worker count -> when interpret reads them -> then the class is not resource-contention', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ setting: 'workers=1', failed: 4 }),
       probe({ setting: 'workers=8', failed: 4 }),
@@ -55,7 +55,7 @@ describe('interpret — the footer flake shape', () => {
 });
 
 describe('interpret — isolation', () => {
-  it('reads pass-alone / fail-together as test pollution', () => {
+  it('given a probe passing alone and failing with the whole file -> when interpret reads them -> then the class is test-pollution and retry is ruled out', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ dimension: 'isolation', setting: 'alone', failed: 0 }),
       probe({ dimension: 'isolation', setting: 'whole file', failed: 9 }),
@@ -68,7 +68,7 @@ describe('interpret — isolation', () => {
 });
 
 describe('interpret — honest non-answers', () => {
-  it('reports not-reproduced rather than inventing a cause', () => {
+  it('given probes in which nothing failed -> when interpret reads them -> then the class is not-reproduced rather than an invented cause', { tags: ['@unit', '@flaky'] }, () => {
     // Reaching for a class when nothing failed is how a bisect tool starts
     // manufacturing explanations.
     const verdict = interpret([
@@ -81,7 +81,7 @@ describe('interpret — honest non-answers', () => {
     expect(verdict.recommendation).toContain('outside the dimensions probed');
   });
 
-  it('says so when every probe was inconclusive', () => {
+  it('given probes that were all inconclusive -> when interpret reads them -> then the class is unclassified and the evidence says inconclusive', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ setting: 'workers=1', inconclusive: true, total: 0 }),
       probe({ setting: 'workers=8', inconclusive: true, total: 0 }),
@@ -91,7 +91,7 @@ describe('interpret — honest non-answers', () => {
     expect(verdict.evidence.join(' ')).toContain('inconclusive');
   });
 
-  it('ignores inconclusive probes rather than counting them as passes', () => {
+  it('given one inconclusive probe and one that failed outright -> when interpret reads them -> then the class is not not-reproduced', { tags: ['@unit', '@flaky'] }, () => {
     // An inconclusive probe means the run never executed — a config error or a
     // grep that matched nothing. Treating it as a pass would let bisect
     // conclude "not reproduced" from a broken invocation.
@@ -103,7 +103,7 @@ describe('interpret — honest non-answers', () => {
     expect(verdict.class).not.toBe('not-reproduced');
   });
 
-  it('calls an always-failing test broken rather than flaky', () => {
+  it('given probes that failed at every setting -> when interpret reads them -> then the class is consistently-failing and the advice is to fix or delete it', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ setting: 'workers=1', failed: 20 }),
       probe({ setting: 'workers=8', failed: 20 }),
@@ -113,7 +113,7 @@ describe('interpret — honest non-answers', () => {
     expect(verdict.recommendation).toContain('Fix it or delete it');
   });
 
-  it('admits when failures reproduce but nothing explains them', () => {
+  it('given probes that reproduce failures at a similar rate everywhere -> when interpret reads them -> then the class is unclassified and says the cause is outside what was measured', { tags: ['@unit', '@flaky'] }, () => {
     const verdict = interpret([
       probe({ setting: 'workers=1', failed: 3 }),
       probe({ setting: 'workers=8', failed: 4 }),
@@ -125,7 +125,7 @@ describe('interpret — honest non-answers', () => {
 });
 
 describe('interpret — attribution', () => {
-  it('does not read a neighbour’s failures as co-scheduling pressure', () => {
+  it('given isolation probes counting only the target spec and neither failing -> when interpret reads them -> then the class is not-reproduced rather than test-pollution', { tags: ['@unit', '@flaky'] }, () => {
     // REGRESSION GUARD from a real bisect run: the "whole file" probe runs
     // neighbours too, and aggregate stats charged THEIR failures to the test
     // under examination — reading as "passes alone, fails together" and

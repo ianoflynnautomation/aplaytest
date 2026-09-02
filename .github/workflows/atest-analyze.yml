@@ -1,0 +1,476 @@
+name: atest Flake Analysis (Reusable)
+
+# Flake analysis over a Playwright run, with history that outlives the run.
+#
+# ── Why this lives HERE and not in bjjeire-ci-templates ───────────────────────
+# It was written there first, and that was wrong. A shared template repository
+# earns its name by holding workflows any project can call; this one runs
+# `npx atest history ingest`, parses atest's verdict JSON, and speaks
+# `azblob://` history URLs. Nothing about it generalises, and a "generic"
+# template with a hardcoded product in it is worse than no template — it makes
+# the catalog a liability to read, because you can no longer trust that an
+# entry means what its name says.
+#
+# The rule this repository follows: a workflow that only its own product can
+# use ships with that product. `npm-tarball-publish-oci.yml` stayed in the
+# templates repo because every input really is parameterised and any Node
+# workspace can call it; this one could not pass that test.
+#
+# CONSUMERS CALL IT CROSS-REPO:
+#
+#   uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@<ref>
+#
+# This repository is PRIVATE, so that call needs Settings → Actions → General →
+# Access set to "Accessible from repositories owned by the user". Without it
+# the caller fails at parse time with "workflow was not found", which reads as
+# a typo rather than a permission.
+#
+# ── The problem this exists for ───────────────────────────────────────────────
+# `fail-on-flaky: true` has no memory. A pipeline goes red with ZERO failed
+# tests because six passed on retry, and the gate cannot tell one bad night
+# from a test that has flipped every week for a month. On main that also skips
+# image promotion: built, scanned, never shipped. This job gives the gate a
+# memory — it records every run, scores each (test, project) pair against a
+# window, and separates "flaky" from "actually broken".
+#
+# ── Where the history lives ───────────────────────────────────────────────────
+# An Azure Blob container, as an append-only log: one immutable object per run
+# and shard, named from the run id and the shard, partitioned by date.
+#
+#   atest-history/v1/runs/2026/08/30/<runId>/<shard>.json.gz
+#
+# There is no download step and no upload step, because there is no single file
+# to move. Two shards write different names; two overlapping main-branch runs
+# write different names. Nothing races, so nothing needs a lock or an ETag
+# precondition — which is what the earlier "one history.sqlite on a blob"
+# design needed, and lost writes to anyway.
+#
+# ── MAIN WRITES, PULL REQUESTS READ ───────────────────────────────────────────
+# Enforced by Entra, not by this file: the main-branch identity federates on
+# refs/heads/main alone and is the only principal holding Contributor, while
+# the PR identity holds Reader. The history URL gains `?readonly=1` off main so
+# atest declares the intent rather than discovering it as a 403 once per shard
+# file. The semantics matter as much as the concurrency — a flake baseline
+# should describe trunk, and a branch whose test code may itself be broken must
+# not enter it before anyone has decided to merge.
+#
+# ── It runs INSIDE the atest image ────────────────────────────────────────────
+# So a caller needs no Node toolchain, no ORAS, and no install step — which is
+# the point: bjjeire is a Java repository that was installing Node to invoke
+# one CLI. It also needs no `az`: DefaultAzureCredential authenticates from a
+# GitHub OIDC token written to AZURE_FEDERATED_TOKEN_FILE, the same mechanism
+# AKS workload identity uses, so the image authenticates identically in a
+# cluster and in CI.
+#
+# ── This job never changes the merge verdict ──────────────────────────────────
+# `continue-on-error` on the job. If atest breaks, or the storage account is
+# unreachable, or nobody configured one, the pipeline's answer is whatever it
+# already was. Analysis that can turn a red build into an infrastructure
+# incident is worse than no analysis.
+#
+# With `history-account` unset the job still runs and still reports — it scores
+# this run alone against a throwaway local store, so every verdict reads
+# "insufficient data". That is a deliberate single code path: the atest
+# invocations do not change when persistence is switched on.
+#
+# Required caller permissions:
+#   contents: read
+#   actions: read          # downloading the upstream test artifact
+#   packages: read         # the atest image is pulled from GHCR
+#   id-token: write        # Azure OIDC; only needed when history-account is set
+#   pull-requests: write   # only when comment-on-pr is true
+#
+# No top-level concurrency — reusable workflows inherit github.workflow from
+# the caller, and declaring the same group in both self-deadlocks.
+
+on:
+  workflow_call:
+    inputs:
+      results-artifact:
+        description: >-
+          Artifact holding the merged Playwright JSON report. Produced by
+          playwright-report.yml (`playwright-json-results`) and by
+          playwright-docker-tests.yml (`playwright-docker-json-results`).
+        required: true
+        type: string
+      atest-image:
+        description: >-
+          Container image providing the atest CLI. The job RUNS IN IT, so the
+          caller needs no Node, no ORAS and no install step — which matters
+          because the repositories calling this are not all Node repositories.
+        required: false
+        type: string
+        default: "ghcr.io/ianoflynnautomation/atest"
+      atest-tag:
+        description: >-
+          Tag on atest-image. `main` tracks trunk and is the bootstrap default,
+          because docker-publish.yml only moves `latest` on a version tag — a
+          consumer pinned to `latest` should get the last thing somebody
+          decided to RELEASE, not the last thing that merged. Until atest cuts
+          a release `latest` does not exist, and defaulting to it would fail
+          the image pull on a fresh setup. Pin to a version tag once there is
+          one to pin to.
+        required: false
+        type: string
+        default: "main"
+      history-account:
+        description: >-
+          Storage account holding the run history. EMPTY DISABLES PERSISTENCE —
+          the job still scores this run and still reports, it just has no
+          baseline to compare against. Nothing else in the pipeline changes.
+        required: false
+        type: string
+        default: ""
+      history-container:
+        description: "Blob container inside history-account."
+        required: false
+        type: string
+        default: "atest-history"
+      history-prefix:
+        description: >-
+          Key prefix inside the container, so several repositories can share one
+          account without their histories merging. Empty writes at the root.
+        required: false
+        type: string
+        default: ""
+      history-window-days:
+        description: >-
+          Days of history downloaded before scoring. Bounds the read: unbounded,
+          the job gets slower every week until somebody disables it. Keep at or
+          below the account's lifecycle retention.
+        required: false
+        type: number
+        default: 90
+      history-retain-days:
+        description: "Retention for `atest history prune`, which runs on the write branch only."
+        required: false
+        type: number
+        default: 90
+      write-branch:
+        description: >-
+          The only ref permitted to write history. A workflow-level echo of the
+          RBAC split; changing it here grants nothing that Entra has not.
+        required: false
+        type: string
+        default: "refs/heads/main"
+      comment-on-pr:
+        description: "Post the flake summary as a sticky pull-request comment."
+        required: false
+        type: boolean
+        default: false
+      runs-on:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      timeout-minutes:
+        required: false
+        type: number
+        default: 15
+      artifact-retention-days:
+        required: false
+        type: number
+        default: 14
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_CLIENT_ID:
+        description: "Client id used off the write branch. Read-only on the history account."
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      ATEST_HISTORY_CLIENT_ID:
+        description: >-
+          Client id of the main-branch-only writer identity. Falls back to
+          AZURE_CLIENT_ID, which holds Reader — so a missing value degrades to
+          "history was not written", never to "a pull request wrote history".
+        required: false
+    outputs:
+      flaky-count:
+        description: "Tests scoring above the flake threshold."
+        value: ${{ jobs.analyze.outputs.flaky-count }}
+      regression-count:
+        description: >-
+          Tests above the threshold that look like genuine regressions rather
+          than flakes. This is the number worth acting on today.
+        value: ${{ jobs.analyze.outputs.regression-count }}
+      history-runs:
+        description: "Runs in the store. Below 10, every verdict reads 'insufficient data'."
+        value: ${{ jobs.analyze.outputs.history-runs }}
+
+jobs:
+  analyze:
+    name: Flake analysis (atest)
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # Analysis must never change the merge verdict.
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+      id-token: write
+      pull-requests: write
+    container:
+      image: ${{ inputs.atest-image }}:${{ inputs.atest-tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+      options: --user root
+    outputs:
+      flaky-count: ${{ steps.report.outputs.flaky-count }}
+      regression-count: ${{ steps.report.outputs.regression-count }}
+      history-runs: ${{ steps.report.outputs.history-runs }}
+    env:
+      HISTORY_ENABLED: ${{ inputs.history-account != '' }}
+      # Writable when there is no shared store to protect, or when this is the
+      # branch allowed to amend it.
+      CAN_WRITE: ${{ inputs.history-account == '' || (github.ref == inputs.write-branch && github.event_name != 'pull_request') }}
+      # Outside the workspace on purpose: the workspace is uploaded by
+      # artifact steps and persists between jobs, and a short-lived Entra token
+      # has no business in either.
+      TOKEN_FILE: /tmp/azure-federated-token
+    steps:
+      # No checkout. The job reads an uploaded artifact and talks to a storage
+      # account; it never touches the caller's source, which is also why it can
+      # safely run against a pull request from a fork.
+
+      # ONE store URL, resolved once, so no atest step below needs an `if:`.
+      #
+      # Deliberately shell rather than a `${{ }}` expression. The expression
+      # form needs a nested conditional inside a format() call, and Actions has
+      # no ternary — `on-main && '' || '&readonly=1'` reads like one and is
+      # not, because the empty string is FALSY, so the `||` always fires and
+      # every branch including main opens the store read-only. History is then
+      # silently never written, and the only symptom is verdicts reading
+      # "insufficient data" forever — which is also exactly what a correctly
+      # working new store says. Nothing goes red.
+      #
+      # With no account the URL is a local SQLite file that dies with the
+      # container. Not a fallback nobody uses: it is what keeps every atest
+      # command below identical whether or not persistence is configured.
+      - name: Resolve the history store
+        env:
+          ACCOUNT: ${{ inputs.history-account }}
+          CONTAINER: ${{ inputs.history-container }}
+          PREFIX: ${{ inputs.history-prefix }}
+          WINDOW: ${{ inputs.history-window-days }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ACCOUNT}" ]; then
+            url=".atest/history.sqlite"
+            echo "::notice title=atest::No history account configured — this run is scored on its own"
+          else
+            url="azblob://${ACCOUNT}/${CONTAINER}"
+            # An `if`, not `[ -n "$PREFIX" ] && url=...`: under `set -e` a
+            # false test is a failed command and would end the step.
+            if [ -n "${PREFIX}" ]; then
+              url="${url}/${PREFIX}"
+            fi
+            url="${url}?window=${WINDOW}"
+            if [ "${CAN_WRITE}" != "true" ]; then
+              url="${url}&readonly=1"
+              echo "::notice title=atest::Read-only — scoring against the trunk baseline without amending it"
+            fi
+          fi
+          echo "ATEST_HISTORY_URL=${url}" >> "$GITHUB_ENV"
+          echo "::notice title=atest::history store ${url}"
+
+      - name: Download Playwright results
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ${{ inputs.results-artifact }}
+          path: pw
+
+      # A cancelled or path-filtered upstream job uploads nothing. That is not
+      # a failure of this job; there is simply nothing to analyse.
+      # Every caller-controlled value below arrives through `env`, never spliced
+      # into the script by `${{ }}`. Template expansion happens before the shell
+      # sees the text, so an artifact name containing a quote and a semicolon
+      # would run as a command and no amount of quoting here could stop it.
+      - name: Locate the merged report
+        id: locate
+        shell: bash
+        env:
+          RESULTS_ARTIFACT: ${{ inputs.results-artifact }}
+        run: |
+          set -euo pipefail
+          json=$(find pw -name '*.json' -size +0 -print 2>/dev/null | head -1 || true)
+          if [ -z "${json}" ]; then
+            echo "::warning title=atest::No Playwright JSON in '${RESULTS_ARTIFACT}' — nothing to analyse"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "json=${json}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # NO azure/login, and no az CLI in the image.
+      #
+      # That action exists to leave the Azure CLI authenticated, so using it
+      # would mean shipping az — Python and ~300 MB — into an image whose whole
+      # point is being small. It is also unnecessary: `DefaultAzureCredential`
+      # already includes `WorkloadIdentityCredential`, which needs exactly three
+      # things, and GitHub will mint the third on request.
+      #
+      # This is the same mechanism AKS workload identity uses, so the image
+      # authenticates identically in a cluster and in CI.
+      #
+      # TWO IDENTITIES, ON PURPOSE. Only the main-branch one holds Contributor;
+      # AZURE_CLIENT_ID holds Reader. If ATEST_HISTORY_CLIENT_ID is unset the
+      # job falls back to the reader, so the degraded outcome is "history was
+      # not written", never "a pull request wrote history".
+      - name: Acquire an Azure token
+        if: env.HISTORY_ENABLED == 'true'
+        env:
+          CLIENT_ID: ${{ (github.ref == inputs.write-branch && github.event_name != 'pull_request' && secrets.ATEST_HISTORY_CLIENT_ID != '') && secrets.ATEST_HISTORY_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+          TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ATEST_TOKEN_FILE: ${{ env.TOKEN_FILE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLIENT_ID}" ] || [ -z "${TENANT_ID}" ]; then
+            echo "::warning title=atest::AZURE_CLIENT_ID/AZURE_TENANT_ID not set — history will not be reachable"
+            exit 0
+          fi
+
+          # node, not curl: the image has node by definition and adding curl to
+          # it for one request would be a package to keep patched forever.
+          # `api://AzureADTokenExchange` is the audience Entra requires for
+          # federated exchange and the one the terraform federated credential
+          # declares — a mismatch fails with AADSTS700212, which names the
+          # audience but not the file that chose it.
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+
+            const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+            const runtimeToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+            if (!url || !runtimeToken) {
+              throw new Error("No OIDC runtime. The calling job needs permissions: id-token: write.");
+            }
+
+            const res = await fetch(url + "&audience=api://AzureADTokenExchange", {
+              headers: { authorization: "bearer " + runtimeToken },
+            });
+            if (!res.ok) throw new Error("OIDC token request failed: " + res.status);
+
+            const { value } = await res.json();
+            if (!value) throw new Error("OIDC response carried no token");
+            writeFileSync(process.env.ATEST_TOKEN_FILE, value, { mode: 0o600 });
+          '
+
+          {
+            echo "AZURE_CLIENT_ID=${CLIENT_ID}"
+            echo "AZURE_TENANT_ID=${TENANT_ID}"
+            echo "AZURE_FEDERATED_TOKEN_FILE=${ATEST_TOKEN_FILE}"
+          } >> "$GITHUB_ENV"
+          echo "::notice title=atest::Federated credential ready for client ${CLIENT_ID}"
+
+      # Unconditional, and identical on every branch. Off the write branch the
+      # store is open read-only, so this indexes the run locally and scores it
+      # against the trunk baseline without leaving anything behind — the branch
+      # logic lives in the URL, not in a matrix of `if:` conditions here.
+      - name: Ingest this run
+        if: steps.locate.outputs.found == 'true'
+        shell: bash
+        env:
+          REPORT_JSON: ${{ steps.locate.outputs.json }}
+        run: npx atest history ingest --playwright-json "$REPORT_JSON"
+
+      - name: Score and summarise
+        id: report
+        if: steps.locate.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx atest flaky report --json > flaky.json
+          npx atest history stats --json > history.json
+
+          # Written to a file rather than passed to `node -e`: the summary is a
+          # markdown template full of backticks and ${...}, and quoting that
+          # through a shell string is how a working script becomes a silently
+          # empty one. A quoted heredoc is literal.
+          cat > summarise.mjs <<'SUMMARISE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const report = JSON.parse(readFileSync('flaky.json', 'utf8'));
+          const stats = JSON.parse(readFileSync('history.json', 'utf8'));
+          const flaky = (report.verdicts ?? []).filter(v => v.flaky);
+          const regressions = report.regressions ?? [];
+          const runs = stats.runs ?? 0;
+          const out = ['## atest — flake analysis', ''];
+
+          // Say the wait out loud. Below the scoring minimum every verdict
+          // reads "insufficient data", which looks exactly like a working
+          // engine finding nothing — and is read as one.
+          if (stats.driver === 'sqlite') {
+            out.push('> No persistent history is configured, so this run was scored on its own.',
+                     '> Set `history-account` to keep a baseline across runs.', '');
+          } else if (runs < 10) {
+            out.push(`> ${runs} run(s) in the store; scoring needs 10. Verdicts read "insufficient`,
+                     '> data" until the window fills. That is the engine accumulating, not failing.', '');
+          }
+
+          if (regressions.length > 0) {
+            out.push(`### ${regressions.length} look like regressions, not flakes`, '',
+                     'Retrying will not help these.', '');
+            for (const v of regressions) out.push(`- \`${v.title}\` [${v.project}]`);
+            out.push('');
+          }
+
+          if (flaky.length === 0) {
+            out.push(`No test scored above the flake threshold across ${report.analyzed ?? 0} (test, project) pairs.`);
+          } else {
+            out.push('| score | n | class | retry helps | test | project |',
+                     '|------:|--:|-------|-------------|------|---------|');
+            for (const v of flaky) {
+              out.push(`| ${v.score.score.toFixed(2)} | ${v.score.rawN} | ${v.classification.class} | ` +
+                       `${v.classification.retryable ? 'yes' : 'no'} | ${v.title} | ${v.project} |`);
+            }
+          }
+
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${out.join('\n')}\n`);
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `flaky-count=${flaky.length}\nregression-count=${regressions.length}\nhistory-runs=${runs}\n`,
+          );
+          SUMMARISE
+
+          node summarise.mjs
+
+      # After scoring, not before: pruning first would drop records this run's
+      # own verdicts were about to be weighed against. Write-branch only — a
+      # read-only store refuses to prune rather than deleting nothing and
+      # reporting success.
+      - name: Trim history
+        if: steps.locate.outputs.found == 'true' && env.CAN_WRITE == 'true' && env.HISTORY_ENABLED == 'true'
+        shell: bash
+        env:
+          RETAIN_DAYS: ${{ inputs.history-retain-days }}
+        run: npx atest history prune --keep-days "$RETAIN_DAYS"
+
+      - name: Comment on the pull request
+        if: inputs.comment-on-pr && github.event_name == 'pull_request' && steps.report.outcome == 'success'
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88  # v3.0.5
+        with:
+          header: atest-flake-analysis
+          message: |
+            ## atest — flake analysis
+
+            **${{ steps.report.outputs.flaky-count }}** flaky · **${{ steps.report.outputs.regression-count }}** look like regressions · ${{ steps.report.outputs.history-runs }} runs in history
+
+            Scored against the trunk baseline; this branch's results were not added to it.
+
+            Full table in the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+      - name: Upload flake report
+        if: always() && steps.locate.outputs.found == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: atest-flaky-report
+          path: |
+            flaky.json
+            history.json
+          retention-days: ${{ inputs.artifact-retention-days }}
+          if-no-files-found: ignore

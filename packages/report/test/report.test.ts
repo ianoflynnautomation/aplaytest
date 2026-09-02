@@ -109,12 +109,12 @@ function bundle(over: Record<string, unknown> = {}): EvidenceBundle {
 }
 
 describe('mergeRuns', () => {
-  it('returns null rather than throwing when there is nothing to merge', () => {
+  it('given no run records -> when mergeRuns runs -> then it returns null rather than throwing', { tags: ['@unit', '@report'] }, () => {
     // A cancelled job produces no records; that is not an error.
     expect(mergeRuns([])).toBeNull();
   });
 
-  it('counts a retried-then-passed test as flaky, not failed', () => {
+  it('given a test that failed then passed on retry -> when mergeRuns totals it -> then it counts once as flaky rather than failed', { tags: ['@unit', '@report'] }, () => {
     // Counting the first attempt would make every retried suite look broken.
     const merged = mergeRuns([
       run({
@@ -129,14 +129,14 @@ describe('mergeRuns', () => {
     expect(merged?.totals.tests).toBe(1);
   });
 
-  it('does not double-count an attempt present in two shard artifacts', () => {
+  it('given one attempt present in two shard artifacts -> when mergeRuns merges them -> then the attempt is counted once', { tags: ['@unit', '@report'] }, () => {
     const shard = run({ attempts: [attempt()] });
     const merged = mergeRuns([shard, { ...shard, runId: 'run-1' }]);
     expect(merged?.attempts).toHaveLength(1);
     expect(merged?.totals.passed).toBe(1);
   });
 
-  it('separates the same test id running under two projects', () => {
+  it('given one test id running under two projects with different outcomes -> when mergeRuns totals them -> then they stay separate and the failure is visible', { tags: ['@unit', '@report'] }, () => {
     // Merging them would hide a failure confined to one browser.
     const merged = mergeRuns([
       run({
@@ -150,7 +150,7 @@ describe('mergeRuns', () => {
     expect(merged?.totals.failed).toBe(1);
   });
 
-  it('reports how many shards contributed', () => {
+  it('given two shard artifacts -> when mergeRuns merges them -> then the number of shards merged is reported', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([
       run({ attempts: [attempt({ testId: 'a' })] }),
       run({ attempts: [attempt({ testId: 'b' })] }),
@@ -160,14 +160,14 @@ describe('mergeRuns', () => {
 });
 
 describe('markdown', () => {
-  it('embeds a marker so CI updates its comment instead of posting a new one', () => {
+  it('given a merged run -> when renderMarkdown renders it -> then the comment marker is embedded so CI updates in place', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     expect(merged).not.toBeNull();
     const out = renderMarkdown({ run: merged!, failures: [] });
     expect(out).toContain(COMMENT_MARKER);
   });
 
-  it('groups failures by kind, because ten of one kind are usually one cause', () => {
+  it('given two failures sharing one kind -> when renderMarkdown renders them -> then they are grouped under that kind with a count', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const out = renderMarkdown({
       run: merged!,
@@ -177,14 +177,14 @@ describe('markdown', () => {
     expect(out).toContain('· 2');
   });
 
-  it('renders object arguments readably rather than as [object Object]', () => {
+  it('given a failing step carrying an object argument -> when renderMarkdown renders it -> then the object is printed readably', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const out = renderMarkdown({ run: merged!, failures: [bundle()] });
     expect(out).toContain("{ name: 'Fitzgerald BJJ' }");
     expect(out).not.toContain('[object Object]');
   });
 
-  it('hides unvalidated heal proposals', () => {
+  it('given a heal proposal that was never validated -> when renderMarkdown renders the report -> then the suggested repairs section is withheld', { tags: ['@unit', '@report'] }, () => {
     // A proposal never re-run against the app is a guess, and a guess in a PR
     // comment gets applied by someone who trusts the tool.
     const merged = mergeRuns([run()]);
@@ -205,7 +205,7 @@ describe('markdown', () => {
     expect(out).not.toContain('Suggested selector repairs');
   });
 
-  it('truncates INSIDE the failures section rather than dropping it', () => {
+  it('given a run holding four thousand failures -> when renderMarkdown renders it -> then the failures section survives and is truncated within the size limit', { tags: ['@unit', '@report'] }, () => {
     // REGRESSION GUARD: dropping whole sections turned a 4000-failure run into
     // a 153-character comment reading "1 section(s) omitted" — discarding the
     // most important section exactly when there was most to say.
@@ -222,7 +222,7 @@ describe('markdown', () => {
     expect(out).toContain('not shown');
   });
 
-  it('reports the hidden count accurately', () => {
+  it('given a run holding four thousand failures -> when renderMarkdown truncates the table -> then the shown and hidden counts add up to the total', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const many = Array.from({ length: 4000 }, (_, i) =>
       bundle({ id: `ev_${i}`, failure: { ...bundle().failure, kind: `kind_${i}` } }),
@@ -234,7 +234,7 @@ describe('markdown', () => {
     expect(shown + hidden).toBe(4000);
   });
 
-  it('keeps a small run whole, with no truncation notice at all', () => {
+  it('given a run holding two failures -> when renderMarkdown renders it -> then nothing is truncated and no notice appears', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const out = renderMarkdown({ run: merged!, failures: [bundle(), bundle({ id: 'ev_2' })] });
     expect(out).not.toContain('not shown');
@@ -243,7 +243,7 @@ describe('markdown', () => {
 });
 
 describe('markdown — intent column', () => {
-  it('falls back to the selector, not a second copy of the title', () => {
+  it('given a failure carrying a selector but no failing step -> when renderMarkdown renders the intent column -> then it shows the selector and the title appears once', { tags: ['@unit', '@report'] }, () => {
     // Printing the title in two adjacent columns reads as a rendering bug and
     // wastes the column that was meant to add information.
     const merged = mergeRuns([run()]);
@@ -259,7 +259,7 @@ describe('markdown — intent column', () => {
     expect([...out.matchAll(/a gym can be found by name/g)]).toHaveLength(1);
   });
 
-  it('prints a dash when there is neither a step nor a selector', () => {
+  it('given a failure carrying neither a step nor a selector -> when renderMarkdown renders the intent column -> then it prints a dash', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const out = renderMarkdown({
       run: merged!,
@@ -270,28 +270,28 @@ describe('markdown — intent column', () => {
 });
 
 describe('markdown — untrusted text', () => {
-  it('wraps content in a fence long enough to contain its own backticks', () => {
+  it('given text containing a triple backtick -> when fence wraps it -> then the fence is long enough to contain it', { tags: ['@unit', '@report'] }, () => {
     // An error message containing ``` would otherwise close the fence early
     // and let the remainder render as markup.
     const out = fence('a ``` b');
     expect(out.startsWith('````')).toBe(true);
   });
 
-  it('escapes a pipe so a title cannot forge a table column', () => {
+  it('given a title containing a pipe -> when cell escapes it -> then the pipe cannot forge a table column', { tags: ['@unit', '@report'] }, () => {
     expect(cell('gyms | admin')).toBe('gyms \\| admin');
   });
 
-  it('flattens newlines that would break out of a table row', () => {
+  it('given a title containing a newline -> when cell escapes it -> then the newline is flattened to a space', { tags: ['@unit', '@report'] }, () => {
     expect(cell('line one\nline two')).toBe('line one line two');
   });
 });
 
 describe('html', () => {
-  it('escapes markup so a test title renders as text', () => {
+  it('given a title containing an img tag -> when escapeHtml escapes it -> then the markup renders as text', { tags: ['@unit', '@report'] }, () => {
     expect(escapeHtml('<img src=x onerror=alert(1)>')).not.toContain('<img');
   });
 
-  it('references nothing external, because the artifact is opened offline', () => {
+  it('given a merged run and a failure -> when renderHtml renders the report -> then it references no external script, stylesheet or asset', { tags: ['@unit', '@report'] }, () => {
     const merged = mergeRuns([run()]);
     const html = renderHtml({ run: merged!, failures: [bundle()] });
     expect(html).not.toMatch(/<script\s+src=/i);
@@ -299,7 +299,7 @@ describe('html', () => {
     expect(html).not.toContain('<link rel="stylesheet"');
   });
 
-  it('NEVER prints the not-checked sentinel as a match count', () => {
+  it('given a candidate whose match count is the not-checked sentinel -> when renderHtml renders it -> then it prints unverified rather than a negative match count', { tags: ['@unit', '@report'] }, () => {
     // REGRESSION GUARD, found against the live app: matchCount is -1 for
     // "no browser has resolved this yet". Rendering it as a number printed
     // "-1 matches — ambiguous" beside the CORRECT candidate, claiming it was
@@ -333,7 +333,7 @@ describe('html', () => {
     expect(html).toContain('unverified');
   });
 
-  it('leads with intent and puts the raw message last', () => {
+  it('given a merged run and a failure -> when renderHtml renders it -> then intent appears before the raw message', { tags: ['@unit', '@report'] }, () => {
     // The stack is what everyone already has; it does not get to be the headline.
     const merged = mergeRuns([run()]);
     const html = renderHtml({ run: merged!, failures: [bundle()] });
@@ -342,7 +342,7 @@ describe('html', () => {
 });
 
 describe('orderFailures', () => {
-  it('puts a real app defect above a locator miss it may have caused', () => {
+  it('given an app_error and a locator_not_found failure -> when orderFailures sorts them -> then the app error leads', { tags: ['@unit', '@report'] }, () => {
     const ordered = orderFailures([
       bundle({ id: 'a', failure: { ...bundle().failure, kind: 'locator_not_found' } }),
       bundle({ id: 'b', failure: { ...bundle().failure, kind: 'app_error' } }),
@@ -352,19 +352,19 @@ describe('orderFailures', () => {
 });
 
 describe('formatArgs', () => {
-  it('renders an object the way a developer would have written it', () => {
+  it('given an object argument -> when formatArgs renders it -> then it reads the way a developer would have written it', { tags: ['@unit', '@report'] }, () => {
     expect(formatArgs([{ name: 'Cork BJJ' }])).toBe("{ name: 'Cork BJJ' }");
   });
 
-  it('does not pair quotes across separate string arguments', () => {
+  it('given two separate string arguments -> when formatArgs renders them -> then each is quoted independently', { tags: ['@unit', '@report'] }, () => {
     expect(formatArgs(['a', 'Cork'])).toBe("'a', 'Cork'");
   });
 
-  it('clips deep nesting instead of printing a wall of it', () => {
+  it('given an argument nested four levels deep -> when formatArgs renders it -> then the deep nesting is clipped', { tags: ['@unit', '@report'] }, () => {
     expect(formatArgs([{ a: { b: { c: { d: 1 } } } }])).toContain('{…}');
   });
 
-  it('handles the empty case', () => {
+  it('given no arguments -> when formatArgs renders them -> then the result is an empty string', { tags: ['@unit', '@report'] }, () => {
     expect(formatArgs([])).toBe('');
   });
 });

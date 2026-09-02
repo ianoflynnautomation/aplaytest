@@ -8,7 +8,7 @@ import { loadRunBundles, parseEvidenceBundle } from '../src/evidence/store.js';
 import { formatFailingStep } from '../src/evidence/types.js';
 
 describe('parseEvidenceBundle', () => {
-  it('rejects a value that is not a bundle', () => {
+  it('given null, a bundle missing required fields, or an unsupported schemaVersion -> when parseEvidenceBundle runs -> then it returns null', { tags: ['@unit', '@evidence-store'] }, () => {
     expect(parseEvidenceBundle(null)).toBeNull();
     expect(parseEvidenceBundle({ schemaVersion: 1 })).toBeNull();
     expect(
@@ -21,7 +21,7 @@ describe('parseEvidenceBundle', () => {
     ).toBeNull();
   });
 
-  it('accepts a bundle with the current schema and required fields', () => {
+  it('given a bundle on the current schema with every required field -> when parseEvidenceBundle runs -> then it returns the bundle carrying its id', { tags: ['@unit', '@evidence-store'] }, () => {
     const parsed = parseEvidenceBundle({
       schemaVersion: 1,
       id: 'ev_1',
@@ -33,7 +33,7 @@ describe('parseEvidenceBundle', () => {
 });
 
 describe('formatFailingStep', () => {
-  it('renders a page-object call or null', () => {
+  it('given a null step and a failed page-object step -> when formatFailingStep runs -> then it returns null and the rendered page-object call respectively', { tags: ['@unit', '@evidence-store'] }, () => {
     expect(formatFailingStep(null)).toBeNull();
     expect(
       formatFailingStep({
@@ -49,7 +49,7 @@ describe('formatFailingStep', () => {
 });
 
 describe('loadRunBundles', () => {
-  it('loads the newest run by name and skips unreadable files', async () => {
+  it('given two run directories where the newest holds one valid and one malformed bundle -> when loadRunBundles reads the root -> then it returns the valid bundle from the newest run and reports the malformed file as skipped', { tags: ['@integration', '@evidence-store'] }, async () => {
     const root = await mkdir(join(tmpdir(), `atest-ev-${Date.now()}`), { recursive: true });
     await mkdir(join(root, 'run-a'), { recursive: true });
     await mkdir(join(root, 'run-b'), { recursive: true });

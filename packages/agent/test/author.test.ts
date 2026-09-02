@@ -37,7 +37,7 @@ const DRAFT = {
 };
 
 describe('author agent', () => {
-  it('plans and drafts in two separate calls', () => {
+  it('given a client queued with a plan and a draft -> when runAuthorAgent runs -> then it makes two separate calls, planning before synthesising', { tags: ['@unit', '@agent'] }, () => {
     // Separated so a human can reject a plan before any code exists. Reviewing
     // prose is cheap; reviewing plausible-looking code is not.
     const client = new FakeLlmClient([{ reply: PLAN }, { reply: DRAFT }]);
@@ -49,7 +49,7 @@ describe('author agent', () => {
     });
   });
 
-  it('stops after planning when asked, spending one call not two', async () => {
+  it('given the planOnly option -> when runAuthorAgent runs -> then it stops at status planned after a single call', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: PLAN }]);
     const result = await runAuthorAgent(
       client,
@@ -60,7 +60,7 @@ describe('author agent', () => {
     expect(client.callCount).toBe(1);
   });
 
-  it('REJECTS a draft that uses a page-object method which does not exist', async () => {
+  it('given a draft naming a page-object method absent from the grounding -> when runAuthorAgent validates it -> then the run is declined naming the invented method', { tags: ['@unit', '@agent'] }, async () => {
     // The prompt asks the model not to invent methods. This is the enforcement
     // that makes that a fact rather than a hope — a spec calling a method that
     // is not there fails at import time, long after the agent looked correct.
@@ -74,7 +74,7 @@ describe('author agent', () => {
     if (result.status === 'declined') expect(result.reason).toContain('filterByCounty');
   });
 
-  it('reports the plan cost even when synthesis then fails', async () => {
+  it('given a paid plan followed by an unparseable draft -> when runAuthorAgent runs -> then status is unavailable and the plan cost is still reported', { tags: ['@unit', '@agent'] }, async () => {
     // Reporting zero for a run that paid for a plan understates the cost of
     // exactly the runs that produced nothing.
     const client = new FakeLlmClient([
@@ -87,7 +87,7 @@ describe('author agent', () => {
     expect(result.costUsd).toBeGreaterThan(0);
   });
 
-  it('degrades to unavailable without a model, spending nothing', async () => {
+  it('given no model is configured -> when runAuthorAgent runs -> then status is unavailable and costUsd is 0', { tags: ['@unit', '@agent'] }, async () => {
     const result = await runAuthorAgent(new UnavailableLlmClient('no key'), {
       goal: 'g',
       grounding: GROUNDING,
@@ -96,7 +96,7 @@ describe('author agent', () => {
     expect(result.costUsd).toBe(0);
   });
 
-  it('puts the shared grounding FIRST so both calls hit the same cache prefix', async () => {
+  it('given a grounding shared by both calls -> when runAuthorAgent builds the prompts -> then each message opens with the same grounding prefix, so the cache hits', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: PLAN }, { reply: DRAFT }]);
     await runAuthorAgent(client, { goal: 'test gym search', grounding: GROUNDING });
 
@@ -106,7 +106,7 @@ describe('author agent', () => {
     expect(second.startsWith('Feature: gyms')).toBe(true);
   });
 
-  it('hands over the exemplar source, not a description of it', async () => {
+  it('given an exemplar carrying its source -> when runAuthorAgent builds the prompt -> then the verbatim exemplar source is included', { tags: ['@unit', '@agent'] }, async () => {
     const client = new FakeLlmClient([{ reply: PLAN }, { reply: DRAFT }]);
     await runAuthorAgent(client, { goal: 'g', grounding: GROUNDING });
     expect(client.requests[0]?.messages[0]?.content).toContain("test('x', async () => {});");
@@ -114,7 +114,7 @@ describe('author agent', () => {
 });
 
 describe('AuthorPlanSchema', () => {
-  it('forces the author to name how its test could fail', () => {
+  it('given a plan with expectedToDieFrom removed -> when AuthorPlanSchema parses it -> then parsing fails, forcing the author to name a mutation', { tags: ['@unit', '@agent'] }, () => {
     // An agent that cannot name a mutation that would break its test has not
     // designed a test.
     const { expectedToDieFrom, ...withoutFailureMode } = PLAN;
@@ -122,11 +122,11 @@ describe('AuthorPlanSchema', () => {
     expect(AuthorPlanSchema.safeParse(withoutFailureMode).success).toBe(false);
   });
 
-  it('rejects a mutation name it does not know', () => {
+  it('given a plan naming an unknown mutation -> when AuthorPlanSchema parses it -> then parsing fails', { tags: ['@unit', '@agent'] }, () => {
     expect(AuthorPlanSchema.safeParse({ ...PLAN, expectedToDieFrom: 'vibes' }).success).toBe(false);
   });
 
-  it('accepts "none" so the agent can admit it, rather than inventing one', () => {
+  it('given a plan whose expectedToDieFrom is none -> when AuthorPlanSchema parses it -> then parsing succeeds, so the agent can admit it rather than invent one', { tags: ['@unit', '@agent'] }, () => {
     expect(AuthorPlanSchema.safeParse({ ...PLAN, expectedToDieFrom: 'none' }).success).toBe(true);
   });
 });
@@ -158,19 +158,19 @@ describe('schema length constraints', () => {
     return offenders;
   };
 
-  it('gives every length-bounded plan field a description the model can see', () => {
+  it('given AuthorPlanSchema -> when its length-bounded fields are inspected -> then every one carries a description the model can see', { tags: ['@unit', '@agent'] }, () => {
     expect(boundedFieldsHaveDescriptions(AuthorPlanSchema)).toEqual([]);
   });
 
-  it('gives every length-bounded draft field a description the model can see', () => {
+  it('given AuthorDraftSchema -> when its length-bounded fields are inspected -> then every one carries a description the model can see', { tags: ['@unit', '@agent'] }, () => {
     expect(boundedFieldsHaveDescriptions(AuthorDraftSchema)).toEqual([]);
   });
 
-  it('gives every length-bounded repair field a description the model can see', () => {
+  it('given RepairChoiceSchema -> when its length-bounded fields are inspected -> then every one carries a description the model can see', { tags: ['@unit', '@agent'] }, () => {
     expect(boundedFieldsHaveDescriptions(RepairChoiceSchema)).toEqual([]);
   });
 
-  it('keeps free-text backstops generous enough not to trip on normal output', () => {
+  it('given the notes field of AuthorDraftSchema -> when its maxLength is inspected -> then the backstop allows at least 2000 characters of normal prose', { tags: ['@unit', '@agent'] }, () => {
     // The backstop guards against pathological output, not against prose.
     const json = z.toJSONSchema(AuthorDraftSchema, { io: 'output' }) as {
       properties: Record<string, { maxLength?: number }>;

@@ -223,7 +223,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
     await emulator?.container?.stop();
   });
 
-  it('round-trips a run through the real service', async () => {
+  it('given a run written to a real blob endpoint -> when it is read back -> then the metadata and routes survive the gzip round trip with nothing skipped', { tags: ['@integration', '@store-azure'] }, async () => {
     const writer = store();
     await writer.ingest(run({ runId: 'roundtrip' }));
     await writer.close();
@@ -244,7 +244,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
    * an SDK. Asserted against a RAW listing, not through the store, because the
    * store would happily round-trip its own mistake.
    */
-  it('writes the documented blob names, even for a run id needing encoding', async () => {
+  it('given a run id containing slashes, spaces and a hash -> when it is written to the service -> then a raw listing shows the documented encoded name and the id decodes back', { tags: ['@integration', '@store-azure'] }, async () => {
     const writer = store();
     await writer.ingest(
       run({ runId: 'refs/heads/main #2', shard: { current: 2, total: 4 } }),
@@ -273,7 +273,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
    * discarding the other run's attempts at worst. Different names cannot race,
    * and this is where that stops being an argument.
    */
-  it('keeps every attempt when eight writers ingest at once', async () => {
+  it('given eight writers ingesting at once -> when the container is read back -> then every attempt survives, because distinct names cannot race', { tags: ['@integration', '@store-azure'] }, async () => {
     const writers = Array.from({ length: 8 }, (_, i) => ({ store: store(), index: i }));
     await Promise.all(
       writers.map(w =>
@@ -295,7 +295,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
     expect(new Set(ids).size).toBe(8);
   });
 
-  it('accumulates shards of one run and counts them as one run', async () => {
+  it('given four shards of one run written concurrently -> when the container is read back -> then all four attempts accumulate under one run', { tags: ['@integration', '@store-azure'] }, async () => {
     const writer = store();
     await Promise.all(
       [1, 2, 3, 4].map(current =>
@@ -318,7 +318,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
     expect((await reader.attempts({ testId: 'shard-1' }))[0]?.runId).toBe('sharded');
   });
 
-  it('re-ingesting a shard overwrites it instead of duplicating it', async () => {
+  it('given a shard re-ingested with different attempts -> when the container is read back -> then the newer attempt replaces the older one', { tags: ['@integration', '@store-azure'] }, async () => {
     const first = store();
     await first.ingest(
       run({ runId: 'idem', shard: { current: 1, total: 1 }, attempts: [attempt({ testId: 'v1' })] }),
@@ -338,7 +338,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
   });
 
   /** The pull-request configuration, against a container that can be checked. */
-  it('read-only leaves the container untouched while still scoring the run', async () => {
+  it('given a read-only store and an existing container -> when a branch run is ingested -> then the branch sees its own run and the blob listing is unchanged', { tags: ['@integration', '@store-azure'] }, async () => {
     const before: string[] = [];
     for await (const blob of service().getContainerClient(container).listBlobsFlat()) {
       before.push(blob.name);
@@ -359,14 +359,14 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
     expect(after.sort()).toEqual(before.sort());
   });
 
-  it('counts runs from the listing without downloading anything', async () => {
+  it('given runs already in the container -> when runCount is read -> then the count is recovered from the listing alone', { tags: ['@integration', '@store-azure'] }, async () => {
     // Cheap to assert here because a wrong answer means the run id is not
     // recoverable from the name, which would also break prune.
     const reader = store();
     expect(await reader.runCount()).toBeGreaterThan(0);
   });
 
-  it('prune deletes the blobs, not just the local index', async () => {
+  it('given an ancient run in the container -> when prune runs with a later cutoff -> then the blobs themselves are deleted from the service', { tags: ['@integration', '@store-azure'] }, async () => {
     const writer = store({ windowDays: null });
     await writer.ingest(run({ runId: 'ancient', startedAt: '2025-01-01T00:00:00.000Z' }));
     await writer.close();
@@ -384,7 +384,7 @@ describe.skipIf(!up)(`BlobHistoryStore against ${SERVICE_URL}`, () => {
     expect(survivors).toEqual([]);
   });
 
-  it('parses the emulator URL into the target the store is actually using', async () => {
+  it('given the live emulator endpoint and container -> when parseHistoryUrl parses it -> then the account, container and service URL match the store configuration', { tags: ['@integration', '@store-azure'] }, async () => {
     // The account-in-the-path form exists precisely for this endpoint, so it
     // is worth checking against the endpoint rather than in isolation.
     const target = parseHistoryUrl(`${required().serviceUrl}/${container}`);

@@ -14,7 +14,11 @@
  */
 
 export { BlobHistoryStore, openBlobHistoryStore, DEFAULT_WINDOW_DAYS, DEFAULT_CONCURRENCY } from './blob-store.js';
-export type { BlobHistoryStoreOptions, SkippedBlob } from './blob-store.js';
+export type {
+  BlobHistoryStoreOptions,
+  OpenBlobHistoryStoreOptions,
+  SkippedBlob,
+} from './blob-store.js';
 
 export { AzureBlobBackend } from './azure-backend.js';
 export type { AzureBlobBackendOptions } from './azure-backend.js';

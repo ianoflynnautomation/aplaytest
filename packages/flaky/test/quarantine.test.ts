@@ -31,7 +31,7 @@ function entry(overrides: Partial<QuarantineEntry> = {}): QuarantineEntry {
 }
 
 describe('effectiveBudget', () => {
-  it('takes the larger of the floor and the ratio', () => {
+  it('given suites of 100 and 1000 tests -> when effectiveBudget resolves the policy -> then the larger of the floor and the ratio is taken', { tags: ['@unit', '@flaky'] }, () => {
     // A small suite gets the floor; a large one gets the percentage.
     expect(effectiveBudget(100, DEFAULT_QUARANTINE_POLICY)).toBe(5);
     expect(effectiveBudget(1000, DEFAULT_QUARANTINE_POLICY)).toBe(20);
@@ -39,14 +39,14 @@ describe('effectiveBudget', () => {
 });
 
 describe('evaluateQuarantinePolicy', () => {
-  it('passes a healthy list', () => {
+  it('given one unexpired quarantine well inside budget -> when evaluateQuarantinePolicy runs -> then the result is ok with no violations', { tags: ['@unit', '@flaky'] }, () => {
     const result = evaluateQuarantinePolicy([entry()], 271, DEFAULT_QUARANTINE_POLICY, NOW);
     expect(result.ok).toBe(true);
     expect(result.violations).toHaveLength(0);
     expect(result.budget).toBe(5);
   });
 
-  it('fails on an expired quarantine', () => {
+  it('given a quarantine whose expiry has passed -> when evaluateQuarantinePolicy runs -> then the result fails with an expired violation', { tags: ['@unit', '@flaky'] }, () => {
     // Expiry is the mechanism that turns "fix or delete promptly" from a
     // convention into something the build enforces.
     const result = evaluateQuarantinePolicy(
@@ -61,7 +61,7 @@ describe('evaluateQuarantinePolicy', () => {
     expect(result.expired).toHaveLength(1);
   });
 
-  it('fails when the budget is exceeded', () => {
+  it('given more quarantines than the budget allows -> when evaluateQuarantinePolicy runs -> then the result fails with a budget-exceeded violation', { tags: ['@unit', '@flaky'] }, () => {
     const many = Array.from({ length: 6 }, (_, i) => entry({ testId: `test-${i}` }));
     const result = evaluateQuarantinePolicy(many, 271, DEFAULT_QUARANTINE_POLICY, NOW);
 
@@ -69,7 +69,7 @@ describe('evaluateQuarantinePolicy', () => {
     expect(result.violations.some(v => v.kind === 'budget-exceeded')).toBe(true);
   });
 
-  it('reports every violation at once rather than only the first', () => {
+  it('given a list both over budget and holding an expired entry -> when evaluateQuarantinePolicy runs -> then both violations are reported together', { tags: ['@unit', '@flaky'] }, () => {
     // Being told about one problem per CI run is how a gate becomes hated.
     const many = [
       ...Array.from({ length: 6 }, (_, i) => entry({ testId: `test-${i}` })),
@@ -80,7 +80,7 @@ describe('evaluateQuarantinePolicy', () => {
     expect(result.violations.map(v => v.kind).sort()).toEqual(['budget-exceeded', 'expired']);
   });
 
-  it('warns about quarantines expiring shortly, soonest first', () => {
+  it('given quarantines expiring at mixed distances -> when evaluateQuarantinePolicy runs -> then the imminent ones are listed soonest first', { tags: ['@unit', '@flaky'] }, () => {
     const result = evaluateQuarantinePolicy(
       [
         entry({ testId: 'later', expiresAt: new Date(NOW + 3 * DAY).toISOString() }),
@@ -98,7 +98,7 @@ describe('evaluateQuarantinePolicy', () => {
 });
 
 describe('buildQuarantineEntry', () => {
-  it('fills defaults so adapters do not re-encode the same policy', () => {
+  it('given only a title and a clock -> when buildQuarantineEntry runs -> then the reason, root cause, score and expiry are filled from policy defaults', { tags: ['@unit', '@flaky'] }, () => {
     const built = buildQuarantineEntry({ title: 'a gym can be found by name', now: NOW });
     expect(built.testId).toBe('a gym can be found by name');
     expect(built.project).toBeNull();
@@ -110,14 +110,14 @@ describe('buildQuarantineEntry', () => {
 });
 
 describe('expiry helpers', () => {
-  it('computes an expiry from the policy window', () => {
+  it('given the default policy window -> when expiryFor computes an expiry -> then daysUntilExpiry reports 14 days', { tags: ['@unit', '@flaky'] }, () => {
     const expires = expiryFor(DEFAULT_QUARANTINE_POLICY, NOW);
     expect(daysUntilExpiry(entry({ expiresAt: expires }), NOW)).toBeCloseTo(14, 5);
   });
 });
 
 describe('renderQuarantineComment', () => {
-  it('is self-documenting, so nobody has to open a dashboard to understand it', () => {
+  it('given a quarantine entry with a reason, cause and issue -> when renderQuarantineComment renders it -> then the comment carries all three and a dated expiry', { tags: ['@unit', '@flaky'] }, () => {
     const lines = renderQuarantineComment(entry(), '0.0.0');
     const text = lines.join('\n');
 
@@ -127,7 +127,7 @@ describe('renderQuarantineComment', () => {
     expect(text).toMatch(/expires \d{4}-\d{2}-\d{2}/);
   });
 
-  it('says plainly when no issue is linked', () => {
+  it('given a quarantine entry with no issue URL -> when renderQuarantineComment renders it -> then the comment says no issue linked', { tags: ['@unit', '@flaky'] }, () => {
     expect(renderQuarantineComment(entry({ issueUrl: null }), '0.0.0').join('\n')).toContain(
       'no issue linked',
     );

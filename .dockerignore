@@ -1,0 +1,39 @@
+# Keep the build context small and the image reproducible.
+#
+# node_modules is the important one: without it Docker uploads a few hundred MB
+# on every build, and worse, a host-built tree can shadow the container's own
+# `npm ci` — producing an image whose dependencies came from a laptop.
+node_modules
+**/node_modules
+
+# Build output. The builder stage regenerates all of it; copying a stale local
+# dist in would produce an image that does not match its own source.
+dist
+**/dist
+**/dist-cjs
+dist-pack
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Test and run artefacts.
+.atest
+**/.atest
+**/test-results
+**/playwright-report
+**/blob-report
+coverage
+**/coverage
+
+.git
+.github
+.claude
+docs
+examples/*/tests
+examples/*/pages
+*.md
+!README.md
+
+.env
+.env.*
+Dockerfile
+.dockerignore

@@ -8,7 +8,7 @@ import {
 } from '../src/locator/stability.js';
 
 describe('parseLocator', () => {
-  it('recognises the durable strategies', () => {
+  it('given getByTestId, getByRole with and without a name, and a data-testid selector -> when parseLocator runs -> then each durable strategy and its value are recognised', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(parseLocator("getByTestId('gym-card-name')")).toMatchObject({
       strategy: 'testid',
       value: 'gym-card-name',
@@ -29,13 +29,13 @@ describe('parseLocator', () => {
     });
   });
 
-  it('falls back to css rather than guessing a durable strategy', () => {
+  it('given an unparsed css selector -> when parseLocator runs -> then the strategy falls back to css rather than a guessed durable one', { tags: ['@unit', '@locator-stability'] }, () => {
     // An unparsed locator must never be mistaken for a stable one, so the
     // fallback is deliberately the low-ranked strategy.
     expect(parseLocator('div.card > span:nth-child(2)')?.strategy).toBe('css');
   });
 
-  it('returns null for absent input instead of a fabricated locator', () => {
+  it('given null, undefined or blank input -> when parseLocator runs -> then it returns null instead of a fabricated locator', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(parseLocator(null)).toBeNull();
     expect(parseLocator(undefined)).toBeNull();
     expect(parseLocator('   ')).toBeNull();
@@ -43,20 +43,20 @@ describe('parseLocator', () => {
 });
 
 describe('stabilityDelta', () => {
-  it('is zero for a like-for-like test id rename', () => {
+  it('given a testid replaced by another testid -> when stabilityDelta runs -> then the delta is 0', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(stabilityDelta('testid', 'testid')).toBe(0);
   });
 
-  it('is negative when a heal would weaken the locator', () => {
+  it('given a testid replaced by text -> when stabilityDelta runs -> then the delta is negative, marking the heal as a weakening', { tags: ['@unit', '@locator-stability'] }, () => {
     // testid → text is the classic "makes it pass, makes it worse" heal.
     expect(stabilityDelta('testid', 'text')).toBeLessThan(0);
   });
 
-  it('is positive when a heal strengthens the locator', () => {
+  it('given a css locator replaced by a testid -> when stabilityDelta runs -> then the delta is positive', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(stabilityDelta('css', 'testid')).toBeGreaterThan(0);
   });
 
-  it('ranks xpath as the least durable option', () => {
+  it('given the STABILITY_RANK table -> when its ranks are compared -> then xpath is the least durable option and testid the most', { tags: ['@unit', '@locator-stability'] }, () => {
     const ranks = Object.values(STABILITY_RANK);
     expect(STABILITY_RANK.xpath).toBe(Math.max(...ranks));
     expect(STABILITY_RANK.testid).toBe(Math.min(...ranks));
@@ -64,18 +64,18 @@ describe('stabilityDelta', () => {
 });
 
 describe('testIdDistance', () => {
-  it('is zero for identical ids', () => {
+  it('given two identical test ids -> when testIdDistance runs -> then the distance is 0', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(testIdDistance('gym-card-name', 'gym-card-name')).toBe(0);
   });
 
-  it('scores a plausible rename far closer than an unrelated id', () => {
+  it('given a plausible rename and an unrelated id -> when testIdDistance runs -> then the rename scores far nearer than the unrelated id and below 0.5', { tags: ['@unit', '@locator-stability'] }, () => {
     const rename = testIdDistance('gym-card-name', 'gym-card-title');
     const unrelated = testIdDistance('gym-card-name', 'checkout-submit-button');
     expect(rename).toBeLessThan(unrelated);
     expect(rename).toBeLessThan(0.5);
   });
 
-  it('ranks a same-container rename ahead of a same-element move to another feature', () => {
+  it('given a same-container rename and a same-element move to another feature -> when testIdDistance runs -> then the rename scores nearer, because prefix disagreement costs more', { tags: ['@unit', '@locator-stability'] }, () => {
     // Elements are renamed far more often than they move between features,
     // so prefix disagreement must cost more than suffix disagreement.
     const sameContainer = testIdDistance('gym-card-name', 'gym-card-title');
@@ -83,7 +83,7 @@ describe('testIdDistance', () => {
     expect(sameContainer).toBeLessThan(otherFeature);
   });
 
-  it('scores a rename and a sibling field identically, because the string cannot tell them apart', () => {
+  it('given a rename and a sibling field of the same container -> when testIdDistance runs -> then both score identically, because the string cannot tell them apart', { tags: ['@unit', '@locator-stability'] }, () => {
     // Honest tie. Separating these is the Tier-1 ranker's job, using the
     // failing assertion's domain arguments — not the string metric's.
     expect(testIdDistance('gym-card-name', 'gym-card-title')).toBe(
@@ -91,13 +91,13 @@ describe('testIdDistance', () => {
     );
   });
 
-  it('keeps a plausible rename under the 0.4 candidate-filter threshold', () => {
+  it('given the canonical gym-card-name to gym-card-title rename -> when testIdDistance runs -> then the score stays under the 0.4 candidate-filter threshold', { tags: ['@unit', '@locator-stability'] }, () => {
     // The heal engine discards candidates above 0.4; the canonical rename
     // case must comfortably survive that filter.
     expect(testIdDistance('gym-card-name', 'gym-card-title')).toBeLessThan(0.4);
   });
 
-  it('never exceeds 1', () => {
+  it('given two entirely unrelated ids -> when testIdDistance runs -> then the distance never exceeds 1', { tags: ['@unit', '@locator-stability'] }, () => {
     expect(testIdDistance('a', 'completely-different-thing-entirely')).toBeLessThanOrEqual(1);
   });
 });

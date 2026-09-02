@@ -37,8 +37,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # @unit only. The @integration half — filesystem, SQLite, Azurite and
+      # the specs that spawn Playwright — runs in the `integration` job below,
+      # which is the one with a browser and a Docker daemon. Splitting on the
+      # tag rather than on file paths means a new boundary test lands in the
+      # right job by saying what it is, with no glob to remember to update.
       - name: Unit tests
-        run: npm test
+        run: npm run test:unit
 
       # The reporter is loaded by `require` from a CommonJS context. Asserting
       # that here is cheaper than discovering it in a consumer's CI.
@@ -138,7 +143,11 @@ jobs:
       #
       # Ubuntu runners have a Docker daemon. Without one the tests skip rather
       # than fail, so this step cannot break a runner that lacks it.
-      - name: Blob history store against Azurite
+      # Every @integration test, of which the Azurite suite is the widest:
+      # filesystem stores, SQLite, the MCP evidence directory and the specs
+      # that spawn a real Playwright run. These are ~15% of the suite and ~95%
+      # of its runtime, which is the whole reason they are not in `build`.
+      - name: Boundary tests (filesystem, SQLite, Azurite, Playwright)
         run: npm run test:integration
 
       # The smoke example fails two tests ON PURPOSE. What is asserted is that

@@ -1,6 +1,6 @@
 {
   "name": "@atest/mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server: the same engine calls the CLI makes, exposed to IDE agents",
   "license": "MIT",
   "type": "module",
@@ -14,13 +14,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@atest/core": "0.0.0",
-    "@atest/flaky": "0.0.0",
-    "@atest/heal": "0.0.0",
-    "@atest/impact": "0.0.0",
+    "@atest/core": "^0.1.0",
+    "@atest/flaky": "^0.1.0",
+    "@atest/heal": "^0.1.0",
+    "@atest/impact": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.3.6",
-    "@atest/author": "0.0.0"
+    "@atest/author": "^0.1.0"
   },
   "exports": {
     ".": {
@@ -30,5 +30,15 @@
   },
   "bin": {
     "atest-mcp": "./dist/bin.js"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ianoflynnautomation/atest.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/ianoflynnautomation/atest#readme",
+  "bugs": {
+    "url": "https://github.com/ianoflynnautomation/atest/issues"
   }
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parsePlaywrightError, splitCallLog, stripCodeFrame } from '../src/taxonomy/parse-error.js';
 
 describe('parsePlaywrightError', () => {
-  it('extracts matcher, locator and the expected/received pair from a text assertion', () => {
+  it('given a toHaveText failure with Locator, Expected, Received and Timeout lines -> when parsePlaywrightError runs -> then the matcher, locator, expected, actual and timeoutMs are extracted', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError(
       [
         `Error: expect(locator).toHaveText(expected) failed`,
@@ -22,7 +22,7 @@ describe('parsePlaywrightError', () => {
     expect(parsed.timeoutMs).toBe(5000);
   });
 
-  it('treats a Timeout: line as an outcome, because Playwright only emits it after waiting', () => {
+  it('given one assertion carrying a Timeout: line and one failing structurally without it -> when parsePlaywrightError runs -> then timedOut is true only for the assertion that waited', { tags: ['@unit', '@taxonomy'] }, () => {
     // Verified against real 1.62 output: an assertion that consumed its budget
     // carries "Timeout: 1000ms"; one that failed structurally (strict mode)
     // carries none. So the line reports what happened, not what was configured.
@@ -48,7 +48,7 @@ describe('parsePlaywrightError', () => {
     expect(immediate.timedOut).toBe(false);
   });
 
-  it('strips the ANSI colour codes Playwright embeds in error.message', () => {
+  it('given an error message carrying the ANSI colour codes Playwright embeds -> when parsePlaywrightError runs -> then the matcher, locator, expected and actual parse as if uncoloured', { tags: ['@unit', '@taxonomy'] }, () => {
     // Captured verbatim from a real run. The escapes split the matcher name
     // mid-word, so every pattern here fails unless they are removed first.
     const real =
@@ -65,7 +65,7 @@ describe('parsePlaywrightError', () => {
     expect(parsed.actual).toBe('element(s) not found');
   });
 
-  it('reads the trailing Error: line as the received value', () => {
+  it('given an assertion failure with no Received: line and a trailing Error: line -> when parsePlaywrightError runs -> then actual is the trailing error text', { tags: ['@unit', '@taxonomy'] }, () => {
     // Modern Playwright dropped "Received:" for assertion failures; the reason
     // now arrives as a second Error: line after the header.
     const parsed = parsePlaywrightError(
@@ -78,14 +78,14 @@ describe('parsePlaywrightError', () => {
     expect(parsed.actual).toBe('element(s) not found');
   });
 
-  it('still honours an explicit Received: line when one is present', () => {
+  it('given an assertion failure carrying an explicit Received string: line -> when parsePlaywrightError runs -> then actual is that received value', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError(
       [`Error: expect(locator).toHaveText(expected) failed`, `Received string: "BJJ Gyms"`].join('\n'),
     );
     expect(parsed.actual).toBe('"BJJ Gyms"');
   });
 
-  it('reports a timeout when the message says one was exceeded', () => {
+  it('given a message reporting Timeout 30000ms exceeded -> when parsePlaywrightError runs -> then timedOut is true and timeoutMs is 30000', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError(
       [`Error: locator.click: Timeout 30000ms exceeded.`, `Call log:`, `  - waiting for getByTestId('x')`].join(
         '\n',
@@ -95,7 +95,7 @@ describe('parsePlaywrightError', () => {
     expect(parsed.timeoutMs).toBe(30000);
   });
 
-  it('recovers the locator from a call log when there is no Locator: line', () => {
+  it('given a timeout message with a call log and no Locator: line -> when parsePlaywrightError runs -> then the locator is recovered from the call log', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError(
       [
         `Error: locator.click: Timeout 30000ms exceeded.`,
@@ -106,19 +106,19 @@ describe('parsePlaywrightError', () => {
     expect(parsed.locator).toBe("getByTestId('search-clear-button')");
   });
 
-  it('recovers the locator from a strict mode violation', () => {
+  it('given a strict mode violation message -> when parsePlaywrightError runs -> then the locator is recovered from the violation text', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError(
       `Error: strict mode violation: getByTestId('gyms-list-item') resolved to 12 elements:`,
     );
     expect(parsed.locator).toBe("getByTestId('gyms-list-item')");
   });
 
-  it('handles a negated matcher', () => {
+  it('given a negated expect(locator).not.toBeVisible() failure -> when parsePlaywrightError runs -> then the matcher is toBeVisible', { tags: ['@unit', '@taxonomy'] }, () => {
     const parsed = parsePlaywrightError('Error: expect(locator).not.toBeVisible() failed');
     expect(parsed.matcher).toBe('toBeVisible');
   });
 
-  it('returns nulls rather than guesses when nothing is parseable', () => {
+  it('given a message with nothing parseable -> when parsePlaywrightError runs -> then matcher, locator, expected and actual are all null rather than guesses', { tags: ['@unit', '@taxonomy'] }, () => {
     // A fabricated locator here would send healing after the wrong element.
     const parsed = parsePlaywrightError('Error: something entirely unexpected');
     expect(parsed.matcher).toBeNull();
@@ -129,7 +129,7 @@ describe('parsePlaywrightError', () => {
 });
 
 describe('splitCallLog', () => {
-  it('separates the summary from the call log', () => {
+  it('given a message containing a Call log: section -> when splitCallLog runs -> then the summary and the call log are returned separately', { tags: ['@unit', '@taxonomy'] }, () => {
     const { summary, callLog } = splitCallLog(
       ['Error: locator.click: Timeout 30000ms exceeded.', 'Call log:', '  - waiting for x'].join('\n'),
     );
@@ -137,7 +137,7 @@ describe('splitCallLog', () => {
     expect(callLog).toContain('waiting for x');
   });
 
-  it('returns a null call log when there is none', () => {
+  it('given a message carrying no call log -> when splitCallLog runs -> then callLog is null', { tags: ['@unit', '@taxonomy'] }, () => {
     expect(splitCallLog('Error: plain').callLog).toBeNull();
   });
 });
@@ -159,7 +159,7 @@ describe('stripCodeFrame', () => {
     '    at /__w/bjjeire/bjjeire/tests/layout/mobile-nav.ui.acceptance.spec.ts:15:44',
   ].join('\n');
 
-  it("removes the user's source, which is not evidence about the failure", () => {
+  it('given a timeout message carrying a quoted source code frame -> when stripCodeFrame runs -> then the quoted user source and the file location are removed', { tags: ['@unit', '@taxonomy'] }, () => {
     const stripped = stripCodeFrame(REAL);
 
     // The line that caused a `navigation_failure` verdict for a click timeout.
@@ -167,14 +167,14 @@ describe('stripCodeFrame', () => {
     expect(stripped).not.toContain('mobile-nav.ui.acceptance.spec.ts:15:44');
   });
 
-  it("keeps Playwright's own prose, including the call log", () => {
+  it('given a timeout message carrying a quoted source code frame -> when stripCodeFrame runs -> then the Playwright summary and call log are kept', { tags: ['@unit', '@taxonomy'] }, () => {
     const stripped = stripCodeFrame(REAL);
 
     expect(stripped).toContain('locator.click: Timeout 10000ms exceeded.');
     expect(stripped).toContain("waiting for getByTestId('navigation-mobile-toggle')");
   });
 
-  it('leaves a message with no code frame untouched', () => {
+  it('given a message with no code frame -> when stripCodeFrame runs -> then the message is returned untouched', { tags: ['@unit', '@taxonomy'] }, () => {
     const plain = 'Error: expect(locator).toBeVisible() failed\nTimeout: 8000ms';
 
     expect(stripCodeFrame(plain)).toBe(plain);
@@ -182,7 +182,7 @@ describe('stripCodeFrame', () => {
 
   // A genuine navigation failure names page.goto in Playwright's own prose,
   // not in a quoted source line. Stripping must not cost us that.
-  it('does not touch a goto named in the error itself', () => {
+  it('given a page.goto failure named in the Playwright error prose -> when stripCodeFrame runs -> then page.goto is kept', { tags: ['@unit', '@taxonomy'] }, () => {
     const real = 'Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/gyms';
 
     expect(stripCodeFrame(real)).toContain('page.goto');

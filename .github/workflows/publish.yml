@@ -10,16 +10,26 @@ name: Publish
 # produced them, and updating a consumer meant a pull request full of blobs
 # nobody could review.
 #
-# ── Why GHCR and not the npm registry ─────────────────────────────────────────
-# GitHub Packages' npm registry only accepts packages scoped to the repository
-# owner. This workspace publishes `atest` and `@atest/core`; renaming both to
-# `@ianoflynnautomation/*` would mean every import in every consumer changes to
-# match a registry rule, and the published code would no longer match the
-# source. GHCR takes the tarballs exactly as `npm pack` produced them.
+# ── npm is the primary channel; GHCR is the escape hatch ─────────────────────
+# The packages publish to npmjs under the `@atest` scope, with real semver
+# ranges between them (`@atest/core@^0.1.0`). That is what makes them ordinary:
+# a consumer writes `npm i -D @atest/runner-playwright`, npm resolves the tree,
+# and Renovate and `npm audit` work on it like anything else.
 #
-# All eleven ship as ONE artifact under one digest, because they resolve each
-# other by `file:` specifier and none is on a public registry — install any one
-# alone and npm 404s looking for @atest/core on registry.npmjs.org.
+# This was not always true. The packages sat on no registry at all, which
+# forced `file:` specifiers between them, an install-all-eleven-or-404 rule, a
+# single-bundle-one-digest publish, and ORAS in every consumer — none of which
+# were design choices. They were symptoms of the packages being nowhere.
+#
+# GitHub Packages was rejected because its npm registry only accepts names
+# scoped to the repository owner: `@atest/core` would have to become
+# `@ianoflynnautomation/atest-core`, changing every import in every consumer to
+# satisfy a registry rule. The `@atest` scope on npmjs was unclaimed, so only
+# the CLI needed renaming — `atest` was squatted, and it is now `@atest/cli`.
+# The BIN is still `atest`, so `npx atest` and `atest` on PATH are unchanged.
+#
+# The OCI bundle below stays for the no-registry path: an air-gapped runner, a
+# fork that cannot authenticate, or pinning a build that was never released.
 #
 # ── Triggers ──────────────────────────────────────────────────────────────────
 #   tag push  → v1.2.3 + latest, attached to the GitHub release
@@ -49,14 +59,129 @@ permissions:
   contents: read
 
 jobs:
+  # ── npm: the channel consumers should actually use ───────────────────────────
+  # Tags only. `npm publish` is IRREVERSIBLE in a way a container tag is not —
+  # a version can be deprecated but never replaced — so it must not fire on
+  # every merge to main. Trunk is distributed by the OCI bundle below and by
+  # the container image, both of which can be overwritten.
+  npm:
+    name: Publish to npm
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Provenance. npm records a signed, verifiable link from the published
+      # tarball back to this workflow run, which is what makes "is this really
+      # from that repo?" answerable without trusting the publisher.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # NO dependency cache, deliberately. A publish is the one job where
+      # restoring something this run did not produce is a supply-chain risk:
+      # a cache entry poisoned from a less-trusted context would be baked into
+      # an immutable, signed release. zizmor flags this as `cache-poisoning`
+      # and it is right to. A cold install costs seconds on a job that runs
+      # once per tag.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+      - run: npm run build
+
+      # The same clean-install check the OCI job runs, before anything is made
+      # permanent. A tarball missing its build output installs cleanly and
+      # fails at import time; on npm that mistake cannot be taken back.
+      - name: Verify the packed tarballs import
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run pack
+          work=$(mktemp -d)
+          cp dist-pack/*.tgz "$work/"
+          cd "$work"
+          npm init -y > /dev/null
+          npm install ./*.tgz --no-audit --no-fund > /dev/null
+          node --input-type=commonjs -e "
+            const r = require('@atest/runner-playwright/reporter');
+            if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load'); }
+          "
+          node --input-type=module -e "
+            const m = await import('@atest/store-azure');
+            if (typeof m.BlobHistoryStore !== 'function') { throw new Error('Azure driver did not load'); }
+          "
+          npx atest --help > /dev/null
+
+      # `--workspaces` publishes every non-private workspace, so the set is
+      # decided by `"private": true` in each package.json rather than by a list
+      # here that can drift from it. @atest/mcp and the examples opt out that way.
+      #
+      # Skips versions already on the registry, so a run that failed partway
+      # can be retried without E403 on the packages that did land.
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # SKIP, do not fail, when there is no token. Publishing to npm is a
+          # deliberate, irreversible step and the rest of the distribution —
+          # the container image and the OCI tarball bundle — is complete
+          # without it. A repo still validating against its own infrastructure
+          # should be able to cut a tag without this job going red.
+          #
+          # Flip this to `exit 1` once NPM_TOKEN exists, so a silent skip can
+          # never be mistaken for a successful release.
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::warning title=npm::NPM_TOKEN is not set — skipping the npm publish."
+            echo "::warning title=npm::The image and the OCI bundle still published; nothing reached npm."
+            exit 0
+          fi
+
+          published=0
+          skipped=0
+          while IFS=$'\t' read -r name version dir; do
+            if npm view "${name}@${version}" version > /dev/null 2>&1; then
+              echo "::notice title=npm::${name}@${version} is already published — skipping"
+              skipped=$((skipped + 1))
+              continue
+            fi
+            echo "::group::publish ${name}@${version}"
+            npm publish --workspace "${dir}" --provenance --access public
+            echo "::endgroup::"
+            published=$((published + 1))
+          done < <(node -e '
+            // Concatenation, not template literals: shellcheck reads a
+            // dollar-brace inside this single-quoted argument as a shell
+            // expansion that was meant to interpolate, and reports SC2016.
+            const { readdirSync, readFileSync } = require("node:fs");
+            for (const d of readdirSync("packages")) {
+              const p = JSON.parse(readFileSync("packages/" + d + "/package.json", "utf8"));
+              if (p.private) continue;
+              process.stdout.write(p.name + "\t" + p.version + "\tpackages/" + d + "\n");
+            }
+          ')
+
+          echo "::notice title=npm::published ${published}, skipped ${skipped}"
+
+  # ── GHCR: the no-registry escape hatch ───────────────────────────────────────
   publish:
     name: Publish tarball bundle
     permissions:
-      contents: write # attaching release assets on a tag
+      contents: write
       packages: write
       id-token: write
       attestations: write
-    uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/npm-tarball-publish-oci.yml@v1
+    # SHA-pinned per bjjeire-ci-templates' CONTRIBUTING. Not `@v1`: that tag
+    # moves only when release-please is run with the opt-in `move-major-tag`
+    # input, so it has sat a release behind before — which is what produced
+    # "error parsing called workflow: workflow was not found" here.
+    uses: ianoflynnautomation/bjjeire-ci-templates/.github/workflows/npm-tarball-publish-oci.yml@e30dc28dd2e56f9830b74187f7504d50ee7a593a  # v1.7.0
     with:
       image: ghcr.io/${{ github.repository_owner }}/atest-packages
       tags: ${{ inputs.tags != '' && inputs.tags

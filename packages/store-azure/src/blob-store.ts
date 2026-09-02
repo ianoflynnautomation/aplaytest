@@ -41,6 +41,8 @@ import {
 } from '@atest/core';
 
 import type { BlobBackend } from './backend.js';
+import { StorageSharedKeyCredential } from '@azure/storage-blob';
+
 import { AzureBlobBackend } from './azure-backend.js';
 import { parseRunBlobName, runBlobName, runsPrefix, type RunBlobName } from './layout.js';
 
@@ -316,13 +318,35 @@ export class BlobHistoryStore implements HistoryStore {
 }
 
 /** Build a store from a parsed `azblob://` URL. The path the CLI takes. */
+export interface OpenBlobHistoryStoreOptions
+  extends Omit<BlobHistoryStoreOptions, 'prefix' | 'windowDays' | 'readOnly'> {
+  /**
+   * Shared-key credential, for an EMULATOR. Unset — the normal case — the
+   * driver uses `DefaultAzureCredential` and authenticates with Entra.
+   *
+   * This exists so the documented Azurite URL form is actually usable: the
+   * emulator has no Entra to federate against, so without a key the CLI can
+   * parse `http://127.0.0.1:10000/devstoreaccount1/…` and then fail to
+   * authenticate against it — a supported-looking target that never works.
+   *
+   * It does NOT weaken production. Keys are refused by the STORAGE ACCOUNT
+   * (`shared_access_key_enabled = false`), so what a client is willing to
+   * construct is irrelevant there; a key passed at a real account fails at the
+   * service. The control lives in Azure, not in this signature.
+   */
+  readonly accountKey?: string | undefined;
+}
+
 export function openBlobHistoryStore(
   target: AzureBlobTarget,
-  options: Omit<BlobHistoryStoreOptions, 'prefix' | 'windowDays' | 'readOnly'> = {},
+  options: OpenBlobHistoryStoreOptions = {},
 ): BlobHistoryStore {
   const backend = new AzureBlobBackend({
     serviceUrl: target.serviceUrl,
     container: target.container,
+    ...(options.accountKey === undefined
+      ? {}
+      : { credential: new StorageSharedKeyCredential(target.account, options.accountKey) }),
   });
   return new BlobHistoryStore(backend, {
     ...options,

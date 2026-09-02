@@ -115,9 +115,27 @@ so with the install command rather than crashing.
 `DefaultAzureCredential`, which covers all three places atest actually runs with
 no configuration:
 
-- GitHub Actions after `azure/login` (OIDC, `id-token: write`)
+- GitHub Actions, via a federated token file (below)
 - inside AKS, via workload identity
 - a developer laptop, via `az login`
+
+**In CI there is no `azure/login` and no `az` CLI.** That action exists to leave
+the Azure CLI authenticated, so using it would mean shipping az — Python and
+~300 MB — into a container image whose point is being small. It is also
+unnecessary: `WorkloadIdentityCredential` is already in the default chain and
+needs exactly three things, the third of which GitHub will mint on request.
+
+```bash
+# audience api://AzureADTokenExchange — what the terraform credential declares
+AZURE_CLIENT_ID=<the identity>
+AZURE_TENANT_ID=<tenant>
+AZURE_FEDERATED_TOKEN_FILE=/tmp/azure-federated-token   # the GitHub OIDC JWT
+```
+
+This is the same mechanism AKS workload identity uses, so the image
+authenticates identically in a cluster and in CI. Verified end to end: with a
+deliberately malformed token, Entra answers `AADSTS50027 — JWT token is invalid
+or malformed`, which is proof the exchange was attempted rather than skipped.
 
 Shared keys are disabled on the account, so there is no key path to fall back
 to and no key to leak.

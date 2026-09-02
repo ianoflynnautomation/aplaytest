@@ -5,7 +5,7 @@ import { quarantineCodemod, releaseCodemod } from '../src/codemod.js';
 const FILE = 'tests/features/gyms/gyms.ui.acceptance.spec.ts';
 
 describe('quarantineCodemod — the three tag shapes in the wild', () => {
-  it('pushes onto an existing tag array', () => {
+  it('given a test carrying an existing tag array -> when quarantineCodemod applies -> then @quarantine is appended to that array', { tags: ['@unit', '@flaky'] }, () => {
     const source = `
 test(
   'Given a gym name, when a visitor searches, then only that gym is displayed',
@@ -22,7 +22,7 @@ test(
     expect(result.after).toContain("'@smoke', '@acceptance', '@quarantine'");
   });
 
-  it('widens a single string tag into an array', () => {
+  it('given a test whose tag is a single string -> when quarantineCodemod applies -> then the tag is widened into an array holding both', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: '@acceptance' }, async () => {});`;
     const result = quarantineCodemod(source, { file: FILE, testTitle: 'a test' });
 
@@ -30,7 +30,7 @@ test(
     expect(result.after).toContain("tag: ['@acceptance', '@quarantine']");
   });
 
-  it('creates an options object when the test has none', () => {
+  it('given a test with no options object -> when quarantineCodemod applies -> then an options object is inserted between the title and the callback, leaving the body intact', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', async () => {});`;
     const result = quarantineCodemod(source, { file: FILE, testTitle: 'a test' });
 
@@ -41,7 +41,7 @@ test(
     expect(result.after).toContain('async () => {}');
   });
 
-  it('adds a tag property to an options object that has none', () => {
+  it('given a test whose options object carries no tag -> when quarantineCodemod applies -> then a tag property is added alongside the existing options', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { timeout: 5000 }, async () => {});`;
     const result = quarantineCodemod(source, { file: FILE, testTitle: 'a test' });
 
@@ -52,7 +52,7 @@ test(
 });
 
 describe('quarantineCodemod — safety', () => {
-  it('is idempotent', () => {
+  it('given a test already tagged @quarantine -> when quarantineCodemod applies -> then the status is already-tagged and nothing is rewritten', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: ['@quarantine'] }, async () => {});`;
     const result = quarantineCodemod(source, { file: FILE, testTitle: 'a test' });
 
@@ -60,7 +60,7 @@ describe('quarantineCodemod — safety', () => {
     expect(result.after).toBeNull();
   });
 
-  it('refuses rather than guessing when a title is ambiguous', () => {
+  it('given two tests sharing one title -> when quarantineCodemod applies -> then the status is ambiguous and a line number is requested', { tags: ['@unit', '@flaky'] }, () => {
     // Silently tagging the first match would quarantine the wrong test.
     const source = `
 test('duplicate', async () => {});
@@ -72,7 +72,7 @@ test('duplicate', async () => {});
     expect(result.message).toContain('line number');
   });
 
-  it('resolves ambiguity with a line number', () => {
+  it('given two tests sharing one title and a line number -> when quarantineCodemod applies -> then the test on that line is tagged', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('duplicate', async () => {});
 test('duplicate', async () => {});
 `;
@@ -82,7 +82,7 @@ test('duplicate', async () => {});
     expect(result.line).toBe(2);
   });
 
-  it('never tags a describe block', () => {
+  it('given a title matching a describe block rather than a test -> when quarantineCodemod applies -> then the status is not-found, so a whole suite is never silenced', { tags: ['@unit', '@flaky'] }, () => {
     // A request to quarantine one test must not silence a whole suite.
     const source = `
 test.describe('Gyms UI acceptance', { tag: ['@gyms'] }, () => {
@@ -97,7 +97,7 @@ test.describe('Gyms UI acceptance', { tag: ['@gyms'] }, () => {
     expect(result.status).toBe('not-found');
   });
 
-  it('reports not-found instead of editing something else', () => {
+  it('given a title matching no test -> when quarantineCodemod applies -> then the status is not-found and nothing is rewritten', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a different test', async () => {});`;
     const result = quarantineCodemod(source, { file: FILE, testTitle: 'missing' });
 
@@ -105,7 +105,7 @@ test.describe('Gyms UI acceptance', { tag: ['@gyms'] }, () => {
     expect(result.after).toBeNull();
   });
 
-  it('leaves the rest of the file untouched', () => {
+  it('given a file holding several tagged tests -> when quarantineCodemod tags one -> then the imports and the sibling tests are left untouched', { tags: ['@unit', '@flaky'] }, () => {
     const source = `import { test } from '@ui/fixtures';
 
 test('first', { tag: ['@acceptance'] }, async () => {});
@@ -120,7 +120,7 @@ test('second', { tag: ['@acceptance'] }, async () => {});
 });
 
 describe('quarantineCodemod — the comment', () => {
-  it('writes a self-documenting block above the test', () => {
+  it('given comment lines describing the quarantine -> when quarantineCodemod applies -> then a block comment carrying them is written above the tagged test', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: ['@acceptance'] }, async () => {});`;
     const result = quarantineCodemod(source, {
       file: FILE,
@@ -139,7 +139,7 @@ describe('quarantineCodemod — the comment', () => {
     expect(result.after).toContain("'@acceptance', '@quarantine'");
   });
 
-  it('indents the comment to match the test, and leaves the test indented', () => {
+  it('given a test nested inside a describe block -> when quarantineCodemod writes the comment -> then the comment and the test keep the original indentation', { tags: ['@unit', '@flaky'] }, () => {
     // Asserted line-by-line, not with toContain: a substring check passes even
     // when the indentation is wrong, which is exactly how the first version of
     // this shipped with `test(` pushed to column zero.
@@ -160,7 +160,7 @@ describe('quarantineCodemod — the comment', () => {
     expect(lines[4]).toBe("  test('a test', { tag: ['@acceptance', '@quarantine'] }, async () => {});");
   });
 
-  it('keeps a top-level test at column zero', () => {
+  it('given a test at the top level -> when quarantineCodemod writes the comment -> then the comment and the test stay at column zero', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: ['@acceptance'] }, async () => {});`;
     const result = quarantineCodemod(source, {
       file: FILE,
@@ -177,7 +177,7 @@ describe('quarantineCodemod — the comment', () => {
 });
 
 describe('releaseCodemod', () => {
-  it('removes the tag again', () => {
+  it('given a test tagged @quarantine alongside another tag -> when releaseCodemod applies -> then @quarantine is removed and the other tag survives', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: ['@acceptance', '@quarantine'] }, async () => {});`;
     const result = releaseCodemod(source, { file: FILE, testTitle: 'a test' });
 
@@ -186,14 +186,14 @@ describe('releaseCodemod', () => {
     expect(result.after).not.toContain('@quarantine');
   });
 
-  it('reports when there is nothing to remove', () => {
+  it('given a test carrying no @quarantine tag -> when releaseCodemod applies -> then the status is not-found', { tags: ['@unit', '@flaky'] }, () => {
     const source = `test('a test', { tag: ['@acceptance'] }, async () => {});`;
     const result = releaseCodemod(source, { file: FILE, testTitle: 'a test' });
 
     expect(result.status).toBe('not-found');
   });
 
-  it('round-trips with the quarantine codemod', () => {
+  it('given a test quarantined then released -> when both codemods have run -> then the source matches the original', { tags: ['@unit', '@flaky'] }, () => {
     const original = `test('a test', { tag: ['@acceptance'] }, async () => {});`;
     const quarantined = quarantineCodemod(original, { file: FILE, testTitle: 'a test' });
     const released = releaseCodemod(quarantined.after ?? '', { file: FILE, testTitle: 'a test' });
@@ -219,7 +219,7 @@ test.describe('Footer UI acceptance', { tag: ['@layout'] }, () => {
 });
 `;
 
-  it('recognises a loop-generated title instead of reporting a bogus not-found', () => {
+  it('given a title generated by a loop over a template literal -> when quarantineCodemod applies -> then the status is parameterised, naming the line, rather than a bogus not-found', { tags: ['@unit', '@flaky'] }, () => {
     // "not found" would read as "your title is wrong" and send someone hunting
     // a typo that does not exist.
     const result = quarantineCodemod(REAL_SHAPE, {
@@ -232,7 +232,7 @@ test.describe('Footer UI acceptance', { tag: ['@layout'] }, () => {
     expect(result.line).toBeGreaterThan(0);
   });
 
-  it('explains that tagging would quarantine every generated case', () => {
+  it('given a parameterised test matched by title -> when quarantineCodemod applies -> then the message explains that tagging would quarantine every generated case', { tags: ['@unit', '@flaky'] }, () => {
     const result = quarantineCodemod(REAL_SHAPE, {
       file: 'tests/layout/footer.ui.acceptance.spec.ts',
       testTitle: 'Given the footer, when a visitor selects "Stores", then /stores is opened',
@@ -242,7 +242,7 @@ test.describe('Footer UI acceptance', { tag: ['@layout'] }, () => {
     expect(result.message).toContain('not the right lever');
   });
 
-  it('does not claim a match when the static fragments do not line up', () => {
+  it('given a title whose static fragments do not line up with any template -> when quarantineCodemod applies -> then the status is not-found', { tags: ['@unit', '@flaky'] }, () => {
     const result = quarantineCodemod(REAL_SHAPE, {
       file: 'tests/layout/footer.ui.acceptance.spec.ts',
       testTitle: 'Given a gym name, when a visitor searches, then the gym is displayed',
@@ -251,7 +251,7 @@ test.describe('Footer UI acceptance', { tag: ['@layout'] }, () => {
     expect(result.status).toBe('not-found');
   });
 
-  it('still tags a plain template literal with no substitutions', () => {
+  it('given a title written as a template literal with no substitutions -> when quarantineCodemod applies -> then the test is tagged', { tags: ['@unit', '@flaky'] }, () => {
     const source = 'test(`a plain title`, { tag: [`@acceptance`] }, async () => {});';
     const result = quarantineCodemod(source, { file: 'x.spec.ts', testTitle: 'a plain title' });
     expect(result.status).toBe('applied');

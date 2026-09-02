@@ -31,7 +31,7 @@ function request(overrides: Partial<RequestRecord> = {}): RequestRecord {
 }
 
 describe('classify — locator resolution', () => {
-  it('reads a strict-mode violation as ambiguous, not as not-found', () => {
+  it('given a strict mode violation naming 12 matched elements -> when classify runs -> then kind is locator_ambiguous', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message: [
@@ -44,7 +44,7 @@ describe('classify — locator resolution', () => {
     expect(c.kind).toBe('locator_ambiguous');
   });
 
-  it('reads "element(s) not found" as a locator problem, not a visibility problem', () => {
+  it('given a toBeVisible timeout reporting element(s) not found -> when classify runs -> then kind is locator_not_found and the kind is healable', { tags: ['@unit', '@taxonomy'] }, () => {
     // This is the discriminator that decides whether healing even applies.
     const c = classify(
       failure({
@@ -64,7 +64,7 @@ describe('classify — locator resolution', () => {
     expect(isHealable(c.kind)).toBe(true);
   });
 
-  it('reads a hidden-but-present element as a visibility assertion', () => {
+  it('given a toBeVisible timeout reporting a received value of hidden -> when classify runs -> then kind is assertion_visibility', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         matcher: 'toBeVisible',
@@ -82,7 +82,7 @@ describe('classify — locator resolution', () => {
     expect(c.kind).toBe('assertion_visibility');
   });
 
-  it('prefers not-actionable over not-found when the element did resolve', () => {
+  it('given a click timeout whose call log resolved the locator to a disabled element -> when classify runs -> then kind is locator_not_actionable', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         timedOut: true,
@@ -100,7 +100,7 @@ describe('classify — locator resolution', () => {
     expect(c.kind).toBe('locator_not_actionable');
   });
 
-  it('classifies an action that never resolved its locator as not-found', () => {
+  it('given a click timeout whose call log never resolved the locator -> when classify runs -> then kind is locator_not_found', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         timedOut: true,
@@ -116,7 +116,7 @@ describe('classify — locator resolution', () => {
 });
 
 describe('classify — assertions and snapshots', () => {
-  it('classifies a text mismatch as a value mismatch', () => {
+  it('given a toHaveText failure with differing expected and received strings -> when classify runs -> then kind is assertion_value_mismatch and the kind is healable', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         matcher: 'toHaveText',
@@ -134,7 +134,7 @@ describe('classify — assertions and snapshots', () => {
     expect(isHealable(c.kind)).toBe(true);
   });
 
-  it('routes a screenshot diff to the visual kind, not to selector healing', () => {
+  it('given a toHaveScreenshot failure reporting differing pixels -> when classify runs -> then kind is visual_diff rather than a selector heal', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         matcher: 'toHaveScreenshot',
@@ -148,14 +148,14 @@ describe('classify — assertions and snapshots', () => {
     expect(c.kind).toBe('visual_diff');
   });
 
-  it('recognises an aria snapshot mismatch', () => {
+  it('given a toMatchAriaSnapshot failure -> when classify runs -> then kind is aria_diff', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(failure({ matcher: 'toMatchAriaSnapshot', message: 'toMatchAriaSnapshot failed' }));
     expect(c.kind).toBe('aria_diff');
   });
 });
 
 describe('classify — the never-heal guards', () => {
-  it('classifies a Zod parse failure as a schema violation and refuses to heal it', () => {
+  it('given a Zod validation error in the failure message -> when classify runs -> then kind is schema_violation and healing is refused', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message:
@@ -167,7 +167,7 @@ describe('classify — the never-heal guards', () => {
     expect(NEVER_HEAL.has(c.kind)).toBe(true);
   });
 
-  it('detects a schema failure carried on a request record even when the message is generic', () => {
+  it('given a generic assertion message and a failed request carrying a schemaError -> when classify runs -> then kind is schema_violation', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message: 'Error: expect(received).toBeTruthy()',
@@ -177,7 +177,7 @@ describe('classify — the never-heal guards', () => {
     expect(c.kind).toBe('schema_violation');
   });
 
-  it('treats an uncaught app exception as the root cause, ahead of any locator rule', () => {
+  it('given a not-found locator failure alongside an uncaught TypeError in the console -> when classify runs -> then kind is app_error and healing is refused', { tags: ['@unit', '@taxonomy'] }, () => {
     // The element is missing *because* the app threw. Healing the selector
     // here would paper over a real bug.
     const c = classify(
@@ -196,7 +196,7 @@ describe('classify — the never-heal guards', () => {
     expect(isHealable(c.kind)).toBe(false);
   });
 
-  it('does NOT let an ordinary console warning veto a legitimate heal', () => {
+  it('given a not-found locator failure alongside an ordinary favicon 404 console warning -> when classify runs -> then kind is locator_not_found and the heal is not vetoed', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         matcher: 'toBeVisible',
@@ -207,7 +207,7 @@ describe('classify — the never-heal guards', () => {
     expect(c.kind).toBe('locator_not_found');
   });
 
-  it('classifies a crashed browser as infra and excludes it from flake statistics', () => {
+  it('given a message reporting the browser has been closed -> when classify runs -> then kind is infra, excluded from flake statistics and not healable', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message: 'Error: Target page, context or browser has been closed',
@@ -219,7 +219,7 @@ describe('classify — the never-heal guards', () => {
     expect(isHealable(c.kind)).toBe(false);
   });
 
-  it('classifies a refused connection as a network error', () => {
+  it('given a page.goto failure reporting net::ERR_CONNECTION_REFUSED -> when classify runs -> then kind is network_error and healing is refused', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message: 'Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/gyms',
@@ -229,7 +229,7 @@ describe('classify — the never-heal guards', () => {
     expect(isHealable(c.kind)).toBe(false);
   });
 
-  it('classifies an unexpected HTTP status as an API finding, not a heal candidate', () => {
+  it('given a toBeOK assertion failure -> when classify runs -> then kind is http_status and healing is refused', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(failure({ matcher: 'toBeOK', message: 'Error: expect(received).toBeOK()' }));
     expect(c.kind).toBe('http_status');
     expect(isHealable(c.kind)).toBe(false);
@@ -237,20 +237,20 @@ describe('classify — the never-heal guards', () => {
 });
 
 describe('classify — auditability and fallbacks', () => {
-  it('always reports the rule that fired and the signals it saw', () => {
+  it('given a strict mode violation message -> when classify runs -> then rule is locator.ambiguous and at least one signal is recorded', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(failure({ message: 'strict mode violation: resolved to 3 elements' }));
     expect(c.rule).toBe('locator.ambiguous');
     expect(c.signals.length).toBeGreaterThan(0);
   });
 
-  it('falls back to unknown rather than guessing, and says so', () => {
+  it('given a failure message matching no rule -> when classify runs -> then kind is unknown with rule none and low confidence', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(failure({ message: 'Error: something nobody anticipated' }));
     expect(c.kind).toBe('unknown');
     expect(c.rule).toBe('none');
     expect(c.confidence).toBe('low');
   });
 
-  it('uses the low-confidence timeout fallback when a test exhausts its budget', () => {
+  it('given a test timeout that consumed its whole budget -> when classify runs -> then kind is assertion_visibility with low confidence', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({ message: 'Test timeout of 30000ms exceeded.', timedOut: true, budgetUsedRatio: 1 }),
     );
@@ -265,7 +265,7 @@ describe('classify — auditability and fallbacks', () => {
    * timed out was routed `navigation_failure` — `heal: never` — because two
    * lines above it the spec read `await page.goto('/about')`.
    */
-  it('ignores the code frame, which is the user source and not the failure', () => {
+  it('given a click timeout whose code frame quotes an earlier page.goto -> when classify runs -> then kind is locator_not_actionable rather than navigation_failure', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({
         message: [
@@ -289,7 +289,7 @@ describe('classify — auditability and fallbacks', () => {
     expect(c.kind).toBe('locator_not_actionable');
   });
 
-  it('still routes a navigation failure Playwright reports in its own prose', () => {
+  it('given a navigation failure Playwright reports in its own prose -> when classify runs -> then kind is network_error, because the transport outranks the navigation', { tags: ['@unit', '@taxonomy'] }, () => {
     const c = classify(
       failure({ message: 'Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/gyms' }),
     );
