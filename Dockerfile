@@ -143,12 +143,24 @@ COPY --from=builder /build/dist-pack/*.tgz /tmp/atest/
 # governs the BUILD; only this governs the IMAGE. Without it the playwright
 # target inherits a browser bundle its base does not have, and the version
 # that lands in the image changes with the date rather than with a commit.
+#
+# npm is then deleted. The runtime image runs `aplaytest`; it never installs
+# packages. Leaving the CLI in the image is how Trivy reports HIGH findings
+# against npm's own tree (tar, pacote, sigstore, brace-expansion, …) for a
+# binary that does not extract untrusted archives. Same RUN so the merged
+# filesystem has no package manager, not a later layer hiding one.
 RUN mkdir -p /opt/atest-runtime \
     && printf '{"name":"atest-runtime","private":true,"version":"0.0.0"}\n' > /opt/atest-runtime/package.json \
     && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
        npm install --prefix /opt/atest-runtime --no-audit --no-fund --omit=dev \
        /tmp/atest/*.tgz "@playwright/test@${PLAYWRIGHT_VERSION}" \
-    && rm -rf /tmp/atest /root/.npm /root/.cache
+    && rm -rf /tmp/atest /root/.npm /root/.cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
+              /usr/local/lib/node_modules/corepack \
+              /usr/local/bin/npm \
+              /usr/local/bin/npx \
+              /usr/local/bin/corepack \
+    && test ! -e /usr/local/lib/node_modules/npm
 
 # NODE_PATH is for CommonJS callers only — a consumer whose script does
 # `require('@aplaytest/runner-playwright/reporter')` from the mounted workspace.
