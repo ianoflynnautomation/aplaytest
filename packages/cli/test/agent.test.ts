@@ -61,7 +61,7 @@ afterEach(async () => {
 });
 
 describe('atest agent author', () => {
-  it('given a model producing a vacuous spec the gate rejects -> when agent author runs -> then it exits on the policy violation and no spec is left on disk', { tags: ['@integration', '@cli'] }, async () => {
+  it('given a model producing a vacuous spec the gate rejects -> when agent author runs -> then it exits on the policy violation and no spec is left on disk', { tags: ['@integration', '@cli'], timeout: 180_000 }, async () => {
     // The property the command exists for. A rejected candidate is green and
     // asserts nothing — strictly worse than generating nothing, because it
     // looks like coverage to whoever reviews the diff.
@@ -74,9 +74,9 @@ describe('atest agent author', () => {
       exitCode: EXIT.POLICY_VIOLATION,
     });
     expect(await exists(join(SMOKE, GENERATED))).toBe(false);
-  }, 180_000);
+  });
 
-  it('given a rejected candidate and the keepRejected flag -> when agent author runs -> then it still exits on the policy violation but the spec is kept on disk', { tags: ['@integration', '@cli'] }, async () => {
+  it('given a rejected candidate and the keepRejected flag -> when agent author runs -> then it still exits on the policy violation but the spec is kept on disk', { tags: ['@integration', '@cli'], timeout: 180_000 }, async () => {
     const client = new FakeLlmClient([
       { reply: PLAN },
       { reply: { spec: VACUOUS_SPEC, methodsUsed: [], needsNewPageObjectMethod: false, notes: '' } },
@@ -88,7 +88,7 @@ describe('atest agent author', () => {
 
     expect(await exists(join(SMOKE, GENERATED))).toBe(true);
     expect(await readFile(join(SMOKE, GENERATED), 'utf8')).toContain('generated candidate');
-  }, 180_000);
+  });
 
   it('given the dry-run flag -> when agent author runs -> then it exits ok having spent no model call', { tags: ['@integration', '@cli'] }, async () => {
     const client = new FakeLlmClient([]);
