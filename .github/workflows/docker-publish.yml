@@ -192,10 +192,15 @@ jobs:
           set -euo pipefail
           require_public() {
             local pkg="$1" ref="$2"
-            local code
-            code=$(curl -sS -o /dev/null -w '%{http_code}' \
-              -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
-              "https://ghcr.io/v2/${OWNER}/${pkg}/manifests/${ref}")
+            local accept='Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
+            local url="https://ghcr.io/v2/${OWNER}/${pkg}/manifests/${ref}"
+            # GHCR always 401s the first manifests request. Public packages then
+            # hand out an anonymous pull token; private ones do not.
+            local tok code
+            tok=$(curl -sS "https://ghcr.io/token?service=ghcr.io&scope=repository:${OWNER}/${pkg}:pull" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("token") or d.get("access_token") or "")')
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -H "$accept" \
+              ${tok:+-H} ${tok:+"Authorization: Bearer $tok"} "$url")
             if [ "$code" = "200" ]; then
               echo "::notice title=GHCR::${pkg}:${ref} is anonymously pullable"
               return 0
