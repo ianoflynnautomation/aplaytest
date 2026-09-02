@@ -167,38 +167,49 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # GitHub does not always let a private repo's packages be public. This job
-  # tries after every successful push so that, once the repository itself is
-  # public, the next main/tag run flips GHCR without a UI visit. Failure here
-  # is a warning: the images still published.
+  # User-namespace GHCR has no REST API to flip visibility, and GITHUB_TOKEN
+  # cannot do it. The first publish of each package is private until someone
+  # clicks Public in the package settings. After that, later pushes stay public.
+  # This job anonymous-pulls the image we just published so a private package
+  # fails the workflow instead of looking like a successful public release.
   visibility:
     name: GHCR packages public
-    needs: [cli]
+    needs: [cli, playwright]
     if: always() && needs.cli.result == 'success' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      packages: write
+      contents: read
     steps:
-      - name: Set container packages public
+      - name: Require anonymous pulls
         env:
-          GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
+          CLI_TAG: ${{ needs.cli.outputs.image-tag }}
+          PW_TAG: ${{ needs.playwright.outputs.image-tag }}
+          PW_RESULT: ${{ needs.playwright.result }}
         shell: bash
         run: |
           set -euo pipefail
-          set_public() {
-            local pkg="$1"
-            if gh api --method PUT "/user/packages/container/${pkg}/visibility" \
-                 -f visibility=public >/dev/null 2>&1 \
-              || gh api --method PUT "/users/${OWNER}/packages/container/${pkg}/visibility" \
-                 -f visibility=public >/dev/null 2>&1; then
-              echo "::notice title=GHCR::${pkg} is public"
+          require_public() {
+            local pkg="$1" ref="$2"
+            local code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+              "https://ghcr.io/v2/${OWNER}/${pkg}/manifests/${ref}")
+            if [ "$code" = "200" ]; then
+              echo "::notice title=GHCR::${pkg}:${ref} is anonymously pullable"
               return 0
             fi
-            echo "::warning title=GHCR::Could not mark ${pkg} public via API (common while the repository is still private)."
-            echo "::warning title=GHCR::After the repo is public, re-run this workflow or set https://github.com/users/${OWNER}/packages/container/${pkg}/settings to Public."
+            echo "::error title=GHCR::${pkg} is not public (HTTP ${code} for tag ${ref})."
+            echo "GitHub has no API to change visibility of a personal-account package."
+            echo "Open https://github.com/users/${OWNER}/packages/container/${pkg}/settings"
+            echo "Danger Zone → Change visibility → Public. One click; later pushes stay public."
+            return 1
           }
-          set_public aplaytest
-          set_public aplaytest-playwright
+          failed=0
+          require_public aplaytest "${CLI_TAG:-main}" || failed=1
+          if [ "$PW_RESULT" = "success" ]; then
+            require_public aplaytest-playwright "${PW_TAG:-latest}" || failed=1
+          fi
+          exit "$failed"
 
