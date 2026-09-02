@@ -117,12 +117,12 @@ export interface HubFile {
  * feature's page object and the graph correctly, uselessly, selects almost
  * everything. Reporting the hub explains WHY a selection did not narrow,
  * instead of leaving someone to conclude the tool is broken.
- */
-/**
- * @param threshold  share of specs a file must reach to count as a hub
- * @param minSpecs   below this, "most specs" is not a meaningful statement —
- *                   in a two-spec project anything reaching one spec is 50%,
- *                   and calling that a hub would suppress selection entirely
+ *
+ * @param graph - Import graph from `buildGraph`.
+ * @param threshold - Share of specs a file must reach to count as a hub.
+ * @param minSpecs - Below this, "most specs" is not meaningful: in a two-spec
+ *   project anything reaching one spec is 50%, and calling that a hub would
+ *   suppress selection entirely.
  */
 export function hubFiles(graph: ImportGraph, threshold = 0.8, minSpecs = 5): HubFile[] {
   const total = graph.specs.length;

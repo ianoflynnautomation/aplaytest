@@ -92,6 +92,28 @@ export interface RouteInputs {
   readonly coverage: RouteCoverage;
 }
 
+/**
+ * Select which specs a diff should run.
+ *
+ * Guards bound what the import-graph trade can cost: full-suite triggers,
+ * hubs, unattributable specs, and an optional route-coverage signal that
+ * survives a shared fixture barrel. A model is not involved.
+ *
+ * @param graph - Import graph from `buildGraph`.
+ * @param changed - Repo-relative paths that changed.
+ * @param config - Triggers, always-run tags, and the full-suite threshold.
+ * @param routeInputs - Optional ownership + coverage, used before the graph
+ *   when present.
+ * @returns Either a partial selection with a reason per spec, or `mode: 'full'`
+ *   with an explanation of why nothing was skipped.
+ *
+ * @example
+ * ```ts
+ * const graph = buildGraph({ rootDir: process.cwd() });
+ * const selection = selectTests(graph, ['src/pages/gyms.page.ts']);
+ * await playwright.test(toPlaywrightArgs(selection));
+ * ```
+ */
 export function selectTests(
   graph: ImportGraph,
   changed: readonly string[],

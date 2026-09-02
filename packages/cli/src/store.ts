@@ -39,6 +39,10 @@ export interface OpenStoreResult {
  * at one store without threading a flag through every `npx atest` invocation —
  * and so that forgetting one invocation degrades to the same store as the rest
  * rather than to a throwaway.
+ *
+ * @param flag - The `--db` value. Empty or omitted falls through to the env.
+ * @param env - Process environment, injected so tests never touch `process.env`.
+ * @returns A SQLite path, an `azblob://` URL, or `:memory:`.
  */
 export function resolveHistoryUrl(flag: string | undefined, env: NodeJS.ProcessEnv): string {
   const fromFlag = flag?.trim();
@@ -77,6 +81,18 @@ async function openBlobStore(
   );
 }
 
+/**
+ * Open a `HistoryStore` for a URL resolved by {@link resolveHistoryUrl}.
+ *
+ * The Azure driver is imported dynamically and only when the URL asks for it,
+ * so `atest --help` in a repo that never installed `@atest/store-azure` does
+ * not crash.
+ *
+ * @param url - SQLite path, `azblob://…`, or `:memory:`.
+ * @param env - Read for `ATEST_BLOB_ENDPOINT_SUFFIX` and `AZURE_STORAGE_KEY`.
+ * @returns The store, the parsed target, and a one-line description.
+ * @throws {UsageError} When the URL asks for Azure and the driver is not installed.
+ */
 export async function openHistoryStore(
   url: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -104,6 +120,5 @@ export async function openHistoryStore(
  * symptom — "insufficient data" — is what a correctly working engine says too.
  */
 export function storeWarnings(store: HistoryStore): { name: string; reason: string }[] {
-  const skipped = (store as { skipped?: readonly { name: string; reason: string }[] }).skipped;
-  return skipped === undefined ? [] : [...skipped];
+  return store.skipped === undefined ? [] : [...store.skipped];
 }

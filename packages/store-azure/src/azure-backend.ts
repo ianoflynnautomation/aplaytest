@@ -1,13 +1,11 @@
 /**
  * `BlobBackend` over Azure Blob Storage.
  *
- * The only file in this package that imports an Azure SDK, and the only one
- * that can fail for a reason that is not atest's fault. That is why the error
- * translation is here and is as specific as it is: the three things that go
- * wrong in practice — no credential, a role assignment that has not propagated,
- * a container nobody created — all surface from the SDK as a bare `RestError`
- * with a status code, and a CI job that prints "403" tells whoever is on call
- * nothing about which of the three it is or what to do next.
+ * Error translation lives here because this is where SDK `RestError`s surface.
+ * The three things that go wrong in practice — no credential, a role
+ * assignment that has not propagated, a container nobody created — all arrive
+ * as a bare status code, and a CI job that prints "403" tells whoever is on
+ * call nothing about which of the three it is or what to do next.
  */
 
 import type { TokenCredential } from '@azure/core-auth';
@@ -91,10 +89,10 @@ function describe(error: unknown, action: string, target: string): Error {
     case 404:
       return new Error(
         `${detail} — not found (404).\n` +
-          '  The storage account or container does not exist. The container is created by\n' +
-          '  terraform (storage_atest_containers), not by atest: a client that creates its\n' +
-          '  own container needs account-level write, which is far more than reading\n' +
-          '  history should ever require.',
+          '  The storage account or container does not exist. Provision the container out\n' +
+          '  of band (Terraform, Bicep, or the Azure portal) — atest never creates it.\n' +
+          '  A client that creates its own container needs account-level write, which is\n' +
+          '  far more than reading history should ever require.',
       );
     default:
       return new Error(`Azure returned ${String(error.statusCode ?? '?')} for ${detail}: ${error.message}`);

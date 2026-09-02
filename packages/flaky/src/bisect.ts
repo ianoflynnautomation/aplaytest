@@ -15,7 +15,7 @@ import { runPlaywright, type PlaywrightRunOptions } from '@atest/runner-playwrig
 
 import type { FlakeClass } from './classify.js';
 
-export type BisectDimension = 'workers' | 'isolation' | 'repeat';
+export type BisectDimension = 'workers' | 'isolation';
 
 export interface BisectProbe {
   readonly dimension: BisectDimension;

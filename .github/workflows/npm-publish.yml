@@ -1,0 +1,120 @@
+name: Publish to npm
+
+# The public, irreversible channel. `npm publish` cannot replace a version —
+# it can only be deprecated — so this workflow is tags only. Trunk is
+# distributed by oci-publish.yml and docker-publish.yml, both of which can
+# overwrite a tag.
+#
+# Independent of OCI and of the container image: a failed GHCR push must not
+# block npm, and a missing NPM_TOKEN must not look like the air-gap bundle
+# failed.
+#
+# The BIN is `atest`. The package is `@atest/cli` because the unscoped name
+# `atest` was already taken on npmjs.
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Provenance. npm records a signed, verifiable link from the published
+      # tarball back to this workflow run, which is what makes "is this really
+      # from that repo?" answerable without trusting the publisher.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # NO dependency cache, deliberately. A publish is the one job where
+      # restoring something this run did not produce is a supply-chain risk:
+      # a cache entry poisoned from a less-trusted context would be baked into
+      # an immutable, signed release. zizmor flags this as `cache-poisoning`
+      # and it is right to. A cold install costs seconds on a job that runs
+      # once per tag.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+      - run: npm run build
+
+      # The same clean-install check the OCI workflow runs, before anything is
+      # made permanent. A tarball missing its build output installs cleanly and
+      # fails at import time; on npm that mistake cannot be taken back.
+      - name: Verify the packed tarballs import
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run pack
+          work=$(mktemp -d)
+          cp dist-pack/*.tgz "$work/"
+          cd "$work"
+          npm init -y > /dev/null
+          npm install ./*.tgz --no-audit --no-fund > /dev/null
+          node --input-type=commonjs -e "
+            const r = require('@atest/runner-playwright/reporter');
+            if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load'); }
+          "
+          node --input-type=module -e "
+            const m = await import('@atest/store-azure');
+            if (typeof m.BlobHistoryStore !== 'function') { throw new Error('Azure driver did not load'); }
+          "
+          npx atest --help > /dev/null
+
+      # `--workspaces` publishes every non-private workspace, so the set is
+      # decided by `"private": true` in each package.json rather than by a list
+      # here that can drift from it. The examples opt out that way.
+      #
+      # Skips versions already on the registry, so a run that failed partway
+      # can be retried without E403 on the packages that did land.
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error title=npm::NPM_TOKEN is not set. Add it as a repository secret and re-run this tag."
+            exit 1
+          fi
+
+          published=0
+          skipped=0
+          while IFS=$'\t' read -r name version dir; do
+            if npm view "${name}@${version}" version > /dev/null 2>&1; then
+              echo "::notice title=npm::${name}@${version} is already published — skipping"
+              skipped=$((skipped + 1))
+              continue
+            fi
+            echo "::group::publish ${name}@${version}"
+            npm publish --workspace "${dir}" --provenance --access public
+            echo "::endgroup::"
+            published=$((published + 1))
+          done < <(node -e '
+            // Concatenation, not template literals: shellcheck reads a
+            // dollar-brace inside this single-quoted argument as a shell
+            // expansion that was meant to interpolate, and reports SC2016.
+            const { readdirSync, readFileSync } = require("node:fs");
+            for (const d of readdirSync("packages")) {
+              const p = JSON.parse(readFileSync("packages/" + d + "/package.json", "utf8"));
+              if (p.private) continue;
+              process.stdout.write(p.name + "\t" + p.version + "\tpackages/" + d + "\n");
+            }
+          ')
+
+          echo "::notice title=npm::published ${published}, skipped ${skipped}"

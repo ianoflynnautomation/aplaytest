@@ -48,7 +48,7 @@ atest/
 │   ├── llm/                          # @atest/llm
 │   │   └── src/
 │   │       ├── client.ts             #   LlmClient interface
-│   │       ├── providers/            #   anthropic.ts | openai.ts | ollama.ts
+│   │       ├── providers/            #   anthropic.ts | unavailable.ts (openai/ollama not implemented)
 │   │       ├── structured.ts         #   zod → tool schema, validated decode + repair
 │   │       ├── cache.ts              #   prompt caching + on-disk response cache
 │   │       └── budget.ts             #   token/cost accounting, hard stops

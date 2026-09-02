@@ -162,9 +162,9 @@ export const getFailure = defineTool({
       ...(include.has('network') ? { network: bundle.network } : {}),
       ...(include.has('console') ? { console: bundle.console } : {}),
       screenshot:
-        bundle.visual.screenshotPath === null
-          ? null
-          : `atest://failures/${bundle.id}/screenshot`,
+        // A path the client can open, not a resource URI this server does not
+        // register. Screenshots are never inlined — they blow the token budget.
+        bundle.visual.screenshotPath,
     };
   },
 });
@@ -258,8 +258,8 @@ export const proposeHealTool = defineTool({
   title: 'Propose a selector heal',
   description:
     'Computes a patch for a drifted selector and returns it as data. Does NOT write anything ' +
-    'and does NOT validate — safe to call while exploring. Use atest_apply_heal to write, ' +
-    'which requires explicit confirmation.',
+    'and does NOT validate — safe to call while exploring. To apply, run `atest heal --apply` ' +
+    'from the CLI after showing the diff to the user.',
   schema: z.object({ evidenceId: z.string(), constantsFile: z.string() }),
   async handler(input, context) {
     const bundle = await findBundle(context, input.evidenceId);

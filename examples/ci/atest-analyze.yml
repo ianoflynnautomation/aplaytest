@@ -8,26 +8,7 @@
 # It is `continue-on-error` and gates nothing. Its only job is to build the
 # history that flake scoring needs, and to say what it sees.
 #
-# ── Why this job exists ───────────────────────────────────────────────────────
-# Runs 33253028409 (main) and 33251984798 (PR) both went red with ZERO failed
-# tests. Six tests passed on retry, `fail-on-flaky: true` fired, and on main
-# that also skipped `promote_images` — images built, scanned, and never
-# promoted. The gate has no memory: it cannot tell one bad night from a test
-# that has flipped every week for a month. This job gives it one.
-#
-# ── Placement (bjjeire-java) ──────────────────────────────────────────────────
-#   ci-main.yml:  needs: acceptance_ephemeral   artifact: playwright-json-results
-#   ci-pr.yml:    needs: compose_smoke          artifact: playwright-docker-json-results
-#
-# Do NOT add it to the `*_complete` aggregator. It is advisory, and a job that
-# cannot change the merge verdict must not sit in branch protection — a broken
-# analyzer would otherwise block every merge.
-#
-# ── Where history lives ───────────────────────────────────────────────────────
-# An Azure Blob container, as an append-only log of run records: one immutable
-# object per run and shard, partitioned by date. No download step, no upload
-# step, no ETag precondition, because there is no single file to move. See
-# docs/12-azure-history.md.
+# Pin the called workflow to a tag or SHA once you have one, not `@main`.
 #
 # Leave `history-account` empty and everything still runs — the job scores this
 # run alone against a throwaway store, so verdicts read "insufficient data" and
@@ -35,32 +16,25 @@
 
 atest_analyze:
   name: Flake Analysis (atest)
-  needs: acceptance_ephemeral # PR: compose_smoke
+  needs: test # the job that uploaded the Playwright JSON artifact
   # `always()` because the interesting runs are the red ones. Skipped upstream
   # means no suite ran, so there is nothing to analyse.
-  if: always() && needs.acceptance_ephemeral.result != 'skipped'
+  if: always() && needs.test.result != 'skipped'
   permissions:
     contents: read
     actions: read
     packages: read # the atest IMAGE is pulled from GHCR — the job runs in it
     id-token: write # mints the OIDC token for AZURE_FEDERATED_TOKEN_FILE
     pull-requests: write # only needed with comment-on-pr
-  # Lives in the atest repo, NOT in bjjeire-ci-templates. It runs `npx atest`
-  # and parses atest's verdict JSON, so no other project could call it — and a
-  # shared template repository holding a product-specific workflow makes its
-  # whole catalog untrustworthy to read.
-  #
-  # atest is PRIVATE, so the calling repo must be owned by the same account and
-  # atest's Settings -> Actions -> General -> Access must be "Accessible from
-  # repositories owned by the user". Otherwise this fails at parse time with
-  # "workflow was not found", which reads as a typo rather than a permission.
+  # Pin to a version tag after the first atest release (`v0.1.0`), not `@main`.
   uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@main
   with:
-    results-artifact: playwright-json-results # PR: playwright-docker-json-results
+    results-artifact: playwright-json-results
     history-account: ${{ vars.ATEST_HISTORY_ACCOUNT }}
-    # Namespaces this repo's history inside a shared account. ci-main and ci-pr
-    # must use the SAME prefix — the PR scores against the baseline main writes.
-    history-prefix: bjjeire-java
+    # Namespaces this repo's history inside a shared account. The job that
+    # writes (usually main) and the job that reads (usually PRs) must use the
+    # SAME prefix — the PR scores against the baseline main writes.
+    history-prefix: my-suite
     history-window-days: 90
     history-retain-days: 90
     # comment-on-pr: true          # PR only
@@ -72,8 +46,8 @@ atest_analyze:
     # Read-only on the history account. Used off main.
     AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
     AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    # The main-branch-only writer. Omit it on ci-pr.yml: a pull request has no
-    # use for a credential it is not allowed to write with, and leaving it out
-    # means the read-only path cannot be turned into a writing one by editing
-    # one line of YAML.
+    # The main-branch-only writer. Omit it on the PR workflow: a pull request
+    # has no use for a credential it is not allowed to write with, and leaving
+    # it out means the read-only path cannot be turned into a writing one by
+    # editing one line of YAML.
     ATEST_HISTORY_CLIENT_ID: ${{ secrets.ATEST_HISTORY_CLIENT_ID }} # main only

@@ -20,4 +20,4 @@ export { buildMutants, applyMutant, stripMutant, hasMutant, MEANINGFUL_CLASSES }
 export type { Mutant, MutantName, MutantClass, MutantOptions } from './mutants.js';
 
 export { ground } from './ground.js';
-export type { GroundingBundle, GroundOptions } from './ground.js';
+export type { GroundingBundle, GroundOptions, ExemplarSpec } from './ground.js';

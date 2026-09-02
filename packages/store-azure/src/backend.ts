@@ -17,7 +17,7 @@ export interface BlobBackend {
   remove(name: string): Promise<void>;
 }
 
-/** In-memory `BlobBackend`, for tests and for `atest doctor --dry-run`. */
+/** In-memory `BlobBackend`, for unit tests and dry-run store construction. */
 export class MemoryBlobBackend implements BlobBackend {
   private readonly blobs = new Map<string, Uint8Array>();
 

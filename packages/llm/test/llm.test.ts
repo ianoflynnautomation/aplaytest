@@ -36,6 +36,14 @@ describe('degradation — no key is not a crash', () => {
     expect(client.available).toBe(false);
   });
 
+  it('given provider none and a present API key -> when createLlmClient builds a client -> then the client reports unavailable rather than calling Anthropic', { tags: ['@unit', '@llm'] }, () => {
+    const client = createLlmClient({
+      provider: 'none',
+      env: { ANTHROPIC_API_KEY: 'sk-test' },
+    });
+    expect(client.available).toBe(false);
+  });
+
   it('given an environment carrying an API key -> when createLlmClient builds a client -> then the client is available and maps the heal role to its model', { tags: ['@unit', '@llm'] }, () => {
     const client = createLlmClient({ env: { ANTHROPIC_API_KEY: 'sk-test' } });
     expect(client.available).toBe(true);

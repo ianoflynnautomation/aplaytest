@@ -27,6 +27,9 @@ export interface TouchedConstant {
 export interface PatchResult {
   readonly status: PatchStatus;
   readonly file: string;
+  /** Literal that was searched for. Stored so revert does not scrape `message`. */
+  readonly from: string;
+  readonly to: string;
   readonly before: string;
   readonly after: string | null;
   readonly touched: readonly TouchedConstant[];
@@ -83,6 +86,8 @@ export function patchConstant(sourceText: string, input: PatchInput): PatchResul
     return {
       status: 'unchanged',
       file: input.file,
+      from: input.from,
+      to: input.to,
       before: sourceText,
       after: null,
       touched: [],
@@ -98,6 +103,8 @@ export function patchConstant(sourceText: string, input: PatchInput): PatchResul
     return {
       status: 'not-found',
       file: input.file,
+      from: input.from,
+      to: input.to,
       before: sourceText,
       after: null,
       touched: [],
@@ -122,6 +129,8 @@ export function patchConstant(sourceText: string, input: PatchInput): PatchResul
   return {
     status: 'applied',
     file: input.file,
+    from: input.from,
+    to: input.to,
     before: sourceText,
     after: source.getFullText(),
     touched,

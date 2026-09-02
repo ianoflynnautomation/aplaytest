@@ -340,6 +340,26 @@ function forMatching(failure: ClassifiableFailure): ClassifiableFailure {
   };
 }
 
+/**
+ * Classify a Playwright failure into a {@link FailureKind}.
+ *
+ * First matching rule wins. The returned `rule` and `signals` are what make a
+ * wrong verdict debuggable — the rest of the system routes on this decision.
+ *
+ * @param input - Message, stack, matcher name, timeout flag, and optional
+ *   console/network evidence.
+ * @returns The kind, the rule that fired, a confidence, and the signals it saw.
+ *
+ * @example
+ * ```ts
+ * const verdict = classify({
+ *   message: "Error: locator('getByTestId('gym-card-name')') resolved to 0 elements",
+ *   stack: '',
+ *   timedOut: true,
+ * });
+ * // verdict.kind === 'locator_not_found'
+ * ```
+ */
 export function classify(input: ClassifiableFailure): Classification {
   const failure = forMatching(input);
 
@@ -369,6 +389,11 @@ export function classify(input: ClassifiableFailure): Classification {
 }
 
 /** Exposed for the CLI's `atest doctor --rules` and for prompt-corpus tooling. */
+/**
+ * The ordered rule list, for diagnostics and `atest doctor`.
+ *
+ * @returns Rule name and kind, in evaluation order (first match wins).
+ */
 export function listRules(): ReadonlyArray<{ name: string; kind: FailureKind }> {
   return [...RULES, TEST_TIMEOUT_RULE].map(r => ({ name: r.name, kind: r.kind }));
 }

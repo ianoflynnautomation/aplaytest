@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { defineAtestConfig } from '../src/config/schema.js';
+import { ATEST_VERSION } from '../src/version.js';
 
 describe('defineAtestConfig', () => {
   it('given an empty config object -> when defineAtestConfig resolves it -> then the safe defaults apply: strict mode, propose-only healing and collateral validation', { tags: ['@unit', '@config'] }, () => {
@@ -64,5 +67,35 @@ describe('defineAtestConfig', () => {
     const c = defineAtestConfig({ mode: 'assisted', heal: { aggressiveness: 'conservative' } });
     expect(c.mode).toBe('assisted');
     expect(c.heal.aggressiveness).toBe('conservative');
+    expect(c.heal.allowedStrategies).toEqual(['testid', 'role']);
+    expect(c.heal.validationRuns).toBe(5);
+    expect(c.heal.apply).toBe('propose');
+  });
+
+  it('given heal.aggressiveness aggressive and no other heal fields -> when defineAtestConfig resolves it -> then the aggressive preset fills strategies and apply', { tags: ['@unit', '@config'] }, () => {
+    const c = defineAtestConfig({ heal: { aggressiveness: 'aggressive' } });
+    expect(c.heal.strategies).toEqual(['selector', 'flow']);
+    expect(c.heal.apply).toBe('local');
+  });
+
+  it('given heal.aggressiveness aggressive and an explicit apply -> when defineAtestConfig resolves it -> then the explicit field wins over the preset', { tags: ['@unit', '@config'] }, () => {
+    const c = defineAtestConfig({ heal: { aggressiveness: 'aggressive', apply: 'propose' } });
+    expect(c.heal.apply).toBe('propose');
+    expect(c.heal.strategies).toEqual(['selector', 'flow']);
+  });
+
+  it('given llm.provider set to an unimplemented value -> when defineAtestConfig validates it -> then it throws rather than silently using Anthropic', { tags: ['@unit', '@config'] }, () => {
+    expect(() =>
+      defineAtestConfig({ llm: { provider: 'openai' } } as never),
+    ).toThrowError(/Invalid atest\.config\.ts/);
+  });
+});
+
+describe('ATEST_VERSION', () => {
+  it('given the published package.json -> when ATEST_VERSION is read -> then it matches the package version', { tags: ['@unit', '@config'] }, () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version: string;
+    };
+    expect(ATEST_VERSION).toBe(pkg.version);
   });
 });

@@ -135,15 +135,30 @@ export const ROUTING: Readonly<Record<FailureKind, KindRouting>> = {
   },
 };
 
+/**
+ * How far a heal may go for this kind. `NEVER_HEAL` wins over `ROUTING`.
+ *
+ * @param kind - A classified failure kind.
+ * @returns `'never'`, `'propose-only'`, or `'full'`.
+ */
 export function healEligibility(kind: FailureKind): HealEligibility {
   if (NEVER_HEAL.has(kind)) return 'never';
   return ROUTING[kind].heal;
 }
 
+/**
+ * @param kind - A classified failure kind.
+ * @returns `true` when a heal may be proposed (not necessarily auto-applied).
+ */
 export function isHealable(kind: FailureKind): boolean {
   return healEligibility(kind) !== 'never';
 }
 
+/**
+ * @param kind - A classified failure kind.
+ * @returns `false` for infra, HTTP status, and schema violations — those are
+ *   not evidence of flakiness.
+ */
 export function countsTowardFlakeStats(kind: FailureKind): boolean {
   return ROUTING[kind].flake !== 'excluded';
 }

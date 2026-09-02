@@ -53,6 +53,15 @@ export interface HistoryStore {
   runCount(): Promise<number>;
   prune(olderThanIso: string): Promise<number>;
   close(): Promise<void>;
+  /**
+   * Records the driver listed but could not read.
+   *
+   * Present on the Azure blob driver (truncated uploads, schema-skewed
+   * objects). Absent on SQLite and memory, which either throw or never skip.
+   * Surfaced rather than thrown so one unreadable object among thousands
+   * cannot cost the rest of the store.
+   */
+  readonly skipped?: readonly { readonly name: string; readonly reason: string }[];
 }
 
 const SCHEMA = `

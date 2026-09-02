@@ -29,10 +29,10 @@ describe('parseHistoryUrl', () => {
   });
 
   it('given an azblob shorthand target -> when parseHistoryUrl runs -> then it expands to the commercial blob endpoint with an empty prefix', { tags: ['@unit', '@history-url'] }, () => {
-    expect(parseHistoryUrl('azblob://bjjeireatest/atest-history')).toEqual({
+    expect(parseHistoryUrl('azblob://acct/atest-history')).toEqual({
       kind: 'azure-blob',
-      serviceUrl: 'https://bjjeireatest.blob.core.windows.net',
-      account: 'bjjeireatest',
+      serviceUrl: 'https://acct.blob.core.windows.net',
+      account: 'acct',
       container: 'atest-history',
       prefix: '',
       windowDays: null,
@@ -41,8 +41,8 @@ describe('parseHistoryUrl', () => {
   });
 
   it('given an azblob target with a multi-segment prefix -> when parseHistoryUrl runs -> then the prefix is normalised to end with a slash', { tags: ['@unit', '@history-url'] }, () => {
-    const target = parseHistoryUrl('azblob://acct/atest-history/bjjeire/java');
-    expect(target).toMatchObject({ prefix: 'bjjeire/java/' });
+    const target = parseHistoryUrl('azblob://acct/atest-history/team/suite');
+    expect(target).toMatchObject({ prefix: 'team/suite/' });
   });
 
   /** Sovereign clouds have different suffixes; hard coding one resolves nowhere. */
@@ -54,13 +54,13 @@ describe('parseHistoryUrl', () => {
   });
 
   it('given a fully qualified blob URL -> when parseHistoryUrl runs -> then the account comes from the subdomain and the container and prefix from the path', { tags: ['@unit', '@history-url'] }, () => {
-    const target = parseHistoryUrl('https://bjjeireatest.blob.core.windows.net/atest-history/x');
+    const target = parseHistoryUrl('https://acct.blob.core.windows.net/atest-history/x');
     expect(target).toMatchObject({
       kind: 'azure-blob',
-      account: 'bjjeireatest',
+      account: 'acct',
       container: 'atest-history',
       prefix: 'x/',
-      serviceUrl: 'https://bjjeireatest.blob.core.windows.net',
+      serviceUrl: 'https://acct.blob.core.windows.net',
     });
   });
 

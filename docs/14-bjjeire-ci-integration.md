@@ -221,7 +221,7 @@ and `ci-pr.yml`. It is `continue-on-error: true` and gates nothing.
 
 | Step | Notes |
 | --- | --- |
-| Install atest | `oras pull ghcr.io/<owner>/atest-packages:<tag>` then `npm i vendor/*.tgz`. Published by the atest repo's `publish.yml`; needs only `packages: read`. This replaced 468 KB of tarballs vendored into git — binaries nobody could review, with no record of which commit produced them. Pulled as ONE bundle because the packages resolve each other by `file:` specifier: install any one alone and npm 404s on `@atest/core`. |
+| Install atest | `oras pull ghcr.io/<owner>/atest-packages:<tag>` then `npm i vendor/*.tgz`. Published by the atest repo's `oci-publish.yml`; needs only `packages: read`. This replaced 468 KB of tarballs vendored into git — binaries nobody could review, with no record of which commit produced them. Pulled as ONE bundle because each tarball declares `@atest/core@^0.1.0`: install any one alone against a registry that does not yet have that version and npm 404s. |
 | Download JSON | `playwright-json-results` (main) / `playwright-docker-json-results` (PR). Already uploaded. |
 | Restore history | *No such step.* The store IS the Azure container: one immutable object per run and shard, so there is no single file to download, merge and race on. |
 | Ingest | `--playwright-json`. Identical on every branch — off main the URL carries `?readonly=1`, so the run is scored against trunk and leaves nothing behind. |

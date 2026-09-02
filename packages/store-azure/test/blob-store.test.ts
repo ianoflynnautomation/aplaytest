@@ -353,18 +353,18 @@ describe('BlobHistoryStore', () => {
 
   it('given two stores writing under different prefixes -> when each is read back -> then neither sees the records of the other', { tags: ['@unit', '@store-azure'] }, async () => {
     const backend = new MemoryBlobBackend();
-    const java = store(backend, { prefix: 'bjjeire-java/' });
-    const tests = store(backend, { prefix: 'bjjeire-tests/' });
+    const java = store(backend, { prefix: 'app/' });
+    const tests = store(backend, { prefix: 'suite/' });
 
     await java.ingest(run({ runId: 'j', attempts: [attempt({ testId: 'java' })] }));
     await tests.ingest(run({ runId: 't', attempts: [attempt({ testId: 'tests' })] }));
     await java.close();
     await tests.close();
 
-    expect((await store(backend, { prefix: 'bjjeire-java/' }).attempts()).map(a => a.testId)).toEqual(
+    expect((await store(backend, { prefix: 'app/' }).attempts()).map(a => a.testId)).toEqual(
       ['java'],
     );
-    expect((await store(backend, { prefix: 'bjjeire-tests/' }).attempts()).map(a => a.testId)).toEqual(
+    expect((await store(backend, { prefix: 'suite/' }).attempts()).map(a => a.testId)).toEqual(
       ['tests'],
     );
   });

@@ -10,7 +10,7 @@ rules:
       # npm — where a bad version can be deprecated but never replaced. There
       # cannot be a lockfile for artifacts built ninety seconds ago, and the
       # finding describes precisely the check that makes the publish safe.
-      - publish.yml
+      - npm-publish.yml
 
   cache-poisoning:
     ignore:
@@ -24,4 +24,4 @@ rules:
       # Re-examine if a `cache:` input is ever added here. A publish job is the
       # one place where restoring something the run did not produce would be
       # baked into an immutable, signed release.
-      - publish.yml
+      - npm-publish.yml

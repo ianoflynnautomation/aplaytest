@@ -19,7 +19,7 @@ beforeAll(async () => {
 
   await write('CLAUDE.md', '# Conventions\nWeb-first assertions only.');
 
-  // The real repo's shape: a page object with siblings that share its name.
+  // A page object with siblings that share its name — the mapper must not win.
   await write(
     'src/ui/pages/gyms/gyms.card.mapper.ts',
     'export function gymCardFromDto(gym: GymDto): GymCard { return gym; }',
@@ -115,8 +115,7 @@ describe('ground — exemplar selection', () => {
 
   it('given a repo holding both a _template scaffold and real specs -> when ground selects exemplars -> then no scaffold is offered', { tags: ['@integration', '@author'] }, () => {
     // Templates are deliberately minimal; a two-step placeholder teaches no
-    // idiom. Against the real repo `_template` tied on kind and won on
-    // alphabetical order.
+    // idiom. `_template` tied on kind and won on alphabetical order.
     for (const exemplar of bundle.exemplars) {
       expect(exemplar.path).not.toContain('_template');
     }
@@ -137,5 +136,11 @@ describe('ground — a repository it knows nothing about', () => {
     expect(bundle.exemplars).toHaveLength(0);
     expect(bundle.missing.length).toBeGreaterThan(0);
     expect(bundle.missing.join(' ')).toContain('page object');
+  });
+});
+
+describe('featureKeyOf', () => {
+  it('given a Windows path under tests/features -> when featureKeyOf runs -> then the feature segment is still found', { tags: ['@unit', '@author'] }, () => {
+    expect(featureKeyOf('tests\\features\\gyms\\gyms.ui.acceptance.spec.ts')).toBe('gyms');
   });
 });

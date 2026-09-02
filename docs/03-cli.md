@@ -27,8 +27,8 @@ atest <command> [options]
   agent author              Generate a test, then prove it asserts something
   ci generate               Emit a CI workflow with the execute/analyze split
   doctor                    Verify configuration, history, and versions
-  (atest-mcp)               MCP server — a SEPARATE binary from @atest/mcp,
-                            not an `atest` subcommand
+  (atest-mcp)               MCP server — the `@atest/mcp` binary, not an
+                            `atest` subcommand
 
   DESIGN ONLY — described in this document, not implemented
   run                       Dropped deliberately; see the section below

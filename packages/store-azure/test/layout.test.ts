@@ -18,8 +18,8 @@ describe('run blob names', () => {
   });
 
   it('given a container prefix -> when runBlobName builds a name -> then the name is nested under that prefix', { tags: ['@unit', '@store-azure'] }, () => {
-    expect(runBlobName('bjjeire/', '2026-08-30T12:00:00.000Z', 'r', 'all')).toBe(
-      'bjjeire/v1/runs/2026/08/30/r/all.json.gz',
+    expect(runBlobName('tenant/', '2026-08-30T12:00:00.000Z', 'r', 'all')).toBe(
+      'tenant/v1/runs/2026/08/30/r/all.json.gz',
     );
   });
 
@@ -58,9 +58,9 @@ describe('run blob names', () => {
   });
 
   it('given a container prefix -> when runsPrefix and runBlobName are compared -> then every run name sits under one listing prefix', { tags: ['@unit', '@store-azure'] }, () => {
-    expect(runsPrefix('bjjeire/')).toBe('bjjeire/v1/runs/');
-    expect(runBlobName('bjjeire/', '2026-08-30T00:00:00Z', 'r', 'all')).toContain(
-      runsPrefix('bjjeire/'),
+    expect(runsPrefix('tenant/')).toBe('tenant/v1/runs/');
+    expect(runBlobName('tenant/', '2026-08-30T00:00:00Z', 'r', 'all')).toContain(
+      runsPrefix('tenant/'),
     );
   });
 });

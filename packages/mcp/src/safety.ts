@@ -17,6 +17,8 @@
 import { redact } from '@atest/core';
 
 export const WRITE_TOOLS: ReadonlySet<string> = new Set([
+  // Reserved names: not registered today. Kept in the gate so a future
+  // mutating tool cannot ship without both ATEST_MCP_WRITE and confirm: true.
   'atest_apply_heal',
   'atest_quarantine',
   // The gate restores the spec it mutates, so it leaves no net change — but it
@@ -42,6 +44,13 @@ export const DEFAULT_SAFETY: SafetyConfig = {
 export const MCP_WRITE_ENV = 'ATEST_MCP_WRITE';
 export const MCP_WRITE_ENABLED = '1';
 
+/**
+ * Read MCP safety from the environment.
+ *
+ * @param env - Defaults to `process.env`. `ATEST_MCP_WRITE=1` enables writes.
+ * @returns A config whose `writeEnabled` is false unless the env explicitly
+ *   opts in. Size caps and redact keys always come from {@link DEFAULT_SAFETY}.
+ */
 export function safetyFromEnv(env: Readonly<Record<string, string | undefined>> = process.env): SafetyConfig {
   return { ...DEFAULT_SAFETY, writeEnabled: env[MCP_WRITE_ENV] === MCP_WRITE_ENABLED };
 }

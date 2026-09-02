@@ -28,7 +28,7 @@ export type {
 export { parsePlaywrightError, splitCallLog, stripAnsi, joinErrors } from '@atest/core';
 export type { ParsedError, ErrorLike } from '@atest/core';
 
-export { atestFixtures, createCaptureFixture } from './fixtures.js';
+export { atestFixtures, createCaptureFixture, test, expect } from './fixtures.js';
 export type { CaptureOptions } from './fixtures.js';
 
 export { bindPage, previewArgs, previewValue } from './bind.js';
@@ -45,6 +45,7 @@ export {
   NetworkSidecarSchema,
   ConsoleSidecarSchema,
   IntentSidecarSchema,
+  CoverageSidecarSchema,
 } from './sidecar.js';
 export type {
   SidecarName,
@@ -52,6 +53,7 @@ export type {
   NetworkSidecar,
   ConsoleSidecar,
   IntentSidecar,
+  CoverageSidecar,
 } from './sidecar.js';
 
 export { runPlaywright, escapeForGrep } from './spawn.js';

@@ -337,6 +337,25 @@ export interface OpenBlobHistoryStoreOptions
   readonly accountKey?: string | undefined;
 }
 
+/**
+ * Build a {@link BlobHistoryStore} from a parsed `azblob://` URL.
+ *
+ * This is the path the CLI takes. Authentication is `DefaultAzureCredential`
+ * unless `accountKey` is set, which exists only so the Azurite emulator URL
+ * is actually usable (the emulator has no Entra to federate against).
+ *
+ * @param target - Parsed Azure Blob target (`parseHistoryUrl` of an `azblob://` URL).
+ * @param options - Optional emulator shared key and concurrency.
+ * @returns A store that implements `HistoryStore`.
+ *
+ * @example
+ * ```ts
+ * const target = parseHistoryUrl('azblob://myaccount/atest-history?readonly=1');
+ * if (target.kind !== 'azure-blob') throw new Error('expected azure-blob');
+ * const store = openBlobHistoryStore(target);
+ * const attempts = await store.attempts();
+ * ```
+ */
 export function openBlobHistoryStore(
   target: AzureBlobTarget,
   options: OpenBlobHistoryStoreOptions = {},

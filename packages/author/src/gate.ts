@@ -20,7 +20,6 @@ import {
   MEANINGFUL_CLASSES,
   applyMutant,
   buildMutants,
-  type Mutant,
   type MutantClass,
   type MutantName,
 } from './mutants.js';
@@ -166,6 +165,34 @@ function inconclusiveReason(result: PlaywrightRunResult, title: string): string 
   return 'the candidate neither passed nor failed';
 }
 
+/**
+ * Prove a test asserts something, by mutating the world around it.
+ *
+ * The candidate must pass repeatedly **and** fail when a data mutant (empty
+ * list, HTTP 500, field rename, …) is injected. A test that always passes is
+ * indistinguishable from a test that asserts nothing — the failure mode
+ * LLM-authored tests actually exhibit.
+ *
+ * Always restores the spec byte-for-byte, including on crash. No model is
+ * consulted, and none can overrule the verdict.
+ *
+ * @param options - Spec, title, and Playwright spawn settings.
+ * @returns `passed: true` only when stability holds and at least one
+ *   meaningful mutant is killed. `undecidable` is distinct from a failing
+ *   verdict — the mutant run never executed the test.
+ * @throws Never swallows a restore failure: if the spec cannot be put back,
+ *   the error propagates so a mutated file is not mistaken for source.
+ *
+ * @example
+ * ```ts
+ * const result = await falsifiabilityGate({
+ *   cwd: process.cwd(),
+ *   specFile: 'tests/gyms.spec.ts',
+ *   testTitle: 'shows the gym name',
+ * });
+ * if (!result.passed) throw new Error(result.summary);
+ * ```
+ */
 export async function falsifiabilityGate(options: GateOptions): Promise<GateResult> {
   const stabilityRuns = options.stabilityRuns ?? DEFAULT_STABILITY_RUNS;
 
@@ -340,5 +367,4 @@ export function evaluateGate(input: EvaluateInput): GateResult {
   };
 }
 
-export { buildMutants, applyMutant };
-export type { Mutant, MutantName };
+

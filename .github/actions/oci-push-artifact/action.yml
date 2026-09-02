@@ -1,0 +1,89 @@
+name: 'Push OCI Artifact'
+# Vendored from ianoflynnautomation/bjjeire-ci-templates@e30dc28dd2e56f (v1.7.0).
+description: 'Publishes a single file to an OCI registry as a typed artifact using ORAS, then applies additional tags to the same manifest. Registry-agnostic (GHCR, ACR, ECR, Docker Hub) — the registry host is derived from the image reference.'
+
+inputs:
+  file:
+    description: 'Path to the file to publish. Pushed from its own directory so the layer title is the bare filename.'
+    required: true
+  image:
+    description: 'OCI reference without a tag, e.g. ghcr.io/owner/my-api-contract. Lowercased internally; the registry host is derived from it.'
+    required: true
+  artifact-type:
+    description: 'OCI artifact type set on the manifest, e.g. application/vnd.example.openapi.v1.'
+    required: true
+  media-type:
+    description: 'Media type of the pushed layer, e.g. application/vnd.oai.openapi+json.'
+    required: true
+  tags:
+    description: >-
+      Whitespace- or newline-separated tags. The first tag is the push target;
+      the rest are applied to the same manifest with `oras tag`, so every tag
+      resolves to one immutable digest. Defaults to the commit SHA.
+    required: false
+    default: ${{ github.sha }}
+  username:
+    description: 'Registry username.'
+    required: false
+    default: ${{ github.actor }}
+  password:
+    description: 'Registry password or token. For GHCR this needs packages: write.'
+    required: true
+  annotations:
+    description: 'Optional newline-separated key=value manifest annotations (e.g. org.opencontainers.image.source=...).'
+    required: false
+    default: ''
+  summary-title:
+    description: 'Heading used in the step summary. Set to an empty string to skip the summary.'
+    required: false
+    default: 'Published OCI artifact'
+
+outputs:
+  reference:
+    description: 'Full pushed reference including the primary tag, e.g. ghcr.io/owner/name:abc123.'
+    value: ${{ steps.push.outputs.reference }}
+  digest:
+    description: 'Manifest digest (sha256:...) of the pushed artifact, empty if ORAS did not report one.'
+    value: ${{ steps.push.outputs.digest }}
+  tags:
+    description: 'Space-separated list of every tag applied.'
+    value: ${{ steps.push.outputs.tags }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d  # v2.0.1
+
+    - name: Push artifact
+      id: push
+      shell: bash
+      env:
+        FILE: ${{ inputs.file }}
+        IMAGE_INPUT: ${{ inputs.image }}
+        ARTIFACT_TYPE: ${{ inputs.artifact-type }}
+        MEDIA_TYPE: ${{ inputs.media-type }}
+        TAGS_INPUT: ${{ inputs.tags }}
+        REGISTRY_USER: ${{ inputs.username }}
+        REGISTRY_PASSWORD: ${{ inputs.password }}
+        ANNOTATIONS: ${{ inputs.annotations }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/push-artifact.sh"
+    - name: Write publish summary
+      if: always() && inputs.summary-title != ''
+      shell: bash
+      env:
+        TITLE: ${{ inputs.summary-title }}
+        FILE: ${{ inputs.file }}
+        REFERENCE: ${{ steps.push.outputs.reference }}
+        DIGEST: ${{ steps.push.outputs.digest }}
+        TAGS: ${{ steps.push.outputs.tags }}
+      run: |
+        {
+          echo "### ${TITLE}"
+          echo ""
+          echo "| Field | Value |"
+          echo "| --- | --- |"
+          echo "| File | \`$(basename "$FILE")\` |"
+          echo "| Reference | \`${REFERENCE:-not pushed}\` |"
+          echo "| Tags | \`${TAGS:-none}\` |"
+          echo "| Digest | \`${DIGEST:-unknown}\` |"
+        } >> "$GITHUB_STEP_SUMMARY"

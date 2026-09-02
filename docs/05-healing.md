@@ -283,11 +283,10 @@ Requirements for an assertion proposal to even be surfaced:
    change from `EVENT` to `OPEN MAT`?"*
 3. `config.heal.apply` is ignored — assertion heals are always `propose`.
 
-Your `TODO.md` contains the textbook case: `events.card.mapper.ts` maps
-`OpenMat → 'EVENT'` because the fix exists in the app but is not deployed. Both `'EVENT'`
-and `'OPEN MAT'` are "correct" depending on which build is running. No amount of page
-inspection resolves that; it requires knowing a deploy is pending. Which is exactly why
-a human decides.
+The textbook case is a mapper that still emits `'EVENT'` because the fix exists in the
+app but is not deployed. Both `'EVENT'` and `'OPEN MAT'` are "correct" depending on
+which build is running. No amount of page inspection resolves that; it requires
+knowing a deploy is pending. Which is exactly why a human decides.
 
 ---
 
@@ -370,7 +369,7 @@ justifies.
   "validation": { "status": "validated", "runs": 3, "targetPassed": 3,
                   "collateralPassed": 9, "typecheck": true, "lint": true },
   "status": "applied",
-  "reviewedBy": "ianoflynn",
+  "reviewedBy": "<github-handle>",
   "revertPatch": "…unified diff…"
 }
 ```

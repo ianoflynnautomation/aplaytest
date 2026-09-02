@@ -12,7 +12,7 @@ function verdict(scoped: HistoricalAttempt[], all: HistoricalAttempt[] = scoped)
   return { score, features, classification: classifyFlake(features, score) };
 }
 
-describe('the real flake from TODO.md', () => {
+describe('resource-contention: one project fails under load, others stay green', () => {
   /**
    * "footer.ui 'Stores' quick link on firefox-desktop occasionally fails to
    *  navigate under full-suite parallel load (passes in isolation)."
@@ -54,7 +54,7 @@ describe('the real flake from TODO.md', () => {
     ),
   ];
 
-  it('given the firefox-under-load history from TODO.md -> when scoreTest scores it -> then the data is sufficient and the score clears the flake threshold', { tags: ['@unit', '@flaky'] }, () => {
+  it('given the firefox-under-load history -> when scoreTest scores it -> then the data is sufficient and the score clears the flake threshold', { tags: ['@unit', '@flaky'] }, () => {
     const { score } = verdict(firefoxUnderLoad, [...firefoxUnderLoad, ...otherProjects]);
     expect(score.insufficientData).toBe(false);
     expect(score.score).toBeGreaterThan(0.15);

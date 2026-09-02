@@ -240,9 +240,8 @@ export function createCaptureFixture(options: CaptureOptions = {}) {
     });
 
     const failed = requests.filter(r => r.failureText !== null || (r.status ?? 0) >= 400);
-    // Phase 0 uses a fixed threshold. A per-route p95 baseline needs history,
-    // which arrives with the flaky engine — claiming one now would be a
-    // number nobody measured.
+    // A fixed threshold, not a per-route p95: that needs history, and
+    // claiming one now would be a number nobody measured.
     const slow = requests.filter(r => r.durationMs >= config.slowRequestMs);
     const statusCounts: Record<string, number> = {};
     for (const request of requests) {

@@ -212,6 +212,26 @@ const RULES: readonly Rule[] = [
   },
 ];
 
+/**
+ * Classify a scored test into a flake class.
+ *
+ * Priority-ordered rules; `genuine-regression` and `consistently-failing`
+ * outrank every flake class, because misfiling a broken test as flaky gets
+ * it retried and quarantined instead of fixed.
+ *
+ * @param features - Measurements from `extractFeatures`.
+ * @param score - Result of `scoreTest`.
+ * @returns A class, a prescription, the evidence strings that fired, and
+ *   whether retries would help.
+ *
+ * @example
+ * ```ts
+ * const score = scoreTest(attempts);
+ * const features = extractFeatures(attempts, allAttempts);
+ * const verdict = classifyFlake(features, score);
+ * // verdict.class === 'resource-contention'
+ * ```
+ */
 export function classifyFlake(features: FlakeFeatures, score: FlakeScore): Classification {
   if (score.insufficientData) {
     return {

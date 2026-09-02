@@ -1,3 +1,4 @@
+.claude/
 node_modules/
 dist/
 # The CommonJS build. Separate from dist/ because Playwright resolves the

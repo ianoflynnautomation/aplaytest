@@ -66,7 +66,13 @@ const EvidenceSchema = z.object({
 });
 
 const LlmSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'ollama', 'none']).default('anthropic'),
+  /**
+   * Model provider. Only `anthropic` is implemented; `none` disables the
+   * model tier entirely. OpenAI and Ollama are not advertised here because
+   * a config that parses and then silently uses a different provider is
+   * worse than a config that fails at load.
+   */
+  provider: z.enum(['anthropic', 'none']).default('anthropic'),
   models: z
     .object({
       classify: z.string().default('claude-haiku-4-5'),
@@ -234,12 +240,44 @@ export interface ResolvedAtestConfig extends AtestConfig {
 }
 
 /**
- * Validate and apply defaults. Throws with a readable message on invalid
- * config — a misconfigured run must fail at startup, not halfway through.
+ * Validate user config and apply the safe defaults.
+ *
+ * An empty object yields `mode: 'strict'`, propose-only healing, and
+ * quarantine expiry — a consumer who configures nothing must not get an
+ * unguarded system. A misconfigured run fails here, at startup, not
+ * halfway through a suite.
+ *
+ * @param input - Partial config plus optional identity hooks for run/trace ids.
+ * @returns Every field filled, with `identity` attached (empty object if omitted).
+ * @throws {Error} When a field fails Zod validation. The message is prefixed
+ *   with `Invalid atest.config.ts:` and lists every issue.
+ *
+ * @example
+ * ```ts
+ * // atest.config.ts
+ * import { defineAtestConfig } from '@atest/core';
+ *
+ * export default defineAtestConfig({
+ *   mode: 'strict',
+ *   heal: { apply: 'propose' },
+ * });
+ * ```
  */
 export function defineAtestConfig(input: AtestUserConfig = {}): ResolvedAtestConfig {
   const { identity, ...rest } = input;
-  const parsed = AtestConfigSchema.safeParse(rest);
+  // Presets apply only when the user named an aggressiveness. Empty config
+  // must stay propose-only — the balanced preset's `apply: 'pr'` would
+  // otherwise override the safe default the rest of this function documents.
+  const named = rest.heal?.aggressiveness;
+  const preset = named === undefined ? undefined : AGGRESSIVENESS_PRESETS[named];
+  const merged =
+    preset === undefined
+      ? rest
+      : {
+          ...rest,
+          heal: { ...preset, ...rest.heal },
+        };
+  const parsed = AtestConfigSchema.safeParse(merged);
 
   if (!parsed.success) {
     const issues = parsed.error.issues

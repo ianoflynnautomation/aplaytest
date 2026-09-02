@@ -31,7 +31,9 @@
   "bin": {
     "atest-mcp": "./dist/bin.js"
   },
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ianoflynnautomation/atest.git",

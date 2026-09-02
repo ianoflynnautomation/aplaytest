@@ -17,8 +17,8 @@ describe('previewValue', () => {
   });
 
   it('given an object carrying a sensitive key -> when previewValue renders it -> then the value is redacted rather than printed into the step title', { tags: ['@unit', '@runner'] }, () => {
-    const out = previewValue({ username: 'ian', password: 'hunter2' });
-    expect(out).toContain("username: 'ian'");
+    const out = previewValue({ username: 'alice', password: 'hunter2' });
+    expect(out).toContain("username: 'alice'");
     expect(out).not.toContain('hunter2');
   });
 

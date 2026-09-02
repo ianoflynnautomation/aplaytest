@@ -184,7 +184,7 @@ describe('tool behaviour against a real evidence directory', () => {
     expect(result.failures[0]?.healable).toBe(true);
   });
 
-  it('given an evidence directory holding one failure -> when getFailure runs for that id -> then the tree and ranked candidates are returned and the screenshot is offered as a URI', { tags: ['@integration', '@mcp'] }, async () => {
+  it('given an evidence directory holding one failure -> when getFailure runs for that id -> then the tree and ranked candidates are returned and the screenshot is a path, not inlined bytes', { tags: ['@integration', '@mcp'] }, async () => {
     const result = (await getFailure.handler({ evidenceId: 'ev_test00000001' }, context)) as {
       page: { ariaSnapshot?: string };
       heal: { candidates?: { value: string }[] };
@@ -193,8 +193,8 @@ describe('tool behaviour against a real evidence directory', () => {
 
     expect(result.page.ariaSnapshot).toContain('heading');
     expect(result.heal.candidates?.[0]?.value).toBe('gym-card-name');
-    // Never inlined — offered as a URI the client fetches deliberately.
-    expect(result.screenshot).toBe('atest://failures/ev_test00000001/screenshot');
+    // Never inlined — a path the client can open if it wants the image.
+    expect(result.screenshot).toBe('/tmp/shot.png');
   });
 
   it('given a getFailure call requesting only candidates -> when the handler runs -> then the accessibility tree is omitted', { tags: ['@integration', '@mcp'] }, async () => {

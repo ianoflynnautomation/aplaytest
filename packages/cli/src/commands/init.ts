@@ -124,11 +124,10 @@ export function addReporter(source: string): ConfigEdit['reason'] | { text: stri
 /**
  * Find where the reporter list is actually built.
  *
- * Measured against a real repository: the config under test declared no
- * `reporter` key at all, because five configs shared one
- * `src/shared/config/playwright.ts` that assembled the list conditionally.
- * "No reporter key found" was true and useless — the next question is always
- * "then where?", and the tool is holding the answer.
+ * A config that declares no `reporter` key because several files share one
+ * assembler (for example `src/shared/config/playwright.ts`) is the other case
+ * worth not guessing at. "No reporter key found" is true and useless — the
+ * next question is always "then where?", and the tool is holding the answer.
  */
 export async function findReporterSites(cwd: string): Promise<string[]> {
   const roots = ['.', 'src/shared/config', 'src/config', 'config'];

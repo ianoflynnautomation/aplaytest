@@ -40,7 +40,7 @@ export interface ValidateOptions {
   /** Spec file containing the failing test. */
   readonly specFile: string;
   readonly testTitle: string;
-  /** Constants file the patch rewrites. */
+  /** File the patch rewrites (constants, page object, or spec). */
   readonly patchFile: string;
   readonly patchedText: string;
   readonly config?: string | undefined;

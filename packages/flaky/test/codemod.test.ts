@@ -205,8 +205,8 @@ describe('releaseCodemod', () => {
 });
 
 describe('quarantineCodemod — parameterised tests', () => {
-  // Found by pointing the codemod at a real suite: the actual flaky test in
-  // bjjeire-tests is generated in a for-loop with a template-literal title.
+  // A suite that generates titles in a for-loop with a template literal.
+  // The concrete title does not exist as a string in source.
   const REAL_SHAPE = `
 test.describe('Footer UI acceptance', { tag: ['@layout'] }, () => {
   for (const { name, path } of FOOTER_QUICK_LINKS) {

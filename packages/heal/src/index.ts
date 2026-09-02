@@ -38,7 +38,7 @@ export { validateHeal } from './validate.js';
 export type { ValidateOptions, ValidationRecord, ValidationStatus } from './validate.js';
 
 export { proposeHeal, DEFAULT_HEAL_OPTIONS } from './propose.js';
-export type { HealProposal, ProposeOptions, TierOneRecord } from './propose.js';
+export type { HealProposal, ProposeOptions, TierOneRecord, ProposalStatus } from './propose.js';
 
 export {
   buildRecord,

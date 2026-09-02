@@ -265,7 +265,7 @@ function collapseDuplicates(attempts: readonly AttemptRecord[]): CollapseResult 
   const collapsed: string[] = [];
 
   for (const attempt of attempts) {
-    const key = `${attempt.testId} ${attempt.project} ${attempt.retry}`;
+    const key = `${attempt.testId}\x00${attempt.project}\x00${attempt.retry}`;
     const existing = byKey.get(key);
     if (existing === undefined) {
       byKey.set(key, attempt);

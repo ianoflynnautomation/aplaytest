@@ -55,9 +55,9 @@ success on nothing.
 
 ## Step 2 — Install atest
 
-It is not on any registry. `npm run pack` in the atest repo emits a tarball per
-package. That is the path for testing UNRELEASED edits; for anything else
-install from npm, where the packages carry real semver on each other:
+Packages publish to npm under the `@atest` scope with real semver on each other.
+`npm run pack` in this repo emits a tarball per package — that is the path for
+testing unreleased edits:
 
 ```sh
 # in bjjeire-tests
@@ -72,7 +72,7 @@ rather than the one you just built.
 ```sh
 # in atest
 npm run pack
-cp dist-pack/*.tgz ~/Sources/bjjeire-tests/vendor/
+cp dist-pack/*.tgz /path/to/your-suite/vendor/
 
 # in bjjeire-tests
 npm i ./vendor/*.tgz

@@ -160,6 +160,31 @@ function refuse(
   };
 }
 
+/**
+ * Run the heal pipeline against one evidence bundle.
+ *
+ * Order is load-bearing: `NEVER_HEAL` kinds and known-flaky tests are refused
+ * before any candidate is generated. Playwright, not the ranking score,
+ * decides whether a patch is proposable.
+ *
+ * @param bundle - Captured failure (selector, ARIA, test-id index).
+ * @param options - Working directory, spec to re-run, and validation policy.
+ * @returns A proposal whose `status` is `proposed`, `rejected`, or one of the
+ *   `refused-*` / `no-*` outcomes. Never throws on a refused heal.
+ *
+ * @example
+ * ```ts
+ * const proposal = await proposeHeal(bundle, {
+ *   cwd: process.cwd(),
+ *   specFile: 'tests/gyms.spec.ts',
+ *   validationRuns: 3,
+ *   checkCollateral: true,
+ * });
+ * if (proposal.status === 'proposed') {
+ *   console.log(proposal.chosen?.value);
+ * }
+ * ```
+ */
 export async function proposeHeal(
   bundle: EvidenceBundle,
   options: ProposeOptions,

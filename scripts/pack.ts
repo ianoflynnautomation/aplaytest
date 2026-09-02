@@ -13,15 +13,14 @@
  *
  *   npm error 404 Not Found - GET https://registry.npmjs.org/@atest%2fcore
  *
- * The consumer flow this enables, with no registry and no auth:
+ * The consumer flow this enables when a registry is unavailable:
  *
  *   npm run pack                       # here
  *   cp dist-pack/*.tgz <repo>/vendor/  # there
  *   npm i ./vendor/atest-core-0.1.0.tgz ./vendor/atest-runner-playwright-0.1.0.tgz
  *
  * `file:` specifiers survive `npm ci`, so a Dockerfile that copies `vendor/`
- * before installing works unchanged — which is what the bjjeire-tests runner
- * image does.
+ * before installing works unchanged.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -32,11 +31,8 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const OUT = join(ROOT, 'dist-pack');
 
 /**
- * Only what a consumer installs into their own test process or CI job.
- *
- * `@atest/mcp` is deliberately absent — the MCP server is run from a checkout —
- * and `packages/mcp/package.json` now carries `"private": true` so that
- * decision is enforced by npm rather than by this list staying in step with it.
+ * Every package a consumer can install. Keep in step with
+ * `expected-tarballs` in `.github/workflows/oci-publish.yml`.
  */
 const PUBLISHABLE = [
   'core',
@@ -50,6 +46,7 @@ const PUBLISHABLE = [
   'llm',
   'agent',
   'cli',
+  'mcp',
 ];
 
 rmSync(OUT, { recursive: true, force: true });
@@ -87,5 +84,5 @@ To consume from a test repository (no registry, no auth):
     ./vendor/atest-core-${reporterPkg.version}.tgz \\
     ./vendor/atest-runner-playwright-${reporterPkg.version}.tgz
 
-Install BOTH in one command — core is not on any registry, so the reporter
-tarball cannot resolve it on its own.`);
+Install every tarball in one command — each declares @atest/core@^0.1.0, and
+npm satisfies that from the other tarballs in the same invocation.`);

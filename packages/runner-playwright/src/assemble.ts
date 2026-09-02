@@ -90,11 +90,6 @@ function attachmentPath(result: TestResultLike, name: string): string | null {
   return result.attachments.find(a => a.name === name)?.path ?? null;
 }
 
-/**
- * ANSI escapes are stripped HERE, so the stored bundle holds clean text.
- * Bundles are read by humans, matched by rules, and sent to models — colour
- * codes serve none of those and cost tokens in the last one.
- */
 /** Candidates further than this from the intended id are not plausible renames. */
 const MAX_SEED_DISTANCE = 0.4;
 /** Enough for a ranker to choose from; small enough to stay readable. */
@@ -153,6 +148,17 @@ export function toClassifiable(
   };
 }
 
+/**
+ * Assemble an {@link EvidenceBundle} from a Playwright test result.
+ *
+ * The reporter calls this once per failure. Classification, step extraction,
+ * and sidecar merge happen here so a reporting failure cannot become a test
+ * failure — the caller swallows errors from this function.
+ *
+ * @param input - Playwright test/result shapes, run context, and optional
+ *   capture-fixture sidecars (ARIA, network, console, intent).
+ * @returns A schema-versioned evidence bundle ready to persist.
+ */
 export function assembleBundle(input: AssembleInput): EvidenceBundle {
   const { test, result, context } = input;
   const sidecars = { ...EMPTY_SIDECARS, ...input.sidecars };

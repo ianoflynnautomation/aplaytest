@@ -1,9 +1,9 @@
 /**
- * Programmatic entry point.
+ * Programmatic entry point for the commands the CLI and tests invoke.
  *
- * The commands are exported so the MCP server can call the identical function
- * the CLI calls. If a capability exists in one surface and not the other, that
- * is a bug in the adapter rather than a missing feature.
+ * MCP talks to the same engines (`@atest/heal`, `@atest/flaky`, …) rather than
+ * importing this package — a façade over engines, not a second copy of the
+ * CLI parser.
  */
 export { doctor } from './commands/doctor.js';
 export { flakyBisect } from './commands/bisect.js';

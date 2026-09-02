@@ -2,7 +2,7 @@
 /**
  * stdio entry point. Configure in a client as:
  *
- *   { "mcpServers": { "atest": { "command": "npx", "args": ["atest-mcp"] } } }
+ *   { "mcpServers": { "atest": { "command": "npx", "args": ["-y", "@atest/mcp"] } } }
  *
  * Nothing is written to stdout except the protocol itself — a stray log line
  * corrupts the stream and the session dies with no useful error.

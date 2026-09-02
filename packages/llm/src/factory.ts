@@ -19,6 +19,26 @@ export interface CreateClientOptions extends AnthropicClientOptions {
   readonly env?: Readonly<Record<string, string | undefined>> | undefined;
 }
 
+/**
+ * Build an {@link LlmClient} from options and the environment.
+ *
+ * Resolves to {@link UnavailableLlmClient} rather than throwing: every
+ * deterministic feature keeps working, and only paths that genuinely need a
+ * model fail — with a reason that names itself.
+ *
+ * @param options - Provider, API key, and an optional `env` override (tests
+ *   inject this so they never touch `process.env`).
+ * @returns A live Anthropic client, or an unavailable client whose
+ *   `complete()` rejects with `LlmUnavailableError`.
+ *
+ * @example
+ * ```ts
+ * const llm = createLlmClient(); // unavailable when ANTHROPIC_API_KEY is unset
+ * if (!llm.available) {
+ *   // heal, flaky, impact still run
+ * }
+ * ```
+ */
 export function createLlmClient(options: CreateClientOptions = {}): LlmClient {
   if (options.disabled === true) {
     return new UnavailableLlmClient('disabled by --no-llm');
@@ -37,6 +57,15 @@ export function createLlmClient(options: CreateClientOptions = {}): LlmClient {
   return new AnthropicLlmClient({ ...options, apiKey });
 }
 
+/**
+ * One-line description of which roles a client can serve, for `atest doctor`
+ * and CLI banners.
+ *
+ * @param client - The client to describe.
+ * @param roles - Roles to include in the description.
+ * @returns `"no model — deterministic tier only"` when unavailable, otherwise
+ *   a `role: model-id` list.
+ */
 export function describeAvailability(client: LlmClient, roles: readonly ModelRole[]): string {
   if (!client.available) return 'no model — deterministic tier only';
   return roles.map(role => `${role}: ${client.modelFor(role)}`).join(' · ');

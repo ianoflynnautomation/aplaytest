@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { patchConstant } from './patch.js';
 import type { HealProposal } from './propose.js';
 import type { ValidationRecord } from './validate.js';
 
@@ -75,8 +76,7 @@ export function buildRecord(
   const chosen = proposal.chosen;
   if (patch === null || chosen === null || patch.after === null) return null;
 
-  const from =
-    patch.message.match(/Replaced "([^"]+)"/)?.[1] ?? proposal.intendedSelector ?? 'unknown';
+  const from = patch.from;
 
   return {
     schemaVersion: HEAL_SCHEMA_VERSION,
@@ -195,7 +195,15 @@ export async function revertHeal(
     return { status: 'not-found', message: `Cannot read ${record.patch.file}.`, record };
   }
 
-  const expected = record.revertText.replace(record.patch.from, record.patch.to);
+  // Replay the original patch, quote-aware and for every shared literal.
+  // `String.replace` would only change the first occurrence and ignore quotes,
+  // so a two-constant heal would look "changed" and refuse to revert.
+  const replayed = patchConstant(record.revertText, {
+    file: record.patch.file,
+    from: record.patch.from,
+    to: record.patch.to,
+  });
+  const expected = replayed.after ?? record.revertText;
   if (options.force !== true && current !== expected) {
     return {
       status: 'file-changed',

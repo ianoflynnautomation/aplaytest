@@ -32,7 +32,7 @@
                                               │
                               ┌───────────────▼─────────────────┐
                               │  LLM ABSTRACTION  @atest/llm    │
-                              │  anthropic · openai · ollama    │
+                              │  anthropic (openai/ollama: n/i) │
                               │  structured output · caching    │
                               └─────────────────────────────────┘
 

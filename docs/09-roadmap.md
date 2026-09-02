@@ -64,7 +64,7 @@ and separating regression from known flake — is delivered in Phase 0 with no m
 - Zero false "flaky" verdicts on a deliberately introduced real regression across a
   10-run corpus.
 
-**Why second:** flake is the pain you have today (documented in `TODO.md`), it needs no
+**Why second:** flake is the pain a mature suite already has, it needs no
 model, and it produces the history that healing later depends on for its
 "is this flaky or broken?" gate.
 

@@ -1,10 +1,11 @@
 /**
  * @atest/agent — the model tier.
  *
- * Deliberately narrow for now: one bounded agent that RANKS pre-verified
- * options. It is handed candidates a deterministic engine already checked
- * against a live page, and whatever it picks is re-run before anything is
- * proposed. The model orders; Playwright decides.
+ * Two bounded agents, both of which propose rather than decide:
+ *   · repair — ranks pre-verified locator candidates; Playwright re-runs the pick
+ *   · author — plans and drafts a test; the falsifiability gate accepts or rejects it
+ *
+ * The model orders; Playwright decides.
  */
 
 export { runRepairAgent, RepairChoiceSchema, REPAIR_SYSTEM_PROMPT } from './repair.js';

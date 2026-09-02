@@ -1,0 +1,345 @@
+name: Pack and publish tarball bundle (Reusable)
+
+# Called by oci-publish.yml. Not an npm publish — the tarballs go to GHCR as
+# one OCI artifact. Vendored from
+# ianoflynnautomation/bjjeire-ci-templates@e30dc28dd2e56f (v1.7.0), with the
+# OCI push step pointed at this repo's `.github/actions/oci-push-artifact`.
+#
+# Pack a Node workspace and publish its tarballs to an OCI registry as ONE
+# artifact.
+#
+# ── Why OCI and not the npm registry ──────────────────────────────────────────
+# GitHub Packages' npm registry only accepts packages scoped to the repository
+# owner (`@owner/name`). A workspace with unscoped packages, or a scope that is
+# not the owner, cannot publish there without renaming every package and every
+# import that resolves it — and renaming for a registry's benefit means the
+# published code no longer matches the source. GHCR takes arbitrary artifacts,
+# so the tarballs go there exactly as `npm pack` produced them.
+#
+# ── Why ONE artifact and not one per package ──────────────────────────────────
+# Workspace tarballs declare each other as `@atest/core@^0.1.0`. Install one
+# alone against a registry that does not yet have that version and npm 404s.
+# They have to be installed together, so they are published together: one
+# manifest, one digest, and no way to end up with a set whose versions disagree.
+#
+# Consumers pull and install in two commands:
+#
+#   oras pull ghcr.io/owner/my-packages:v1.2.3 -o vendor
+#   tar -xzf vendor/*.tar.gz -C vendor && npm i vendor/*.tgz
+#
+# ── The install check is the point of the job ─────────────────────────────────
+# A tarball missing its build output installs cleanly and fails at import time,
+# in the consumer's pipeline, days later. `verify-install` does a clean install
+# into a temp directory and runs the caller's smoke command against it, so that
+# failure happens here instead.
+#
+# Required caller permissions:
+#   contents: read          # or write, when attach-to-release is set
+#   packages: write
+#   id-token: write         # only when attest-provenance is true
+#   attestations: write     # only when attest-provenance is true
+#
+# No top-level concurrency — put it on the caller only.
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: >-
+          OCI reference without a tag, e.g. ghcr.io/owner/my-packages.
+          The registry host is derived from it.
+        required: true
+        type: string
+      tags:
+        description: >-
+          Whitespace- or newline-separated tags. The first is the push target;
+          the rest alias the same digest, so `latest` and `v1.2.3` can never
+          drift apart.
+        required: false
+        type: string
+        default: ${{ github.sha }}
+      working-directory:
+        description: "Directory holding the workspace root package.json."
+        required: false
+        type: string
+        default: "."
+      node-version:
+        required: false
+        type: string
+        default: "22"
+      install-command:
+        required: false
+        type: string
+        default: "npm ci"
+      build-command:
+        description: "Run before packing. Empty skips it, for a workspace that packs from source."
+        required: false
+        type: string
+        default: "npm run build"
+      pack-command:
+        description: "Must leave tarballs in tarball-dir. Empty falls back to `npm pack` at the root."
+        required: false
+        type: string
+        default: "npm run pack"
+      tarball-dir:
+        description: "Directory the pack command writes `*.tgz` into, relative to working-directory."
+        required: false
+        type: string
+        default: "dist-pack"
+      bundle-name:
+        description: >-
+          Filename of the tar holding every tarball. `{version}` is replaced
+          with the root package.json version.
+        required: false
+        type: string
+        default: "npm-packages-{version}.tar.gz"
+      expected-tarballs:
+        description: >-
+          Fail unless exactly this many tarballs were produced. 0 disables the
+          check. Set it — a pack script that silently drops a package produces
+          a bundle that installs and then cannot resolve an import.
+        required: false
+        type: number
+        default: 0
+      verify-install:
+        description: "Install the bundle into a clean directory before publishing."
+        required: false
+        type: boolean
+        default: true
+      verify-command:
+        description: >-
+          Smoke command run inside the clean install directory. Should exercise
+          an entry point, not just check that files exist.
+        required: false
+        type: string
+        default: ""
+      artifact-type:
+        required: false
+        type: string
+        default: "application/vnd.npm.tarball-bundle.v1"
+      media-type:
+        required: false
+        type: string
+        default: "application/gzip"
+      attest-provenance:
+        description: "Generate a build-provenance attestation for the bundle."
+        required: false
+        type: boolean
+        default: true
+      attach-to-release:
+        description: >-
+          Tag to attach the bundle and the individual tarballs to as release
+          assets. Empty skips it. The air-gapped path — vendoring a tarball
+          into a repo needs no registry auth.
+        required: false
+        type: string
+        default: ""
+      runs-on:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      timeout-minutes:
+        required: false
+        type: number
+        default: 20
+    outputs:
+      reference:
+        description: "Full pushed reference including the primary tag."
+        value: ${{ jobs.publish.outputs.reference }}
+      digest:
+        description: "Manifest digest of the published bundle."
+        value: ${{ jobs.publish.outputs.digest }}
+      version:
+        description: "Version read from the root package.json."
+        value: ${{ jobs.publish.outputs.version }}
+      tarball-count:
+        description: "Number of tarballs in the bundle."
+        value: ${{ jobs.publish.outputs.tarball-count }}
+
+jobs:
+  publish:
+    name: Publish npm tarballs to ${{ inputs.image }}
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      reference: ${{ steps.push.outputs.reference }}
+      digest: ${{ steps.push.outputs.digest }}
+      version: ${{ steps.pack.outputs.version }}
+      tarball-count: ${{ steps.pack.outputs.count }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install dependencies
+        shell: bash
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
+        run: |
+          set -euo pipefail
+          bash -c "$INSTALL_COMMAND"
+
+      - name: Build
+        if: inputs.build-command != ''
+        shell: bash
+        env:
+          BUILD_COMMAND: ${{ inputs.build-command }}
+        run: |
+          set -euo pipefail
+          bash -c "$BUILD_COMMAND"
+
+      - name: Pack
+        id: pack
+        env:
+          PACK_COMMAND: ${{ inputs.pack-command }}
+          TARBALL_DIR: ${{ inputs.tarball-dir }}
+          BUNDLE_NAME: ${{ inputs.bundle-name }}
+          EXPECTED: ${{ inputs.expected-tarballs }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${PACK_COMMAND}" ]; then
+            eval "${PACK_COMMAND}"
+          else
+            mkdir -p "${TARBALL_DIR}"
+            npm pack --pack-destination "${TARBALL_DIR}"
+          fi
+
+          count=$(find "${TARBALL_DIR}" -maxdepth 1 -name '*.tgz' | wc -l | tr -d ' ')
+          if [ "${count}" -eq 0 ]; then
+            echo "::error title=Pack::No tarballs in ${TARBALL_DIR}"
+            exit 1
+          fi
+          # A pack script that silently drops one package produces a bundle
+          # that installs and then cannot resolve an import — in the consumer's
+          # pipeline, not here.
+          if [ "${EXPECTED}" -gt 0 ] && [ "${count}" -ne "${EXPECTED}" ]; then
+            echo "::error title=Pack::Expected ${EXPECTED} tarballs, produced ${count}"
+            find "${TARBALL_DIR}" -maxdepth 1 -name '*.tgz' -print
+            exit 1
+          fi
+
+          version=$(node -p "require('./package.json').version")
+          bundle="${BUNDLE_NAME//\{version\}/${version}}"
+
+          # Packed from inside the directory so the archive has no leading
+          # path — `tar -xzf` next to the tarballs is what the consumer runs.
+          tar -czf "${bundle}" -C "${TARBALL_DIR}" .
+
+          {
+            echo "version=${version}"
+            echo "count=${count}"
+            echo "bundle=${bundle}"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice title=Packed::${count} tarballs → ${bundle} (v${version})"
+
+      # The check that matters. A tarball shipping no build output installs
+      # cleanly and fails at import time; only a real install finds that.
+      - name: Verify the bundle installs
+        if: inputs.verify-install
+        env:
+          BUNDLE: ${{ steps.pack.outputs.bundle }}
+          VERIFY_COMMAND: ${{ inputs.verify-command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_path="$(pwd)/${BUNDLE}"
+          work=$(mktemp -d)
+          tar -xzf "${bundle_path}" -C "${work}"
+
+          cd "${work}"
+          npm init -y > /dev/null
+          # ALL of them in one command: each tarball declares @atest/core@^0.1.0,
+          # and npm satisfies that from the other tarballs in the same invocation.
+          npm install ./*.tgz --no-audit --no-fund > /dev/null
+
+          if [ -n "${VERIFY_COMMAND}" ]; then
+            eval "${VERIFY_COMMAND}"
+          fi
+          echo "::notice title=Verified::the bundle installs into a clean project"
+
+      - name: Publish bundle to the registry
+        id: push
+        uses: ./.github/actions/oci-push-artifact
+        with:
+          file: ${{ inputs.working-directory }}/${{ steps.pack.outputs.bundle }}
+          image: ${{ inputs.image }}
+          artifact-type: ${{ inputs.artifact-type }}
+          media-type: ${{ inputs.media-type }}
+          tags: ${{ inputs.tags }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.pack.outputs.version }}
+          summary-title: Published npm tarball bundle
+
+      - name: Build provenance
+        if: inputs.attest-provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: ${{ inputs.working-directory }}/${{ steps.pack.outputs.bundle }}
+
+      # The no-registry path: a consumer who cannot authenticate to GHCR — an
+      # air-gapped runner, a fork — downloads a release asset instead.
+      - name: Attach to the release
+        if: inputs.attach-to-release != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.attach-to-release }}
+          BUNDLE: ${{ steps.pack.outputs.bundle }}
+          TARBALL_DIR: ${{ inputs.tarball-dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # --clobber so re-running a release job replaces assets rather than
+          # failing halfway with some uploaded and some not.
+          gh release upload "${TAG}" "${BUNDLE}" --clobber
+          find "${TARBALL_DIR}" -maxdepth 1 -name '*.tgz' -print0 \
+            | xargs -0 gh release upload "${TAG}" --clobber
+          echo "::notice title=Release::attached the bundle and $(find "${TARBALL_DIR}" -maxdepth 1 -name '*.tgz' | wc -l | tr -d ' ') tarballs to ${TAG}"
+
+      - name: Summarise
+        if: always() && steps.pack.outcome == 'success'
+        env:
+          VERSION: ${{ steps.pack.outputs.version }}
+          COUNT: ${{ steps.pack.outputs.count }}
+          REFERENCE: ${{ steps.push.outputs.reference }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        shell: bash
+        run: |
+          {
+            echo "### npm tarball bundle"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| version | \`${VERSION}\` |"
+            echo "| packages | ${COUNT} |"
+            echo "| reference | \`${REFERENCE:-not pushed}\` |"
+            echo "| digest | \`${DIGEST:-unknown}\` |"
+            echo ""
+            echo "Consume with:"
+            echo ""
+            echo '```bash'
+            echo "oras pull ${REFERENCE:-<reference>} -o vendor"
+            echo "tar -xzf vendor/*.tar.gz -C vendor && npm i vendor/*.tgz"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

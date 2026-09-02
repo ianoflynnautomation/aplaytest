@@ -1,7 +1,7 @@
 {
   "name": "@atest/cli",
   "version": "0.1.0",
-  "description": "The atest binary: flaky analysis, quarantine policy, and diagnostics",
+  "description": "The atest binary: flaky analysis, healing, impact, reporting, and diagnostics",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

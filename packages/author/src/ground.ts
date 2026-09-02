@@ -101,14 +101,13 @@ export function extractSignatures(source: string): string[] {
  * Which feature a file belongs to, from its path.
  *
  * Needed because the second exemplar must come from a DIFFERENT feature, and
- * "different" cannot be inferred from a relevance score. Measured against the
- * real repo, ranking `gyms.api.acceptance.spec.ts` below the same-feature
- * threshold made it look like another feature's file, so the agent was handed
- * two gyms specs while being told the second showed cross-feature idiom — the
- * one thing it was there to do.
+ * "different" cannot be inferred from a relevance score. Ranking a same-feature
+ * API spec below the threshold made it look like another feature's file, so
+ * the agent was handed two specs of the same slice while being told the
+ * second showed cross-feature idiom — the one thing it was there to do.
  */
 export function featureKeyOf(path: string): string {
-  const segments = path.split('/');
+  const segments = path.replaceAll('\\', '/').split('/');
   const featuresAt = segments.lastIndexOf('features');
   if (featuresAt !== -1 && featuresAt + 1 < segments.length) {
     return (segments[featuresAt + 1] ?? '').toLowerCase();
@@ -125,8 +124,8 @@ function scoreExemplar(path: string): number {
   if (name.includes('spec')) score += 2;
   if (name.includes('.api.') || name.includes('.a11y.') || name.includes('.snapshot.')) score -= 4;
   // Scaffolds are deliberately minimal — a two-step placeholder is the
-  // opposite of what an exemplar is for. Against the real repo, `_template`
-  // tied with every genuine spec on kind and then won on alphabetical order.
+  // opposite of what an exemplar is for. `_template` tied with genuine specs
+  // on kind and then won on alphabetical order.
   if (/(^|\/|\.)_?template/.test(path.toLowerCase())) score -= 6;
   return score;
 }
@@ -157,11 +156,10 @@ async function pickRichest(
 /**
  * Rank page-object candidates instead of taking the first name that matches.
  *
- * Measured against the real repo: `find()` on "filename contains the feature"
- * returned `gyms.card.mapper.ts` — alphabetically first — handing the agent a
- * single DTO mapper in place of the page object's entire API. With no methods
- * to call, the model can only invent one or give up, and the invention guard
- * then rejects its own draft.
+ * `find()` on "filename contains the feature" returned a DTO mapper —
+ * alphabetically first — handing the agent a single mapper in place of the
+ * page object's entire API. With no methods to call, the model can only
+ * invent one or give up, and the invention guard then rejects its own draft.
  */
 function scorePageObject(path: string, feature: string): number {
   const name = basename(path).toLowerCase();

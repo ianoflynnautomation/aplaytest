@@ -98,6 +98,28 @@ export function wilsonLowerBound(successes: number, total: number, z = Z): numbe
   return Math.max(0, (centre - margin) / denominator);
 }
 
+/**
+ * Score a test's flakiness from its recorded attempts.
+ *
+ * Combines a Wilson lower bound on the **minority** outcome with transition
+ * density. A test that fails 12 of 12 is deterministically broken, not flaky
+ * — scoring on raw failure rate labelled that case FLAKY, which sends a real
+ * breakage to the quarantine list.
+ *
+ * @param attempts - History for one (test, project), oldest or newest first.
+ * @param config - Thresholds, half-life, and minimum sample size.
+ * @param now - Clock used for recency weighting. Injected so tests are stable.
+ * @returns A score in 0..1, plus the measurements that produced it. Check
+ *   `insufficientData` before acting on `score`.
+ *
+ * @example
+ * ```ts
+ * const score = scoreTest(attempts);
+ * if (!score.insufficientData && score.score > 0.15) {
+ *   // candidate for classification, not yet for quarantine
+ * }
+ * ```
+ */
 export function scoreTest(
   attempts: readonly HistoricalAttempt[],
   config: ScoreConfig = DEFAULT_SCORE_CONFIG,

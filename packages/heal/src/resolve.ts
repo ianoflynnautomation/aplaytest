@@ -2,9 +2,9 @@
  * Find the file that actually holds a drifted locator.
  *
  * Healing used to require `--constants` because the first suite kept every
- * selector in `*.constants.ts`. Real suites also inline literals in page
- * objects and specs (bjjeire snapshot tests: `getByTestId('gyms-page-header')`).
- * The engine walks configured globs and prefers the most reviewable target.
+ * selector in `*.constants.ts`. Suites also inline literals in page objects
+ * and specs (`getByTestId('page-header')`). The engine walks configured globs
+ * and prefers the most reviewable target.
  */
 
 import { readdir, readFile } from 'node:fs/promises';

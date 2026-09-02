@@ -126,7 +126,7 @@ function azureTarget(
 /**
  * Accepted forms:
  *
- *   :memory:                                        throwaway, the default
+ *   :memory:                                        throwaway (not the config default)
  *   .atest/history.sqlite                           a local file
  *   azblob://<account>/<container>[/<prefix>]       Azure, via the DNS suffix
  *   https://<account>.blob.core.windows.net/<c>/<p> Azure, fully qualified

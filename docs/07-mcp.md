@@ -250,7 +250,7 @@ Every write goes through `@atest/core`'s patch layer, which enforces the same
   "mcpServers": {
     "atest": {
       "command": "npx",
-      "args": ["atest", "mcp", "serve"],
+      "args": ["-y", "@atest/mcp"],
       "env": { "ATEST_MCP_WRITE": "0" }
     }
   }

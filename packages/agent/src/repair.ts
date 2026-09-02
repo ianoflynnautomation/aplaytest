@@ -137,6 +137,35 @@ export interface RepairOptions {
   readonly budget?: BudgetGuard | undefined;
 }
 
+/**
+ * Rank pre-verified heal candidates by the test's intent.
+ *
+ * The model chooses among options Tier 0 already produced; it cannot invent a
+ * selector. `isRealBug: true` is a first-class outcome — the engine then
+ * reports a bug instead of a patch. Whatever is returned is still re-run by
+ * Playwright before anything is proposed.
+ *
+ * @param client - Injected LLM client. An unavailable client returns
+ *   `{ status: 'unavailable' }` rather than throwing.
+ * @param input - Failure intent, the missing test id, and the candidate list.
+ * @param options - Optional budget guard and ARIA truncation.
+ * @returns A choice, a decline, a real-bug verdict, or an unavailable/invalid
+ *   status. Never throws on a missing key or a refusal.
+ *
+ * @example
+ * ```ts
+ * const outcome = await runRepairAgent(createLlmClient(), {
+ *   testTitle: 'shows the gym name',
+ *   intent: 'gymsPage.expectCardData({ name })',
+ *   missingTestId: 'gym-card-name',
+ *   failureKind: 'locator_not_found',
+ *   expected: null,
+ *   actual: null,
+ *   ariaSnapshot: '...',
+ *   candidates: [{ value: 'gym-card-title', expression: "getByTestId('gym-card-title')", semanticDistance: 0.1 }],
+ * });
+ * ```
+ */
 export async function runRepairAgent(
   client: LlmClient,
   input: RepairInput,

@@ -22,6 +22,24 @@ export interface ServerOptions {
   readonly safety?: SafetyConfig | undefined;
 }
 
+/**
+ * Build the MCP server over the same engines the CLI calls.
+ *
+ * A façade, not a second product: no engine logic lives here. Mutating tools
+ * still require `ATEST_MCP_WRITE=1` **and** `confirm: true`.
+ *
+ * @param options - Tool context (cwd, evidence/runs dirs) and optional safety
+ *   overrides. Defaults to {@link safetyFromEnv}.
+ * @returns An MCP server ready to connect to a transport. Does not start
+ *   listening — call {@link startStdioServer} for the stdio entry point.
+ *
+ * @example
+ * ```ts
+ * const server = createServer({
+ *   context: { cwd: process.cwd(), evidenceDir: '.atest/evidence', runsDir: '.atest/runs' },
+ * });
+ * ```
+ */
 export function createServer(options: ServerOptions): McpServer {
   const safety = options.safety ?? safetyFromEnv();
 
@@ -85,6 +103,14 @@ export function createServer(options: ServerOptions): McpServer {
   return server;
 }
 
+/**
+ * Connect {@link createServer} to stdio and run until the client disconnects.
+ *
+ * Nothing except the protocol may be written to stdout — a stray log line
+ * corrupts the stream and the session dies with no useful error.
+ *
+ * @param options - Same as {@link createServer}.
+ */
 export async function startStdioServer(options: ServerOptions): Promise<void> {
   const server = createServer(options);
   await server.connect(new StdioServerTransport());

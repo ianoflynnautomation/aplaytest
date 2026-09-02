@@ -1,12 +1,12 @@
 # atest as a container.
 #
 # ── What this is for ──────────────────────────────────────────────────────────
-# The analyze job. Today a consumer runs five steps to get one CLI onto a
-# runner — setup-node, oras login, oras pull, untar, npm install — and
-# bjjeire-java pays all of it to run `npx atest` in a repository that is
-# otherwise entirely Java. An image collapses that to `container:`.
+# The analyze job. A consumer that only wants to RUN the CLI otherwise pays
+# five steps — setup-node, oras login, oras pull, untar, npm install — even
+# in a repository that is not Node at all. An image collapses that to
+# `container:`.
 #
-# It does NOT replace the tarball bundle published by npm-tarball-publish-oci.
+# It does NOT replace the tarball bundle published by oci-publish.yml.
 # The two serve different consumers and both are needed:
 #
 #   tarballs → a Node repo that installs atest as a DEPENDENCY, because the
@@ -119,9 +119,10 @@ LABEL org.opencontainers.image.title="atest" \
 # A flat node_modules is the layout every consumer already gets from
 # `npm i ./*.tgz`, so the image exercises the same resolution the tarballs do.
 #
-# ALL of them in one command, for the reason `scripts/pack.ts` documents: the
-# packages resolve each other by `file:` specifier and none is on a public
-# registry, so installing any one alone 404s on @atest/core.
+# ALL of them in one command, for the reason `scripts/pack.ts` documents: each
+# tarball declares `@atest/core@^0.1.0`, and npm satisfies that from the other
+# tarballs in the same invocation. Ask for one alone against an empty registry
+# cache and you 404 on `@atest/core`.
 COPY --from=builder /build/dist-pack/*.tgz /tmp/atest/
 # The directory must not be called `atest`: npm refuses to install a package
 # into a project of the same name.

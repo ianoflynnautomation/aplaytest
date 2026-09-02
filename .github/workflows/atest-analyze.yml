@@ -2,28 +2,19 @@ name: atest Flake Analysis (Reusable)
 
 # Flake analysis over a Playwright run, with history that outlives the run.
 #
-# ── Why this lives HERE and not in bjjeire-ci-templates ───────────────────────
-# It was written there first, and that was wrong. A shared template repository
-# earns its name by holding workflows any project can call; this one runs
-# `npx atest history ingest`, parses atest's verdict JSON, and speaks
-# `azblob://` history URLs. Nothing about it generalises, and a "generic"
-# template with a hardcoded product in it is worse than no template — it makes
-# the catalog a liability to read, because you can no longer trust that an
-# entry means what its name says.
+# ── Why this lives in the atest repo ──────────────────────────────────────────
+# A shared template repository earns its name by holding workflows any project
+# can call. This one runs `atest history ingest`, parses atest's verdict JSON,
+# and speaks `azblob://` history URLs. Nothing about it generalises, and a
+# "generic" template with a hardcoded product in it is worse than no template.
 #
-# The rule this repository follows: a workflow that only its own product can
-# use ships with that product. `npm-tarball-publish-oci.yml` stayed in the
-# templates repo because every input really is parameterised and any Node
-# workspace can call it; this one could not pass that test.
-#
-# CONSUMERS CALL IT CROSS-REPO:
+# CONSUMERS CALL IT CROSS-REPO (pin a tag or SHA, not `@main`, in production):
 #
 #   uses: ianoflynnautomation/atest/.github/workflows/atest-analyze.yml@<ref>
 #
-# This repository is PRIVATE, so that call needs Settings → Actions → General →
-# Access set to "Accessible from repositories owned by the user". Without it
-# the caller fails at parse time with "workflow was not found", which reads as
-# a typo rather than a permission.
+# The caller needs `packages: read` so GitHub Actions can pull the atest image
+# from GHCR. If the image package is private, the calling repo must be granted
+# access or the pull fails with a generic "unauthorized".
 #
 # ── The problem this exists for ───────────────────────────────────────────────
 # `fail-on-flaky: true` has no memory. A pipeline goes red with ZERO failed
@@ -56,8 +47,8 @@ name: atest Flake Analysis (Reusable)
 #
 # ── It runs INSIDE the atest image ────────────────────────────────────────────
 # So a caller needs no Node toolchain, no ORAS, and no install step — which is
-# the point: bjjeire is a Java repository that was installing Node to invoke
-# one CLI. It also needs no `az`: DefaultAzureCredential authenticates from a
+# the point: a Java repository should not install Node to invoke one CLI. It
+# also needs no `az`: DefaultAzureCredential authenticates from a
 # GitHub OIDC token written to AZURE_FEDERATED_TOKEN_FILE, the same mechanism
 # AKS workload identity uses, so the image authenticates identically in a
 # cluster and in CI.
@@ -106,10 +97,10 @@ on:
           Tag on atest-image. `main` tracks trunk and is the bootstrap default,
           because docker-publish.yml only moves `latest` on a version tag — a
           consumer pinned to `latest` should get the last thing somebody
-          decided to RELEASE, not the last thing that merged. Until atest cuts
-          a release `latest` does not exist, and defaulting to it would fail
-          the image pull on a fresh setup. Pin to a version tag once there is
-          one to pin to.
+          decided to RELEASE, not the last thing that merged. After the first
+          `v*` tag exists, change this default to `latest` (or the version)
+          and pin callers the same way. Defaulting to `latest` before that
+          tag exists fails the image pull.
         required: false
         type: string
         default: "main"
@@ -338,8 +329,8 @@ jobs:
           # node, not curl: the image has node by definition and adding curl to
           # it for one request would be a package to keep patched forever.
           # `api://AzureADTokenExchange` is the audience Entra requires for
-          # federated exchange and the one the terraform federated credential
-          # declares — a mismatch fails with AADSTS700212, which names the
+          # federated exchange and the one the federated credential must
+          # declare — a mismatch fails with AADSTS700212, which names the
           # audience but not the file that chose it.
           node --input-type=module -e '
             import { writeFileSync } from "node:fs";
@@ -376,7 +367,7 @@ jobs:
         shell: bash
         env:
           REPORT_JSON: ${{ steps.locate.outputs.json }}
-        run: npx atest history ingest --playwright-json "$REPORT_JSON"
+        run: atest history ingest --playwright-json "$REPORT_JSON"
 
       - name: Score and summarise
         id: report
@@ -384,8 +375,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx atest flaky report --json > flaky.json
-          npx atest history stats --json > history.json
+          atest flaky report --json > flaky.json
+          atest history stats --json > history.json
 
           # Written to a file rather than passed to `node -e`: the summary is a
           # markdown template full of backticks and ${...}, and quoting that
@@ -448,7 +439,7 @@ jobs:
         shell: bash
         env:
           RETAIN_DAYS: ${{ inputs.history-retain-days }}
-        run: npx atest history prune --keep-days "$RETAIN_DAYS"
+        run: atest history prune --keep-days "$RETAIN_DAYS"
 
       - name: Comment on the pull request
         if: inputs.comment-on-pr && github.event_name == 'pull_request' && steps.report.outcome == 'success'

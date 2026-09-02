@@ -4,9 +4,9 @@
 > authoring, auto-healing, flaky management, and test-impact analysis — without
 > making a green test depend on a language model.
 
-Grounded against this repository (`bjjeire-tests`: 271 acceptance tests, 9 Playwright
-projects, sharded CI, OTel tracing, seeded-data oracle). Every design choice below is
-checked against "does this survive contact with that suite?"
+Grounded against a real Playwright suite (hundreds of acceptance tests, multiple
+projects, sharded CI, OpenTelemetry tracing, a seeded-data oracle). Every design
+choice below is checked against "does this survive contact with a suite like that?"
 
 ## Documents
 
@@ -118,8 +118,8 @@ Confidence scores order the queue; they never authorize a change.
 
 Selector healing recovers a lost address. Assertion healing changes what the test
 *proves* — and an assertion heal that turns red green is indistinguishable from
-deleting the test. Your own `TODO.md` has the canonical case: `events.card.mapper.ts`
-maps `OpenMat → 'EVENT'` because the deployed build lags the fixed app. Resolving that
+deleting the test. The canonical case is a mapper that still emits `'EVENT'` because
+the deployed build lags the fixed app. Resolving that
 correctly required knowing a deploy was pending. No model has that context; a human
 does. Assertion heals may be proposed with evidence, never auto-applied.
 

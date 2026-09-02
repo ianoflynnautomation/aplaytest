@@ -1,0 +1,101 @@
+name: Publish OCI tarball bundle
+
+# The no-registry path: an air-gapped runner, a fork that cannot authenticate
+# to npm, or pinning a build that was never released. One GHCR artifact holds
+# every workspace tarball, because they must be installed together.
+#
+# Independent of npm-publish.yml. This workflow overwrites `main` on every
+# merge; npm never runs here. `latest` moves only on a version tag.
+#
+# Implementation: `.github/workflows/oci-publish-tarballs.yml`.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Whitespace-separated OCI tags to publish under."
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish tarball bundle
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/oci-publish-tarballs.yml
+    with:
+      image: ghcr.io/${{ github.repository_owner }}/atest-packages
+      tags: ${{ inputs.tags != '' && inputs.tags
+                || (startsWith(github.ref, 'refs/tags/')
+                    && format('{0} {1} latest', github.ref_name, github.sha)
+                    || format('main {0}', github.sha)) }}
+      node-version: "22"
+      # --ignore-scripts everywhere else in this repo's CI, but not here: the
+      # build has to run, and it is this repo's own lockfile.
+      install-command: npm ci
+      build-command: npm run build
+      pack-command: npm run pack
+      tarball-dir: dist-pack
+      bundle-name: atest-packages-{version}.tar.gz
+      # scripts/pack.ts names them explicitly. If that list changes, this
+      # number is the thing that makes it a deliberate change rather than a
+      # consumer discovering a missing package at import time.
+      expected-tarballs: 12
+      verify-install: true
+      # Loading the reporter from CommonJS is what Playwright actually does —
+      # `require.resolve` from a CJS context — and it is the entry point most
+      # likely to break in a way `npm install` cannot see.
+      verify-command: |
+        node --input-type=commonjs -e "
+          const r = require('@atest/runner-playwright/reporter');
+          if (typeof r.default !== 'function') { throw new Error('CJS reporter did not load from the tarball'); }
+        "
+        node --input-type=module -e "
+          import { BlobHistoryStore } from '@atest/store-azure';
+          if (typeof BlobHistoryStore !== 'function') { throw new Error('Azure history store did not load'); }
+        "
+        npx atest --help > /dev/null
+      artifact-type: application/vnd.atest.packages.v1
+      attest-provenance: true
+      attach-to-release: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+
+  visibility:
+    name: GHCR packages public
+    needs: [publish]
+    if: always() && needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      packages: write
+    steps:
+      - name: Set the tarball bundle public
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=atest-packages
+          if gh api --method PUT "/user/packages/container/${pkg}/visibility" \
+               -f visibility=public >/dev/null 2>&1 \
+            || gh api --method PUT "/users/${OWNER}/packages/container/${pkg}/visibility" \
+               -f visibility=public >/dev/null 2>&1; then
+            echo "::notice title=GHCR::${pkg} is public"
+          else
+            echo "::warning title=GHCR::Could not mark ${pkg} public via API (common while the repository is still private)."
+            echo "::warning title=GHCR::After the repo is public, re-run this workflow or set https://github.com/users/${OWNER}/packages/container/${pkg}/settings to Public."
+          fi

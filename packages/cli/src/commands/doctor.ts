@@ -151,7 +151,7 @@ export async function doctor(flags: {
         : warn(
             `page object (${flags.feature})`,
             'not found',
-            `expected src/ui/pages/<dir>/${flags.feature}.page.ts`,
+            `expected ${flags.feature}.page.ts under src/ui/pages, src/pages, or pages`,
           ),
     );
     checks.push(

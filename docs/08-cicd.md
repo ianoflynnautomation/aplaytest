@@ -364,7 +364,8 @@ Non-negotiable guards:
 
 ### Cross-repo (the interesting hard case)
 
-A change in `~/Sources/BjjEire` (`GymCard.tsx`) has no import edge into this repo. Two
+A change in the application repo (`GymCard.tsx`) has no import edge into the test
+repo. Two
 mechanisms, in order:
 
 1. **Testid diff (deterministic).** Extract `data-testid` literals from the app diff,
@@ -396,7 +397,7 @@ test.run (per shard)
 ```
 
 Attributes follow the existing `test.*` namespace. **Do not rename existing `test.*`
-attributes** — your `TODO.md` notes the Grafana dashboard depends on them. New
+attributes** — existing dashboards depend on them. New
 attributes go under `atest.*`:
 
 ```ts

@@ -143,7 +143,8 @@ describe('splitCallLog', () => {
 });
 
 describe('stripCodeFrame', () => {
-  // Verbatim from run 33253028409, mobile-nav.ui.acceptance.spec.ts.
+  // Shape captured from a real Playwright timeout: quoted source, caret, and
+  // a worker path. The path is generic; only the frame layout is load-bearing.
   const REAL = [
     'TimeoutError: locator.click: Timeout 10000ms exceeded.',
     'Call log:',
@@ -156,7 +157,7 @@ describe('stripCodeFrame', () => {
     '> 15 |       await page.getByTestId(mobileToggle).click();',
     '     |                                            ^',
     '  16 |',
-    '    at /__w/bjjeire/bjjeire/tests/layout/mobile-nav.ui.acceptance.spec.ts:15:44',
+    '    at /__w/org/repo/tests/layout/mobile-nav.ui.acceptance.spec.ts:15:44',
   ].join('\n');
 
   it('given a timeout message carrying a quoted source code frame -> when stripCodeFrame runs -> then the quoted user source and the file location are removed', { tags: ['@unit', '@taxonomy'] }, () => {

@@ -171,8 +171,7 @@ jobs:
       - name: Log in to Azure
         if: \${{ vars.ATEST_HISTORY_ACCOUNT != '' }}
         # SHA-pinned. The zizmor policy lets actions/* float on a tag and
-        # requires a hash for everything else; this is the same commit
-        # bjjeire-tests already vetted in env-deploy.yml.
+        # requires a hash for everything else.
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: \${{ github.ref == 'refs/heads/main' && vars.ATEST_HISTORY_CLIENT_ID != '' && vars.ATEST_HISTORY_CLIENT_ID || vars.AZURE_CLIENT_ID }}
