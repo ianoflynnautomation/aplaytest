@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/runner-playwright",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Playwright adapter: reporter plugin, error parsing, step extraction, evidence assembly",
   "license": "MIT",
   "type": "module",

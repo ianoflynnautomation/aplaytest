@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent runtime: bounded loops that rank pre-verified options",
   "license": "MIT",
   "type": "module",

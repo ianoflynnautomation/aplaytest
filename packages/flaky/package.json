@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/flaky",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Statistical flake detection, root-cause classification, and quarantine policy",
   "license": "MIT",
   "type": "module",

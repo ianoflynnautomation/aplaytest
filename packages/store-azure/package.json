@@ -1,7 +1,7 @@
 {
   "name": "@aplaytest/store-azure",
-  "version": "0.1.0",
-  "description": "Azure Blob Storage history store for atest \u2014 an append-only log of run records, so flake statistics outlive the run that produced them",
+  "version": "0.1.1",
+  "description": "Azure Blob Storage history store for atest — an append-only log of run records, so flake statistics outlive the run that produced them",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

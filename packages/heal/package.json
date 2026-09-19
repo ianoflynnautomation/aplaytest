@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/heal",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deterministic selector healing: candidates, validation, and constants patching",
   "license": "MIT",
   "type": "module",

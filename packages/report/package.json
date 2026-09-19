@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/report",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shard merge, PR comment, and the self-contained HTML report",
   "license": "MIT",
   "type": "module",

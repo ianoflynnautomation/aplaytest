@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server: the same engine calls the CLI makes, exposed to IDE agents",
   "license": "MIT",
   "type": "module",

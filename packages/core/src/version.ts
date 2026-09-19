@@ -6,5 +6,5 @@
  * enforces that, because a drift here is how a consumer's `aplaytest doctor`
  * reports a version nobody published.
  */
-export const ATEST_VERSION = '0.1.0';
+export const ATEST_VERSION = '0.1.1';
 

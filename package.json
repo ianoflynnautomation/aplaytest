@@ -1,9 +1,9 @@
 {
   "name": "atest-monorepo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Agentic test framework \u2014 a control plane around Playwright",
+  "description": "Agentic test framework — a control plane around Playwright",
   "license": "MIT",
   "engines": {
     "node": ">=22"

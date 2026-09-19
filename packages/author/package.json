@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/author",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Grounding retrieval and the falsifiability gate for generated tests",
   "license": "MIT",
   "type": "module",

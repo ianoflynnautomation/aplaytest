@@ -43,9 +43,7 @@ atest_analyze:
     flake-threshold: 0.15
     window-runs: 50
     comment-on-pr: true          # PR only
-    # `main` until atest cuts a release — docker-publish.yml only moves
-    # `latest` on a version tag, so it does not exist yet.
-    atest-tag: ${{ vars.ATEST_VERSION != '' && vars.ATEST_VERSION || 'main' }}
+    atest-tag: ${{ vars.ATEST_VERSION != '' && vars.ATEST_VERSION || '0.1.1' }}
   secrets:
     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     # Read-only on the history account. Used off main.

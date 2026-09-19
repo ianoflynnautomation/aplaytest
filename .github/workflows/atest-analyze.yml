@@ -94,16 +94,12 @@ on:
         default: "ghcr.io/ianoflynnautomation/aplaytest"
       atest-tag:
         description: >-
-          Tag on atest-image. `main` tracks trunk and is the bootstrap default,
-          because docker-publish.yml only moves `latest` on a version tag — a
-          consumer pinned to `latest` should get the last thing somebody
-          decided to RELEASE, not the last thing that merged. After the first
-          `v*` tag exists, change this default to `latest` (or the version)
-          and pin callers the same way. Defaulting to `latest` before that
-          tag exists fails the image pull.
+          Tag on atest-image. `latest` and `0.1.1` are written only by a
+          version tag (`docker-publish.yml`). `main` still tracks trunk.
+          Pin callers to a version (`0.1.1`) rather than floating on `main`.
         required: false
         type: string
-        default: "main"
+        default: "0.1.1"
       history-account:
         description: >-
           Storage account holding the run history. EMPTY DISABLES PERSISTENCE —

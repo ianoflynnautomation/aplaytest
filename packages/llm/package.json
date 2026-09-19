@@ -1,6 +1,6 @@
 {
   "name": "@aplaytest/llm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "LLM provider abstraction: structured output, prompt caching, budget accounting",
   "license": "MIT",
   "type": "module",

@@ -83,13 +83,13 @@ Do this **before** making the repository public, then cut the first tag.
    for `aplaytest`, `aplaytest-playwright` (after the first tag), and
    `aplaytest-packages`. Later pushes stay public. The publish workflows
    anonymous-pull the image and fail until that click happens.
-3. **First release.** `git tag v0.1.0 && git push origin v0.1.0`. That
-   fires three independent workflows: npm, the OCI tarball bundle, and the
-   container images. Until that tag exists, `atest-analyze.yml` defaults
-   to image tag `main` (published on every merge). After `v0.1.0`, change
-   `atest-tag`'s default in `.github/workflows/atest-analyze.yml` from
-   `main` to `latest` (or `0.1.0`) and pin `examples/ci/atest-analyze.yml`
-   to the same tag.
+3. **Release.** Bump every `packages/*/package.json` (and
+   `packages/core/src/version.ts`) together, then
+   `git tag v0.1.1 && git push origin v0.1.1`. That fires three independent
+   workflows: npm, the OCI tarball bundle, and the container images.
+   `atest-analyze.yml` defaults `atest-tag` to the current release
+   (`0.1.1`). `main` still tracks trunk for the image, but consumers should
+   pin a version. npm versions are immutable — never retag `v0.1.0`.
 
 Publish workflows (independent; none `needs:` another):
 
