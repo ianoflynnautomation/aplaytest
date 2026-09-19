@@ -137,6 +137,35 @@ on:
         required: false
         type: number
         default: 90
+      min-runs:
+        description: >-
+          Conclusive attempts required before a (test, project) pair is scored.
+          Below this, every verdict reads "insufficient data". Maps to
+          ATEST_FLAKY_MIN_RUNS / atest.config.ts flaky.minRuns.
+        required: false
+        type: number
+        default: 10
+      half-life-days:
+        description: >-
+          Recency half-life in days. A failure this old counts half as much as
+          one today. Maps to ATEST_FLAKY_HALF_LIFE_DAYS.
+        required: false
+        type: number
+        default: 7
+      flake-threshold:
+        description: >-
+          Score above this is flaky, once min-runs is met (0..1).
+          Maps to ATEST_FLAKY_THRESHOLD.
+        required: false
+        type: number
+        default: 0.15
+      window-runs:
+        description: >-
+          Cap on attempts pulled per (test, project) when scoring.
+          Maps to ATEST_FLAKY_WINDOW_RUNS.
+        required: false
+        type: number
+        default: 50
       write-branch:
         description: >-
           The only ref permitted to write history. A workflow-level echo of the
@@ -185,7 +214,7 @@ on:
           than flakes. This is the number worth acting on today.
         value: ${{ jobs.analyze.outputs.regression-count }}
       history-runs:
-        description: "Runs in the store. Below 10, every verdict reads 'insufficient data'."
+        description: "Runs in the store. Below min-runs, every verdict reads 'insufficient data'."
         value: ${{ jobs.analyze.outputs.history-runs }}
 
 jobs:
@@ -220,6 +249,10 @@ jobs:
       # artifact steps and persists between jobs, and a short-lived Entra token
       # has no business in either.
       TOKEN_FILE: /tmp/azure-federated-token
+      ATEST_FLAKY_MIN_RUNS: ${{ inputs.min-runs }}
+      ATEST_FLAKY_HALF_LIFE_DAYS: ${{ inputs.half-life-days }}
+      ATEST_FLAKY_THRESHOLD: ${{ inputs.flake-threshold }}
+      ATEST_FLAKY_WINDOW_RUNS: ${{ inputs.window-runs }}
     steps:
       # No checkout. The job reads an uploaded artifact and talks to a storage
       # account; it never touches the caller's source, which is also why it can
@@ -390,6 +423,7 @@ jobs:
           const flaky = (report.verdicts ?? []).filter(v => v.flaky);
           const regressions = report.regressions ?? [];
           const runs = stats.runs ?? 0;
+          const minRuns = report.config?.minRuns ?? 10;
           const out = ['## atest — flake analysis', ''];
 
           // Say the wait out loud. Below the scoring minimum every verdict
@@ -398,8 +432,8 @@ jobs:
           if (stats.driver === 'sqlite') {
             out.push('> No persistent history is configured, so this run was scored on its own.',
                      '> Set `history-account` to keep a baseline across runs.', '');
-          } else if (runs < 10) {
-            out.push(`> ${runs} run(s) in the store; scoring needs 10. Verdicts read "insufficient`,
+          } else if (runs < minRuns) {
+            out.push(`> ${runs} run(s) in the store; scoring needs ${minRuns}. Verdicts read "insufficient`,
                      '> data" until the window fills. That is the engine accumulating, not failing.', '');
           }
 

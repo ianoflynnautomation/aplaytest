@@ -74,6 +74,14 @@ ${style.bold('OPTIONS')}
   --reason "<text>"         Why it is being quarantined
   --issue <url>             Tracking issue
   --suite-size <n>          Suite size, for the quarantine budget
+  --min-runs <n>            Attempts required before a flake verdict   [10]
+                            Falls back to $ATEST_FLAKY_MIN_RUNS
+  --half-life-days <n>      Recency half-life for flake scoring         [7]
+                            Falls back to $ATEST_FLAKY_HALF_LIFE_DAYS
+  --threshold <n>           Flake score threshold (0..1)             [0.15]
+                            Falls back to $ATEST_FLAKY_THRESHOLD
+  --window-runs <n>         Attempts pulled per (test, project)        [50]
+                            Falls back to $ATEST_FLAKY_WINDOW_RUNS
   --repeat <n>              Repetitions per bisect probe            [10]
   --workers <list>          Worker levels to sweep, comma-separated [1,4,8]
   --config <path>           Playwright config to drive
@@ -137,6 +145,10 @@ const OPTIONS = {
   issue: { type: 'string' },
   expires: { type: 'string' },
   'suite-size': { type: 'string' },
+  'min-runs': { type: 'string' },
+  'half-life-days': { type: 'string' },
+  threshold: { type: 'string' },
+  'window-runs': { type: 'string' },
   repeat: { type: 'string' },
   workers: { type: 'string' },
   config: { type: 'string' },
@@ -234,6 +246,10 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
     issue: values.issue,
     expires: values.expires,
     suiteSize: values['suite-size'],
+    ...(values['min-runs'] === undefined ? {} : { minRuns: values['min-runs'] }),
+    ...(values['half-life-days'] === undefined ? {} : { halfLifeDays: values['half-life-days'] }),
+    ...(values.threshold === undefined ? {} : { threshold: values.threshold }),
+    ...(values['window-runs'] === undefined ? {} : { windowRuns: values['window-runs'] }),
   };
 
   const bisectFlags: BisectFlags = {

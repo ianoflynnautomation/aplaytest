@@ -11,7 +11,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { ingestDirectory } from '@aplaytest/core';
-import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@aplaytest/flaky';
+import { AnalyzeConfigError, analyzeAll, resolveAnalyzeConfig } from '@aplaytest/flaky';
 import {
   loadEvidence,
   loadRuns,
@@ -45,18 +45,22 @@ async function flakySummaries(flags: ReportFlags): Promise<FlakySummary[]> {
   // actually waiting for.
   try {
     const { store } = await openHistoryStore(resolveHistoryUrl(flags.db, process.env));
-    await ingestDirectory(store, flags.runs);
-    const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
-    await store.close();
-
-    return report.flaky.map(v => ({
-      title: v.title,
-      project: v.project,
-      score: v.score.score,
-      class: v.classification.class,
-      prescription: v.classification.prescription,
-    }));
-  } catch {
+    try {
+      await ingestDirectory(store, flags.runs);
+      const config = resolveAnalyzeConfig(process.env);
+      const report = await analyzeAll(store, config);
+      return report.flaky.map(v => ({
+        title: v.title,
+        project: v.project,
+        score: v.score.score,
+        class: v.classification.class,
+        prescription: v.classification.prescription,
+      }));
+    } finally {
+      await store.close();
+    }
+  } catch (caught) {
+    if (caught instanceof AnalyzeConfigError) warn(caught.message);
     return [];
   }
 }

@@ -26,6 +26,15 @@ export { analyzeTest, analyzeAll, groupByTestAndProject, DEFAULT_ANALYZE_CONFIG 
 export type { AnalyzeConfig, FlakyVerdict, FlakyReport } from './analyze.js';
 
 export {
+  resolveAnalyzeConfig,
+  parsePositiveInt,
+  parsePositiveNumber,
+  parseUnitInterval,
+  AnalyzeConfigError,
+} from './resolve.js';
+export type { AnalyzeConfigOverrides } from './resolve.js';
+
+export {
   evaluateQuarantinePolicy,
   effectiveBudget,
   daysUntilExpiry,

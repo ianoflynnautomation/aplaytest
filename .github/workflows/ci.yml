@@ -37,16 +37,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # @unit only. The @integration half — filesystem, SQLite, Azurite and
-      # the specs that spawn Playwright — runs in the `integration` job below,
-      # which is the one with a browser and a Docker daemon. Splitting on the
-      # tag rather than on file paths means a new boundary test lands in the
-      # right job by saying what it is, with no glob to remember to update.
       - name: Unit tests
         run: npm run test:unit
 
-      # The reporter is loaded by `require` from a CommonJS context. Asserting
-      # that here is cheaper than discovering it in a consumer's CI.
       - name: Both entry points load
         run: |
           node --input-type=commonjs -e "

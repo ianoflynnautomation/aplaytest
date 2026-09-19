@@ -8,6 +8,8 @@
  * document can make true.
  */
 
+import { QUARANTINE_DEFAULTS } from '@aplaytest/core';
+
 export interface QuarantineEntry {
   readonly testId: string;
   /** Null means every project. */
@@ -31,9 +33,9 @@ export interface QuarantinePolicy {
 }
 
 export const DEFAULT_QUARANTINE_POLICY: QuarantinePolicy = {
-  expiryDays: 14,
-  maxTests: 5,
-  maxRatio: 0.02,
+  expiryDays: QUARANTINE_DEFAULTS.expiryDays,
+  maxTests: QUARANTINE_DEFAULTS.maxTests,
+  maxRatio: QUARANTINE_DEFAULTS.maxRatio,
 };
 
 export const DEFAULT_QUARANTINE_REASON = 'flaky';

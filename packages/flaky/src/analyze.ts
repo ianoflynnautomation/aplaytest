@@ -7,7 +7,7 @@
  * aggregate is the number that hides the bug.
  */
 
-import type { HistoricalAttempt, HistoryStore } from '@aplaytest/core';
+import { FLAKY_DEFAULTS, type HistoricalAttempt, type HistoryStore } from '@aplaytest/core';
 
 import { classifyFlake, type Classification } from './classify.js';
 import { extractFeatures, type FlakeFeatures } from './features.js';
@@ -23,8 +23,8 @@ export interface AnalyzeConfig extends ScoreConfig {
 
 export const DEFAULT_ANALYZE_CONFIG: AnalyzeConfig = {
   ...DEFAULT_SCORE_CONFIG,
-  threshold: 0.15,
-  windowRuns: 50,
+  threshold: FLAKY_DEFAULTS.threshold,
+  windowRuns: FLAKY_DEFAULTS.windowRuns,
 };
 
 export interface FlakyVerdict {

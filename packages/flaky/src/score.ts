@@ -19,7 +19,12 @@
  * patterns. No model is involved anywhere in this file.
  */
 
-import { countsTowardFlakeStats, isFailure, type HistoricalAttempt } from '@aplaytest/core';
+import {
+  FLAKY_DEFAULTS,
+  countsTowardFlakeStats,
+  isFailure,
+  type HistoricalAttempt,
+} from '@aplaytest/core';
 
 export type ScoreConfidence = 'low' | 'medium' | 'high';
 
@@ -53,8 +58,8 @@ export interface ScoreConfig {
 }
 
 export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
-  minRuns: 10,
-  halfLifeDays: 7,
+  minRuns: FLAKY_DEFAULTS.minRuns,
+  halfLifeDays: FLAKY_DEFAULTS.halfLifeDays,
 };
 
 /** 95% confidence. */
@@ -129,6 +134,7 @@ export function scoreTest(
   const rawN = usable.length;
   const failures = usable.filter(a => isFailure(a.outcome)).length;
 
+  // Ref: @spec docs/specs/stc/flaky/scoring.md#AC-01
   if (rawN < config.minRuns) {
     return { ...EMPTY, rawN, failures };
   }

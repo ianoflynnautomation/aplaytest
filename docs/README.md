@@ -19,6 +19,7 @@ choice below is checked against "does this survive contact with a suite like tha
 | 04  | [Agent runtime](./04-agent-runtime.md)             | Repair agent, author agent, tools, prompting             |
 | 05  | [Healing engine](./05-healing.md)                  | Candidate generation, validation, patch, ledger          |
 | 06  | [Flaky engine](./06-flaky.md)                      | Scoring, classification, policy, quarantine hygiene      |
+| STC | [Flaky scoring knobs](./specs/stc/flaky/scoring.md) | `minRuns` / half-life / threshold / window — AC-tagged |
 | 07  | [MCP server](./07-mcp.md)                          | Tools, resources, safety model                           |
 | 08  | [CI/CD](./08-cicd.md)                              | GitHub Actions, GitLab, history storage, secret split    |
 | 09  | [Roadmap](./09-roadmap.md)                         | Phase 0 → 6, with exit criteria                          |

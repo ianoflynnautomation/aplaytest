@@ -44,8 +44,6 @@ jobs:
                     && format('{0} {1} latest', github.ref_name, github.sha)
                     || format('main {0}', github.sha)) }}
       node-version: "22"
-      # --ignore-scripts everywhere else in this repo's CI, but not here: the
-      # build has to run, and it is this repo's own lockfile.
       install-command: npm ci
       build-command: npm run build
       pack-command: npm run pack
@@ -73,8 +71,6 @@ jobs:
       attest-provenance: true
       attach-to-release: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
 
-  # Same constraint as docker-publish.yml: personal-account GHCR visibility is
-  # a one-time UI click. Re-running this workflow cannot flip it.
   visibility:
     name: GHCR packages public
     needs: [publish]

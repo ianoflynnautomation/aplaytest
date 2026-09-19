@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { LOCATOR_STRATEGIES, MAX_STABILITY_RANK } from '../locator/stability.js';
+import { FLAKY_DEFAULTS, QUARANTINE_DEFAULTS } from './defaults.js';
 
 export const ExecutionModeSchema = z.enum(['strict', 'assisted', 'agentic']);
 export type ExecutionMode = z.infer<typeof ExecutionModeSchema>;
@@ -126,21 +127,21 @@ const HealSchema = z.object({
 const FlakySchema = z.object({
   window: z
     .object({
-      runs: z.number().int().positive().default(50),
-      days: z.number().int().positive().default(14),
+      runs: z.number().int().positive().default(FLAKY_DEFAULTS.windowRuns),
+      days: z.number().int().positive().default(FLAKY_DEFAULTS.windowDays),
     })
     .prefault({}),
   /** Recency weighting: a failure this old counts half as much as one today. */
-  halfLifeDays: z.number().positive().default(7),
-  threshold: z.number().min(0).max(1).default(0.15),
-  minRuns: z.number().int().positive().default(10),
+  halfLifeDays: z.number().positive().default(FLAKY_DEFAULTS.halfLifeDays),
+  threshold: z.number().min(0).max(1).default(FLAKY_DEFAULTS.threshold),
+  minRuns: z.number().int().positive().default(FLAKY_DEFAULTS.minRuns),
   quarantine: z
     .object({
-      policy: z.enum(['off', 'propose', 'auto']).default('propose'),
-      expiryDays: z.number().int().positive().default(14),
-      maxTests: z.number().int().nonnegative().default(5),
-      maxRatio: z.number().min(0).max(1).default(0.02),
-      tag: z.string().default('@quarantine'),
+      policy: z.enum(['off', 'propose', 'auto']).default(QUARANTINE_DEFAULTS.policy),
+      expiryDays: z.number().int().positive().default(QUARANTINE_DEFAULTS.expiryDays),
+      maxTests: z.number().int().nonnegative().default(QUARANTINE_DEFAULTS.maxTests),
+      maxRatio: z.number().min(0).max(1).default(QUARANTINE_DEFAULTS.maxRatio),
+      tag: z.string().default(QUARANTINE_DEFAULTS.tag),
     })
     .prefault({}),
 });

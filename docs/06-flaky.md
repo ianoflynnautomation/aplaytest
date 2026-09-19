@@ -1,5 +1,8 @@
 # 06 — Flaky detection & management
 
+Machine-readable knobs (`minRuns`, half-life, threshold, window) live in
+[specs/stc/flaky/scoring.md](./specs/stc/flaky/scoring.md).
+
 ## Definition
 
 A test is flaky when, **holding commit, environment, and project fixed**, its outcome is

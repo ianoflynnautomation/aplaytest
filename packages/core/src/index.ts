@@ -108,6 +108,7 @@ export type {
 export type { IngestResult } from './history/ingest.js';
 
 // Config
+export { FLAKY_DEFAULTS, QUARANTINE_DEFAULTS, ANALYZE_ENV } from './config/defaults.js';
 export {
   defineAtestConfig,
   AtestConfigSchema,

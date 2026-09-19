@@ -37,7 +37,12 @@ atest_analyze:
     history-prefix: my-suite
     history-window-days: 90
     history-retain-days: 90
-    # comment-on-pr: true          # PR only
+    # Scoring knobs (optional). Defaults match atest.config.ts flaky.*
+    min-runs: 10
+    half-life-days: 7
+    flake-threshold: 0.15
+    window-runs: 50
+    comment-on-pr: true          # PR only
     # `main` until atest cuts a release — docker-publish.yml only moves
     # `latest` on a version tag, so it does not exist yet.
     atest-tag: ${{ vars.ATEST_VERSION != '' && vars.ATEST_VERSION || 'main' }}

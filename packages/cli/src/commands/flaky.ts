@@ -10,14 +10,19 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import {
-  DEFAULT_ANALYZE_CONFIG,
+  AnalyzeConfigError,
   DEFAULT_QUARANTINE_POLICY,
   analyzeAll,
   buildQuarantineEntry,
   evaluateQuarantinePolicy,
+  parsePositiveInt,
+  parsePositiveNumber,
+  parseUnitInterval,
   quarantineCodemod,
   releaseCodemod,
   renderQuarantineComment,
+  resolveAnalyzeConfig,
+  type AnalyzeConfigOverrides,
   type FlakyVerdict,
 } from '@aplaytest/flaky';
 import { ATEST_VERSION, ingestDirectory } from '@aplaytest/core';
@@ -46,6 +51,37 @@ export interface FlakyFlags {
   readonly issue?: string | undefined;
   readonly expires?: string | undefined;
   readonly suiteSize?: string | undefined;
+  readonly minRuns?: string | undefined;
+  readonly halfLifeDays?: string | undefined;
+  readonly threshold?: string | undefined;
+  readonly windowRuns?: string | undefined;
+}
+
+function analyzeOverrides(flags: FlakyFlags): AnalyzeConfigOverrides {
+  try {
+    const minRuns = parsePositiveInt(flags.minRuns, '--min-runs');
+    const halfLifeDays = parsePositiveNumber(flags.halfLifeDays, '--half-life-days');
+    const threshold = parseUnitInterval(flags.threshold, '--threshold');
+    const windowRuns = parsePositiveInt(flags.windowRuns, '--window-runs');
+    return {
+      ...(minRuns === undefined ? {} : { minRuns }),
+      ...(halfLifeDays === undefined ? {} : { halfLifeDays }),
+      ...(threshold === undefined ? {} : { threshold }),
+      ...(windowRuns === undefined ? {} : { windowRuns }),
+    };
+  } catch (caught) {
+    if (caught instanceof AnalyzeConfigError) throw new UsageError(caught.message);
+    throw caught;
+  }
+}
+
+function analyzeConfig(flags: FlakyFlags) {
+  try {
+    return resolveAnalyzeConfig(process.env, analyzeOverrides(flags));
+  } catch (caught) {
+    if (caught instanceof AnalyzeConfigError) throw new UsageError(caught.message);
+    throw caught;
+  }
 }
 
 async function loadReport(flags: FlakyFlags) {
@@ -54,7 +90,7 @@ async function loadReport(flags: FlakyFlags) {
   // on a fresh CI runner: the shard artifacts land, get written to the store,
   // and are scored against everything already there — in that order.
   const ingest = await ingestDirectory(store, flags.runs);
-  const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
+  const report = await analyzeAll(store, analyzeConfig(flags));
   const unreadable = storeWarnings(store);
   await store.close();
   return { ingest, report, description, unreadable };

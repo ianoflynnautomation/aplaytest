@@ -75,13 +75,14 @@ Do this **before** making the repository public, then cut the first tag.
    repository secret `NPM_TOKEN`. A tag without this secret fails the npm
    job — that is intentional; a release that never reached npm is not a
    release.
-2. **GHCR.** `docker-publish.yml` and `oci-publish.yml` try to mark
-   `aplaytest`, `aplaytest-playwright`, and `aplaytest-packages` public after a
-   successful push. GitHub often refuses that while the repo is still
-   private. After you switch the repo to public, either re-run those
-   workflows or set each package to Public under
-   `https://github.com/users/<owner>/packages/container/<name>/settings`.
-   Packages linked to this repository also inherit its visibility.
+2. **GHCR.** The first push of each image is **private**, even when this
+   repository is public. GitHub has no API to flip visibility for a
+   personal-account package, so do this once per package under Danger Zone →
+   Change visibility → Public:
+   `https://github.com/users/<owner>/packages/container/<name>/settings`
+   for `aplaytest`, `aplaytest-playwright` (after the first tag), and
+   `aplaytest-packages`. Later pushes stay public. The publish workflows
+   anonymous-pull the image and fail until that click happens.
 3. **First release.** `git tag v0.1.0 && git push origin v0.1.0`. That
    fires three independent workflows: npm, the OCI tarball bundle, and the
    container images. Until that tag exists, `atest-analyze.yml` defaults

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import { FLAKY_DEFAULTS, QUARANTINE_DEFAULTS } from '../src/config/defaults.js';
 import { defineAtestConfig } from '../src/config/schema.js';
 import { ATEST_VERSION } from '../src/version.js';
 
@@ -14,7 +15,11 @@ describe('defineAtestConfig', () => {
     expect(c.heal.apply).toBe('propose');
     expect(c.heal.strategies).toEqual(['selector']);
     expect(c.heal.validateCollateral).toBe(true);
-    expect(c.flaky.quarantine.expiryDays).toBe(14);
+    expect(c.flaky.minRuns).toBe(FLAKY_DEFAULTS.minRuns);
+    expect(c.flaky.halfLifeDays).toBe(FLAKY_DEFAULTS.halfLifeDays);
+    expect(c.flaky.threshold).toBe(FLAKY_DEFAULTS.threshold);
+    expect(c.flaky.window.runs).toBe(FLAKY_DEFAULTS.windowRuns);
+    expect(c.flaky.quarantine.expiryDays).toBe(QUARANTINE_DEFAULTS.expiryDays);
     expect(c.llm.provider).toBe('anthropic');
   });
 

@@ -23,7 +23,7 @@ import {
   loadRunBundles,
   type EvidenceBundle,
 } from '@aplaytest/core';
-import { DEFAULT_ANALYZE_CONFIG, analyzeAll } from '@aplaytest/flaky';
+import { analyzeAll, resolveAnalyzeConfig } from '@aplaytest/flaky';
 import {
   DEFAULT_HEAL_OPTIONS,
   assessBundle,
@@ -182,7 +182,7 @@ export const flakyQuery = defineTool({
   async handler(input, context) {
     const store = new MemoryHistoryStore();
     const ingest = await ingestDirectory(store, context.runsDir);
-    const report = await analyzeAll(store, DEFAULT_ANALYZE_CONFIG);
+    const report = await analyzeAll(store, resolveAnalyzeConfig(process.env));
     await store.close();
 
     const verdicts = report.verdicts
