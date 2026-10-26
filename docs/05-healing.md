@@ -13,187 +13,104 @@ test something it does not, and nobody finds out until a real bug slips through.
 
 The test still fails in the run where the breakage happened. That is the point.
 
+## Heal flow
+
+`aplaytest heal` reads a captured failure and asks `@aplaytest/heal` for a patch. It scores the same history store as `flaky report` and passes that score in. Schema, application, and network failures stop immediately. A score above the threshold stops immediately too. A missing store, or fewer runs than `minRuns`, leaves the score unset and that gate stays shut. A model, when a key is set, may only rank candidates the deterministic tier already found. Playwright re-runs the test before a patch counts as proposed. `--dry-run` skips that re-run and says so.
+
+```mermaid
+sequenceDiagram
+    participant CLI as aplaytest heal
+    participant Hist as History
+    participant Heal as @aplaytest/heal
+    participant Agent as repair agent
+    participant PW as Playwright
+
+    CLI->>Hist: Ingest runs and score the test
+    Note over Hist: Missing store or too few runs: no score
+    Hist-->>CLI: Flake score, when the sample is large enough
+    CLI->>Heal: Evidence bundle plus flake score
+    Heal->>Heal: Refuse NEVER_HEAL kinds
+    Heal->>Heal: Refuse when the score is above the threshold
+    opt ANTHROPIC_API_KEY is set and --no-llm is off
+        Heal->>Agent: Rank Tier-0 candidates
+        Agent-->>Heal: One candidate, or a real bug
+    end
+    Heal->>Heal: Patch the selector constant in memory
+    Heal->>PW: Re-run the test N times, then the rest of the spec
+    PW-->>Heal: Pass or fail
+    Heal-->>CLI: Proposed diff and ledger record, or a refusal
+```
+
+The same picture is in the [README](../README.md#how-a-heal-is-proposed). The decision detail is below.
+
 ---
 
 ## Decision flow
 
+`proposeHeal` in `packages/heal/src/propose.ts` runs these gates in order. A later gate does not run after an earlier one refuses.
+
 ```
-                            failure + EvidenceBundle
-                                      │
-                     ┌────────────────▼────────────────┐
-                     │ classify(kind)   [deterministic]│
-                     └────────────────┬────────────────┘
-                                      │
-                     kind ∈ NEVER_HEAL?├── yes ──► record · file bug · STOP
-                                      │            (schema_violation, app_error,
-                                      │             http_status, network, infra)
-                                      no
-                                      │
-                     ┌────────────────▼────────────────┐
-                     │ flaky check: is this test already│
-                     │ above threshold?    [history]    │
-                     └────────────────┬────────────────┘
-                                      │
-                        flaky? ───────┼── yes ──► route to flaky engine · STOP
-                                      │            (never heal a flake — you would be
-                                      │             changing code to chase noise)
-                                      no
-                                      │
-                     ┌────────────────▼─────────────────────────┐
-                     │ TIER 0 — deterministic candidate search   │
-                     │  a. exact testid at a different scope     │
-                     │  b. testid edit-distance neighbours       │
-                     │  c. role + accessible-name from ARIA      │
-                     │  d. label / placeholder / text            │
-                     │  e. last known-good locator from history  │
-                     │  f. sibling-of-stable-anchor              │
-                     └────────────────┬─────────────────────────┘
-                                      │
-                     ┌────────────────▼────────────────┐
-                     │ score + filter                   │
-                     │  · matchCount must be 1          │
-                     │  · stabilityRank ≤ minStability  │
-                     │  · semanticDistance ≤ 0.4        │
-                     └────────────────┬────────────────┘
-                                      │
-                   0 candidates ──────┼─────────► propose 'none' · escalate to human
-                                      │
-                   1 candidate,  ─────┼─────────► skip Tier 1 (no model needed)
-                   distance < 0.1     │
-                                      │
-                   ambiguous ─────────┤
-                                      ▼
-                     ┌──────────────────────────────────────────┐
-                     │ TIER 1 — repair agent ranks by INTENT     │  [model, optional]
-                     │  · picks among verified candidates        │
-                     │  · may answer isRealBug: true → STOP      │
-                     └────────────────┬─────────────────────────┘
-                                      │
-                     ┌────────────────▼─────────────────────────┐
-                     │ VALIDATE  [deterministic, mandatory]      │
-                     │  1. apply patch to a scratch worktree     │
-                     │  2. re-run the failing test N× (default 3)│
-                     │     → must be N/N pass                    │
-                     │  3. re-run the whole spec file            │
-                     │     → no new failures (collateral check)  │
-                     │  4. typecheck + lint the patched tree     │
-                     └────────────────┬─────────────────────────┘
-                                      │
-                     fails any step ──┼──► reject · record why · escalate
-                                      │
-                     ┌────────────────▼─────────────────────────┐
-                     │ GATE — policy                             │
-                     │  strategy ∈ allowed? aggressiveness? CI?  │
-                     │  stabilityDelta < 0 → force human review  │
-                     │  assertion strategy → propose-only ALWAYS │
-                     └────────────────┬─────────────────────────┘
-                                      │
-                  ┌───────────────────┼───────────────────┐
-                  ▼                   ▼                   ▼
-              propose               open PR          apply locally
-           (default in CI)     (balanced+CI)      (aggressive, dev only)
-                  │                   │                   │
-                  └───────────────────┴───────────────────┘
-                                      ▼
-                          LEDGER  .atest/heals/<id>.json  (git-tracked)
+failure + EvidenceBundle
+        │
+        ▼
+NEVER_HEAL, or the kind is not healable? ── yes ──► refused-never-heal
+        │
+        no
+        ▼
+flake score is set and above the threshold (default 0.15)? ── yes ──► refused-flaky
+        │
+        no
+        ▼
+assessBundle ── ineligible ──► refused-ineligible
+        │
+        eligible
+        ▼
+generateCandidates
+  strategies: testid, role, label, text
+        │
+        none within maxDistance ──► no-candidates
+        │
+        ▼
+optional ranker picks one generated candidate, or marks a real bug
+        │
+        real bug ──► refused-never-heal
+        │
+        ▼
+patchConstant ── no source ──► no-constant
+        │
+        ▼
+--dry-run ──► proposed, and the reason says NOT VALIDATED
+        │
+        otherwise
+        ▼
+validateHeal: re-run the target N times (default 3), then the rest of the spec
+        │
+        pass ──► proposed
+        fail ──► rejected
 ```
 
-Two gates in that flow deserve emphasis because they are what most implementations skip:
+The CLI opens the same history store as `flaky report` (`--db`, then `ATEST_HISTORY_URL`, then `:memory:`), ingests `--runs`, and passes a score only when the sample meets `minRuns`. A missing runs directory leaves the score unset, and the flake gate stays shut. A young test is not treated as a measurement.
 
-**"Is this test already flaky?" comes before healing.** Healing a flake is the worst
-possible outcome — you make a permanent code change to chase noise, the flake continues,
-and now the locator is wrong too. Flaky and broken are different problems with different
-treatments, and the engine must decide which one it is *first*.
+**A known flake is refused before any candidate is generated.** Healing a flake is a permanent code change made to chase noise. The flake continues, and the selector is wrong as well. Flaky and broken are different problems, and the engine decides which one it is first.
 
-**Validation is not optional and not model-scored.** The model's confidence orders the
-queue. Playwright decides.
+**Validation is a re-run.** The model's choice orders the candidates. Playwright decides. `--dry-run` skips the re-run and labels the proposal `NOT VALIDATED`.
 
 ---
 
 ## Tier 0 — deterministic candidate generation
 
-This resolves the majority of real-world selector drift with no model at all. Your repo
-makes it especially strong: selectors are testids held in one constants file, so the
-search space is small and the target is unambiguous.
+`generateCandidates` is synchronous. It reads the evidence bundle. It does not open a history store and it does not drive a browser.
 
-```ts
-// packages/heal/src/candidates.ts
+The default strategies are `testid`, `role`, `label`, and `text` (`DEFAULT_CANDIDATE_OPTIONS.allowedStrategies`). `css` and `xpath` stay out. For a single missing test id, every other id on the page is scored by token-aware distance and kept when `semanticDistance` is within `maxDistance` (default 0.4) and the stability rank is within `minStabilityRank` (default 4, which still allows text). For a role, label, or text locator, other accessible names are taken from the ARIA snapshot.
 
-export async function generateCandidates(
-  bundle: EvidenceBundle, history: HistoryStore,
-): Promise<LocatorCandidate[]> {
-  const intended = parseIntendedLocator(bundle.intent.selector); // e.g. testid 'gym-card-name'
-  const aria = parseAriaSnapshot(bundle.page.ariaSnapshot);
-  const out: LocatorCandidate[] = [];
+The score only orders that list:
 
-  // (a) Same testid, different scope — the element moved, the id survived.
-  if (intended?.kind === 'testid' && bundle.page.testIdsPresent.includes(intended.value)) {
-    out.push(candidate('testid', `getByTestId('${intended.value}')`, { rescope: true }));
-  }
-
-  // (b) Renamed testid: nearest neighbours by token-aware edit distance.
-  //     'gym-card-name' → 'gym-card-title' scores well; → 'gym-card-county' does not,
-  //     because the differing token is the semantic head.
-  if (intended?.kind === 'testid') {
-    for (const present of bundle.page.testIdsPresent) {
-      const d = testIdDistance(intended.value, present);   // token-aware, head-weighted
-      if (d <= 0.34) out.push(candidate('testid', `getByTestId('${present}')`, { distance: d }));
-    }
-  }
-
-  // (c) Role + accessible name, from the ARIA tree, matched against the test's
-  //     domain arguments. This is where intent pays off: expectCardData({ name:
-  //     'Blackwater Valley BJJ' }) tells us the accessible name to look for.
-  for (const arg of domainStringArgs(bundle.intent.failingStep)) {
-    for (const node of aria.findByAccessibleName(arg)) {
-      out.push(candidate('role', `getByRole('${node.role}', { name: ${JSON.stringify(arg)} })`));
-    }
-  }
-
-  // (d) Label / placeholder / text, for form controls.
-  out.push(...labelCandidates(aria, bundle), ...textCandidates(aria, bundle));
-
-  // (e) Last known-good: what did this test resolve to the last time it passed?
-  const priorLocator = await history.lastKnownGoodLocator(bundle.test.id, bundle.intent.failingStep);
-  if (priorLocator) out.push(candidate(priorLocator.strategy, priorLocator.expression, { prior: true }));
-
-  // (f) Sibling-of-stable-anchor: the target's container testid still resolves, so
-  //     search within it. Works well for card internals like gym-card-*.
-  out.push(...withinStableAnchor(aria, intended, bundle));
-
-  return dedupe(out);
-}
+```
+score = 0.7 * (1 - semanticDistance)
+      + 0.3 * (1 - stabilityRank / minStabilityRank)
 ```
 
-Then every candidate is **verified against the live page** before it is ever shown to a
-model or a human:
-
-```ts
-export async function verifyCandidates(
-  page: Page, cands: LocatorCandidate[],
-): Promise<LocatorCandidate[]> {
-  const verified: LocatorCandidate[] = [];
-  for (const c of cands) {
-    const loc = buildLocator(page, c.expression);
-    const count = await loc.count();
-    if (count !== 1) continue;                        // ambiguity is disqualifying
-    verified.push({
-      ...c,
-      matchCount: count,
-      visible: await loc.isVisible(),
-      enabled: await loc.isEnabled().catch(() => true),
-      accessibleName: await accessibleName(loc),
-      boundingBox: await loc.boundingBox(),
-      stabilityRank: STABILITY_RANK[c.strategy],
-    });
-  }
-  return verified.sort(byScore);
-}
-```
-
-The model therefore never invents a selector. It chooses among options that are already
-proven to resolve to exactly one element. This single design choice removes the entire
-class of "the AI suggested a selector that does not exist."
+The ranker, when a key is set, may choose one of those candidates, or it may say the failure is an application defect. It does not invent a selector. Playwright's re-run is what accepts a patch.
 
 ### Stability ranking
 

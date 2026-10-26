@@ -59,6 +59,12 @@ export interface TierOneRecord {
   readonly changedChoice: boolean;
 }
 
+/** What a ranker returns. `changedChoice` is computed by {@link proposeHeal}. */
+export type RankerResult = Omit<TierOneRecord, 'changedChoice'> & {
+  readonly chosen: string | null;
+  readonly realBug: boolean;
+};
+
 export interface HealProposal {
   readonly status: ProposalStatus;
   readonly evidenceId: string;
@@ -89,22 +95,26 @@ export interface ProposeOptions {
   readonly validationRuns: number;
   readonly checkCollateral: boolean;
   readonly candidateOptions?: CandidateOptions | undefined;
-  /** Flake score for this test, when history is available. */
+  /**
+   * Measured flake score for this test. Omit it when history cannot say:
+   * the gate does not treat a missing score as zero.
+   */
   readonly flakeScore?: number | undefined;
   readonly flakeThreshold?: number | undefined;
   /** Skip the re-run — for `--dry-run`, which must never claim validation. */
   readonly skipValidation?: boolean | undefined;
   readonly timeoutMs?: number | undefined;
   /**
-   * Optional Tier-1 ranker. Given the same verified candidates, it may reorder
-   * them by intent — and nothing else. Its choice is still validated by a
-   * re-run, so a wrong answer costs a rejected proposal, never a bad patch.
+   * Optional Tier-1 ranker. It may pick one candidate this function already
+   * generated, or it may call the failure a real bug. It does not invent a
+   * selector. A wrong pick is still re-run, so the cost is a rejected
+   * proposal.
    */
   readonly rankCandidates?:
     | ((input: {
         readonly candidates: readonly HealCandidate[];
         readonly missingTestId: string;
-      }) => Promise<TierOneRecord & { readonly chosen: string | null; readonly realBug: boolean }>)
+      }) => Promise<RankerResult>)
     | undefined;
 }
 

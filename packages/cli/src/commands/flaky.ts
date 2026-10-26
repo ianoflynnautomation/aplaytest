@@ -57,7 +57,9 @@ export interface FlakyFlags {
   readonly windowRuns?: string | undefined;
 }
 
-function analyzeOverrides(flags: FlakyFlags): AnalyzeConfigOverrides {
+export function analyzeOverrides(
+  flags: Pick<FlakyFlags, 'minRuns' | 'halfLifeDays' | 'threshold' | 'windowRuns'>,
+): AnalyzeConfigOverrides {
   try {
     const minRuns = parsePositiveInt(flags.minRuns, '--min-runs');
     const halfLifeDays = parsePositiveNumber(flags.halfLifeDays, '--half-life-days');

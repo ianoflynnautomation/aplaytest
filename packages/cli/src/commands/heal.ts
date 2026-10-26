@@ -22,14 +22,18 @@ import {
 import {
   ATEST_VERSION,
   formatFailingStep,
+  ingestDirectory,
   loadRunBundles,
   type EvidenceBundle,
 } from '@aplaytest/core';
+import { analyzeAll, resolveAnalyzeConfig } from '@aplaytest/flaky';
 import { BudgetGuard, createLlmClient, type LlmClient } from '@aplaytest/llm';
 import { runRepairAgent } from '@aplaytest/agent';
 
 import { EXIT, UsageError, type ExitCode } from '../exit.js';
+import { openHistoryStore, resolveHistoryUrl } from '../store.js';
 import { heading, line, renderDiff, style, warn } from '../ui/output.js';
+import { analyzeOverrides } from './flaky.js';
 
 export interface HealFlags {
   readonly evidence: string;
@@ -48,6 +52,17 @@ export interface HealFlags {
   readonly force: boolean;
   /** Force the deterministic tier even when a key is present. */
   readonly noLlm: boolean;
+  readonly runs: string;
+  /**
+   * History target. `undefined` means "not stated" — resolveHistoryUrl then
+   * falls back to $ATEST_HISTORY_URL and finally to :memory:. Defaulting it
+   * here would make the environment variable unreachable.
+   */
+  readonly db: string | undefined;
+  readonly minRuns?: string | undefined;
+  readonly halfLifeDays?: string | undefined;
+  readonly threshold?: string | undefined;
+  readonly windowRuns?: string | undefined;
 }
 
 export { ATEST_VERSION };
@@ -91,7 +106,6 @@ function rankWithRepairAgent(
       reasoning: 'choice' in outcome ? outcome.choice.reasoning : null,
       confidence: 'choice' in outcome ? outcome.choice.confidence : null,
       usd: 'usd' in outcome ? outcome.usd : 0,
-      changedChoice: false,
       chosen,
       realBug: outcome.status === 'real-bug',
     };
@@ -153,6 +167,59 @@ function renderProposal(proposal: HealProposal): void {
   }
 }
 
+function scoreKey(testId: string, project: string): string {
+  return `${testId}::${project}`;
+}
+
+/**
+ * Key for the history row of this bundle.
+ *
+ * A bundle read back from disk can omit fields the type requires. The
+ * reporter stores a nameless Playwright project as `default`
+ * (`reporter.ts`), and the score is per (test, project), so a missing
+ * project has to use that same name or the lookup misses.
+ */
+function historyKey(test: EvidenceBundle['test']): string | undefined {
+  const testId = test.id;
+  if (testId === undefined || testId === '') return undefined;
+  const project = test.project === undefined || test.project === '' ? 'default' : test.project;
+  return scoreKey(testId, project);
+}
+
+async function flakeScoresFor(
+  flags: HealFlags,
+): Promise<{ scores: ReadonlyMap<string, number>; threshold: number }> {
+  const config = resolveAnalyzeConfig(process.env, analyzeOverrides(flags));
+  // A store that cannot be opened throws. Catching it would heal against a
+  // history the operator did not choose.
+  const { store } = await openHistoryStore(resolveHistoryUrl(flags.db, process.env));
+  try {
+    await ingestDirectory(store, flags.runs);
+    const report = await analyzeAll(store, config);
+    const scores = new Map<string, number>();
+    for (const verdict of report.verdicts) {
+      // Below minRuns the numeric score is 0. That is not a measurement, and
+      // counting it would tell the operator the gate had seen history.
+      if (verdict.score.insufficientData) continue;
+      scores.set(scoreKey(verdict.testId, verdict.project), verdict.score.score);
+    }
+    if (!flags.json) {
+      const count = scores.size;
+      const noun = count === 1 ? 'test' : 'tests';
+      line(
+        style.dim(
+          count === 0
+            ? `flake gate: no scored history under ${flags.runs}`
+            : `flake gate: ${count} ${noun} scored`,
+        ),
+      );
+    }
+    return { scores, threshold: config.threshold };
+  } finally {
+    await store.close();
+  }
+}
+
 export async function heal(flags: HealFlags): Promise<ExitCode> {
   let constantsText: string | undefined;
   if (flags.constants !== undefined) {
@@ -177,12 +244,17 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
   const llm = createLlmClient({ disabled: flags.noLlm });
   const budget = new BudgetGuard();
 
-  if (!llm.available) {
+  // --json is the whole of stdout. A status line here would make it unparseable.
+  if (!llm.available && !flags.json) {
     line(style.dim('tier 0 only — no model configured; deterministic ranking stands'));
   }
 
+  const { scores, threshold } = await flakeScoresFor(flags);
+
   const proposals: HealProposal[] = [];
   for (const bundle of bundles) {
+    const key = historyKey(bundle.test);
+    const flakeScore = key === undefined ? undefined : scores.get(key);
     proposals.push(
       await proposeHeal(bundle, {
         cwd: flags.cwd ?? process.cwd(),
@@ -195,6 +267,8 @@ export async function heal(flags: HealFlags): Promise<ExitCode> {
         checkCollateral: !flags.noCollateral,
         // A dry run must never produce a record that reads as verified.
         skipValidation: flags.dryRun,
+        ...(flakeScore === undefined ? {} : { flakeScore }),
+        flakeThreshold: threshold,
         rankCandidates: llm.available ? rankWithRepairAgent(llm, budget, bundle) : undefined,
       }),
     );

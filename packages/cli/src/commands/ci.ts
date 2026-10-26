@@ -133,6 +133,16 @@ jobs:
       id-token: write
     env:
       ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+      # Job-level so flaky report, heal, and the report open one store. The
+      # prune step overrides this with the writable URL; it runs only on main.
+      #
+      # \`?readonly=1\` is selected by the POSITIVE condition, never by
+      # \`on-main && '' || '?readonly=1'\`. That reads as a ternary and is not:
+      # an empty string is falsy, so the \`||\` always fires and main would open
+      # the store read-only too. History would silently never be written, and
+      # the only symptom is "insufficient data" forever — which is also what a
+      # correctly working new store says.
+      ATEST_HISTORY_URL: \${{ vars.ATEST_HISTORY_ACCOUNT != '' && format('azblob://{0}/atest-history{1}', vars.ATEST_HISTORY_ACCOUNT, (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && '?readonly=1' || '') || '' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -181,20 +191,11 @@ jobs:
       # Deterministic: runs with or without a model key. Unset
       # ATEST_HISTORY_ACCOUNT and everything still works, scored against this
       # run alone — persistence is the feature that degrades, not the job.
-      #
-      # \`?readonly=1\` is selected by the POSITIVE condition, never by
-      # \`on-main && '' || '?readonly=1'\`. That reads as a ternary and is not:
-      # an empty string is falsy, so the \`||\` always fires and main would open
-      # the store read-only too. History would silently never be written, and
-      # the only symptom is "insufficient data" forever — which is also what a
-      # correctly working new store says.
       - name: Flaky analysis
-        env:
-          ATEST_HISTORY_URL: \${{ vars.ATEST_HISTORY_ACCOUNT != '' && format('azblob://{0}/atest-history{1}', vars.ATEST_HISTORY_ACCOUNT, (github.ref != 'refs/heads/main' || github.event_name == 'pull_request') && '?readonly=1' || '') || '' }}
         run: npx aplaytest flaky report --runs .atest-artifacts/runs
 
       - name: Propose heals
-        run: npx aplaytest heal --evidence .atest-artifacts/evidence --dry-run || true
+        run: npx aplaytest heal --evidence .atest-artifacts/evidence --runs .atest-artifacts/runs --dry-run || true
 
       # Merges every shard into one view. Writes the comment to a file rather
       # than stdout so the human summary on stderr cannot end up inside it.
@@ -301,7 +302,7 @@ analyze:
   script:
     - npm ci --ignore-scripts
     - npx aplaytest flaky report --runs .atest/runs
-    - npx aplaytest heal --evidence .atest/evidence --dry-run || true
+    - npx aplaytest heal --evidence .atest/evidence --runs .atest/runs --dry-run || true
     - npx aplaytest report --runs .atest/runs --evidence .atest/evidence --out report.html
   artifacts:
     when: always
@@ -345,7 +346,7 @@ export async function ciGenerate(flags: CiFlags): Promise<ExitCode> {
     // base of the `playwright` Docker target. A generated workflow whose
     // image predates the reporter's Playwright fails at browser launch with
     // "Executable doesn't exist", naming a tag the reader did not choose.
-    playwrightImage: flags.playwrightImage ?? 'mcr.microsoft.com/playwright:v1.61.0-noble',
+    playwrightImage: flags.playwrightImage ?? 'mcr.microsoft.com/playwright:v1.64.1-noble',
   };
 
   const content = provider === 'github' ? githubWorkflow(options) : gitlabWorkflow(options);

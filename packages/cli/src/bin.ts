@@ -276,6 +276,12 @@ async function dispatch(argv: readonly string[]): Promise<ExitCode> {
     healLedger: values['heal-ledger'],
     force: values.force,
     noLlm: values['no-llm'],
+    runs: values.runs,
+    db: values.db,
+    ...(values['min-runs'] === undefined ? {} : { minRuns: values['min-runs'] }),
+    ...(values['half-life-days'] === undefined ? {} : { halfLifeDays: values['half-life-days'] }),
+    ...(values.threshold === undefined ? {} : { threshold: values.threshold }),
+    ...(values['window-runs'] === undefined ? {} : { windowRuns: values['window-runs'] }),
   };
 
   const reportFlags: ReportFlags = {

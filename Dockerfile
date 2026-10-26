@@ -33,7 +33,7 @@
 # in the global scope. Declared inside a stage it silently expands to empty,
 # and the build fails resolving `playwright:v-noble` — a confusing error for
 # what is only a scoping rule.
-ARG PLAYWRIGHT_VERSION=1.61.0
+ARG PLAYWRIGHT_VERSION=1.64.1
 
 # ── builder ───────────────────────────────────────────────────────────────────
 # Builds and packs exactly the way CI does, so an image and a published bundle
@@ -204,15 +204,14 @@ CMD ["--help"]
 # Everything above plus browsers, for the commands that spawn Playwright.
 #
 # THE TAG AND THE npm VERSION ARE ONE DECISION. The base ships a specific
-# browser build and the npm package demands exactly that build: v1.61.0-noble
-# carries chromium-1228, and playwright 1.62.1 looks for chromium-1234 and
-# refuses to start. This is pinned to 1.61.0 in package.json and
-# packages/runner-playwright/package.json, exactly — a caret there would let a
-# fresh install drift away from this tag.
+# browser build and the npm package demands exactly that build. This is pinned
+# to 1.64.1 in package.json and packages/runner-playwright/package.json,
+# exactly — a caret there would let a fresh install drift away from this tag.
 #
-# Keeping them together is not only about starting: a heal or a gate verdict
-# validated against a different browser build than CI runs is not validated,
-# and screenshot rendering changes between builds.
+# The 1.62.1 drift is why the pairing stays enforced: v1.61.0-noble carried
+# chromium-1228, and playwright 1.62.1 looked for chromium-1234 and refused to
+# start. A heal or a gate verdict validated against a different browser build
+# than CI runs is not validated, and screenshot rendering changes between builds.
 #
 # The launch check at the end of this stage enforces the pairing at BUILD time,
 # and Playwright's own error names the tag to move to. That is how the 1.62.1

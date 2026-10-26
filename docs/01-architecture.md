@@ -5,12 +5,12 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  FRONT-ENDS                                                             │
-│    atest CLI  (commander + clack)      MCP server (stdio | http)        │
+│    atest CLI  (parseArgs)              MCP server (stdio)               │
 └───────────────────────────┬─────────────────────────────────────────────┘
                             │  same in-process API — no HTTP between them
 ┌───────────────────────────▼─────────────────────────────────────────────┐
-│  CORE ENGINE  @aplaytest/core                                               │
-│    config resolution · run orchestration · policy evaluation · audit    │
+│  CORE ENGINE  @aplaytest/core                                           │
+│    config · evidence · history · taxonomy · locator ranking             │
 └──┬──────────┬───────────┬───────────┬──────────┬──────────┬─────────────┘
    │          │           │           │          │          │
 ┌──▼───────┐┌─▼─────────┐┌▼─────────┐┌▼────────┐┌▼────────┐┌▼───────────┐
@@ -18,33 +18,67 @@
 │ ADAPTER  ││ STORE     ││ STORE    ││ ENGINE  ││ ENGINE  ││ ENGINE     │
 │          ││           ││          ││         ││         ││            │
 │ spawn pw ││ bundles   ││ sqlite / ││ cand.   ││ scoring ││ import     │
-│ ingest   ││ artifacts ││ postgres ││ gen +   ││ classify││ graph +    │
+│ ingest   ││ artifacts ││ azblob   ││ gen +   ││ classify││ graph +    │
 │ blob/json││ aria/dom  ││ trace-id ││ validate││ policy  ││ coverage   │
 │ parse    ││ shots/net ││ keyed    ││ patch   ││ quaran. ││ map        │
 │ traces   ││           ││          ││         ││         ││            │
 └──────────┘└───────────┘└──────────┘└────┬────┘└────┬────┘└────────────┘
                                           │          │
                               ┌───────────▼──────────▼──────────┐
-                              │  AGENT RUNTIME  @aplaytest/agent    │
+                              │  @aplaytest/agent               │
                               │  repair agent · author agent    │
-                              │  tool registry · budget guard   │
+                              │  author drafts a test           │
                               └───────────────┬─────────────────┘
                                               │
                               ┌───────────────▼─────────────────┐
-                              │  LLM ABSTRACTION  @aplaytest/llm    │
-                              │  anthropic (openai/ollama: n/i) │
-                              │  structured output · caching    │
+                              │  @aplaytest/llm                 │
+                              │  anthropic | unavailable        │
+                              │  budget · structured output     │
                               └─────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  OUTPUTS   report (HTML + insights) · OTel spans · GitHub/Slack/Jira    │
+│  OUTPUTS   HTML report · pull-request comment                           │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Dependency rule:** arrows point down only. `@aplaytest/heal` may import `@aplaytest/core`;
-`core` never imports an engine. Engines never import each other — `flaky` needing
-impact data receives it through `core`. This keeps each engine independently testable
-with a fake history store.
+**Dependency rule:** arrows point down only. `@aplaytest/heal` and `@aplaytest/flaky` import
+`@aplaytest/core` and `@aplaytest/runner-playwright`. `@aplaytest/impact` imports core.
+`@aplaytest/agent` imports core and `@aplaytest/llm`. `core` never imports an engine.
+Engines never import each other. The CLI and the MCP server are the places that call
+more than one engine.
+
+`@aplaytest/author` (`gate.ts`, `ground.ts`, `mutants.ts`) is the falsifiability gate.
+It imports core and the Playwright runner, and it does not call a model.
+`@aplaytest/agent`'s `author.ts` is the model that drafts a test. The gate accepts or
+rejects that draft.
+
+## Run flow
+
+Playwright still discovers and runs the tests. The reporter collects each attempt and writes evidence after the run. It does not change the pass or fail result. Scoring and healing are later commands.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant PW as Playwright
+    participant Rep as atest reporter
+    participant Disk as .atest
+    participant CLI as aplaytest
+
+    Dev->>PW: playwright test
+    PW->>Rep: onTestEnd for each attempt
+    PW->>Rep: onEnd
+    Rep->>Disk: Write .atest/evidence and .atest/runs
+    Rep-->>PW: Leave the verdict unchanged
+    PW-->>Dev: Pass or fail
+    Dev->>CLI: flaky report
+    CLI->>Disk: Read run records and history
+    CLI-->>Dev: Scores, classes, quarantine advice
+    Dev->>CLI: heal
+    CLI->>Disk: Read evidence and history
+    CLI-->>Dev: A proposed diff, or a refusal
+```
+
+The same picture is in the [README](../README.md#how-a-run-is-recorded).
 
 ---
 

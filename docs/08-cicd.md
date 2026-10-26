@@ -11,24 +11,39 @@
 > [12 — Azure history](./12-azure-history.md). `:memory:` (the default)
 > reports "insufficient data" forever, which reads as the engine working.
 
+## CI flow
+
+`aplaytest ci generate` writes three jobs: test, analyze, and policy. The test job runs the branch and has no model key. The analyze job holds the key, runs no application code, and continues on error. Main writes the history store. A pull request opens it read-only. Heal in that job is scored against the same store. Policy runs `flaky expire --ci` and can fail the workflow.
+
+```mermaid
+sequenceDiagram
+    participant PR as Pull request or main
+    participant Test as test job
+    participant PW as Playwright
+    participant Art as Artifacts
+    participant An as analyze job
+    participant Store as History store
+
+    PR->>Test: Start the workflow
+    Note over Test: Branch code. No model key.
+    Test->>PW: playwright test --shard
+    PW->>Art: Upload .atest/runs and .atest/evidence
+    Test-->>An: needs test, unless cancelled
+    Note over An: Model key. No application code. continue-on-error.
+    An->>Art: Download every shard
+    An->>Store: flaky report
+    Note over Store: Main writes. A pull request reads.
+    An->>An: heal --dry-run, scored against that history
+    An->>An: Write the HTML report and the PR comment
+    An-->>PR: Comment on the pull request
+```
+
+The same picture is in the [README](../README.md#ci-flow). The generator that emits this shape is `packages/cli/src/commands/ci.ts`.
+
 ## The central constraint: split execute from analyze
 
 The test job executes application code and, on `pull_request`, code from a fork. The
 analyze job holds a model API key. **These must not be the same job.**
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  plan            no secrets · computes impact + shard plan          │
-├─────────────────────────────────────────────────────────────────────┤
-│  test  (matrix)  no model key · APP_ENV creds only                  │
-│                  playwright test                                    │
-│                  ↳ uploads blob-report + .atest/evidence            │
-├─────────────────────────────────────────────────────────────────────┤
-│  analyze         model key · runs NO application code               │
-│                  downloads artifacts · heal --propose · flaky       │
-│                  ↳ PR comment · heal branch · history commit        │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 Why this matters concretely, and not as generic hygiene:
 
@@ -47,173 +62,27 @@ Why this matters concretely, and not as generic hygiene:
 
 ## GitHub Actions — `atest.yml`
 
-Fits alongside your existing `ci.yml` (lint + typecheck) and the reusable
-`playwright-docker.yml`.
+`npx aplaytest ci generate` writes `.github/workflows/atest.yml`. The generator is `packages/cli/src/commands/ci.ts`. It emits three jobs. The default Playwright image is `mcr.microsoft.com/playwright:v1.64.1-noble`; `--playwright-image` overrides it. Keep that tag on the same Playwright version the suite pins.
 
-```yaml
-name: Acceptance (atest)
+**test.** Runs `npx playwright test --shard`. Uploads `.atest/runs` and `.atest/evidence`. The job has no model key and no secrets. Shards share `ATEST_RUN_ID`.
 
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  workflow_dispatch:
+**analyze.** `continue-on-error: true`. Holds `ANTHROPIC_API_KEY`. Downloads the shard artifacts and does not run application code. The job environment sets `ATEST_HISTORY_URL` from `vars.ATEST_HISTORY_ACCOUNT`: `azblob://<account>/atest-history` on main, and the same URL with `?readonly=1` on a pull request or any other branch. An empty account leaves the URL empty, and the CLI falls through to `:memory:`.
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+The steps are:
 
-permissions:
-  contents: read
+- `npx aplaytest flaky report --runs .atest-artifacts/runs`
+- `npx aplaytest heal --evidence .atest-artifacts/evidence --runs .atest-artifacts/runs --dry-run`
+- `npx aplaytest report`, writing the HTML report and the pull-request comment
+- on main, `npx aplaytest history prune --keep-days 90` against the writable store
+- on a pull request, one updating comment via `gh pr comment --edit-last`
 
-jobs:
-  # ── 1. PLAN ────────────────────────────────────────────────────────────────
-  plan:
-    name: Plan
-    runs-on: ubuntu-latest
-    outputs:
-      shards: ${{ steps.plan.outputs.shards }}
-      grep: ${{ steps.plan.outputs.grep }}
-      skip: ${{ steps.plan.outputs.skip }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0          # impact analysis needs history
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: 'npm' }
-      - run: npm ci --ignore-scripts
+Heal and the flaky report share that history URL, so a score above the threshold refuses the heal before any candidate is generated. `--dry-run` writes nothing to the working tree.
 
-      # Impact analysis is deterministic (import graph + coverage map). On main it
-      # is skipped entirely — main always runs everything.
-      - id: plan
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            npx aplaytest ci plan --all --shards 4 >> "$GITHUB_OUTPUT"
-          else
-            npx aplaytest ci plan --impact-from origin/main --shards auto --max-shards 4 \
-              >> "$GITHUB_OUTPUT"
-          fi
+**policy.** Runs `npx aplaytest flaky expire --ci`. This job is not `continue-on-error`. An expired quarantine fails the workflow.
 
-  # ── 2. TEST ────────────────────────────────────────────────────────────────
-  test:
-    name: ${{ matrix.project }} ${{ matrix.shard }}
-    needs: plan
-    if: needs.plan.outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.61.0-noble    # Renovate-grouped pin
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.shards) }}
-    env:
-      APP_ENV: docker
-      CI: 'true'
-      # NOTE: no ANTHROPIC_API_KEY here. Deliberate.
-    steps:
-      - uses: actions/checkout@v6
-        with: { persist-credentials: false }
-      - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: 'npm' }
-      - run: npm ci
+Impact selection is `npx aplaytest impact`. The generator does not emit a plan job.
 
-      - name: Run acceptance tests
-        run: |
-          npx playwright test \
-            --project ${{ matrix.project }} \
-            --shard ${{ matrix.shard }} \
-            --grep '${{ needs.plan.outputs.grep }}' \
-            --record-coverage
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: atest-${{ matrix.project }}-${{ strategy.job-index }}
-          path: |
-            blob-report/
-            .atest/evidence/
-            .atest/run.json
-          retention-days: 7
-
-  # ── 3. ANALYZE ─────────────────────────────────────────────────────────────
-  analyze:
-    name: Analyze
-    needs: [plan, test]
-    if: ${{ !cancelled() && needs.plan.outputs.skip != 'true' }}
-    runs-on: ubuntu-latest
-    continue-on-error: true          # analysis must never change the merge verdict
-    permissions:
-      contents: write                # heal branch + history branch
-      pull-requests: write           # PR comment
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-    steps:
-      - uses: actions/checkout@v6
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: 'npm' }
-      - run: npm ci --ignore-scripts
-
-      - uses: actions/download-artifact@v4
-        with: { pattern: atest-*, path: artifacts, merge-multiple: true }
-
-      # No restore step: the store IS the container. Records are written as
-      # one immutable object per run and shard, so there is no single file to
-      # download, merge and race on. See 12 — Azure history.
-      - name: Ingest this run
-        run: npx aplaytest history ingest --runs .atest-artifacts/runs
-
-      - name: Merge run data
-        run: npx aplaytest analyze ingest --from artifacts
-
-      # Flaky analysis is fully deterministic — runs even with no model key.
-      - name: Flaky analysis
-        run: |
-          npx aplaytest flaky analyze --ci
-          npx aplaytest flaky expire --ci || echo "EXPIRED_QUARANTINE=1" >> "$GITHUB_ENV"
-
-      # Heals need a browser to validate candidates against the live page.
-      - name: Propose heals
-        if: env.ANTHROPIC_API_KEY != ''
-        run: npx aplaytest heal --run latest --aggressiveness balanced --validate 3 --json > heals.json
-        continue-on-error: true
-
-      - name: PR comment
-        if: github.event_name == 'pull_request'
-        run: npx aplaytest report --format markdown --ci | npx aplaytest ci comment --update
-
-      - name: Open heal PR
-        if: github.ref == 'refs/heads/main' && hashFiles('heals.json') != ''
-        run: npx aplaytest heal pr --all --branch-prefix atest/heal/
-
-      # Retention only. The write already happened during ingest, and it is
-      # main-only because ATEST_HISTORY_URL carries ?readonly=1 off main.
-      - name: Trim history
-        if: github.ref == 'refs/heads/main'
-        run: npx aplaytest history prune --keep-days 90
-
-      - uses: actions/upload-artifact@v4
-        with: { name: atest-report, path: playwright-report/ }
-
-  # ── 4. POLICY GATE ─────────────────────────────────────────────────────────
-  # Separate, non-continue-on-error job so quarantine hygiene can actually block.
-  policy:
-    name: Policy
-    needs: analyze
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with: { persist-credentials: false }
-      - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: 'npm' }
-      - run: npm ci --ignore-scripts
-      - run: npx aplaytest flaky expire --ci     # exit 4 on expired quarantine or budget breach
-```
-
-The four-job shape maps cleanly onto the properties you want: `plan` is cheap and
-secret-free, `test` is the merge gate and is unchanged in character from today,
-`analyze` is best-effort intelligence, and `policy` is the only place new rules can
-block a merge — so the blocking surface stays small and explicit.
+`test` is the merge gate. `analyze` is best-effort. `policy` is where quarantine hygiene can block a merge.
 
 ---
 
@@ -255,48 +124,19 @@ expire, and a history store with a 7-day memory cannot detect flake.
 
 ## GitLab CI
 
-```yaml
-stages: [plan, test, analyze]
+`npx aplaytest ci generate --provider gitlab` writes `.gitlab-ci.atest.yml`. The stages are `test`, `analyze`, and `policy`.
 
-variables:
-  APP_ENV: docker
+**test** uses the same Playwright image, runs `npx playwright test --shard`, and publishes `.atest/runs` and `.atest/evidence`.
 
-plan:
-  stage: plan
-  image: node:22
-  script:
-    - npm ci --ignore-scripts
-    - npx aplaytest ci plan --impact-from origin/$CI_DEFAULT_BRANCH --shards auto > plan.env
-  artifacts: { reports: { dotenv: plan.env } }
+**analyze** is `allow_failure: true` and holds `ANTHROPIC_API_KEY`. It runs:
 
-test:
-  stage: test
-  image: mcr.microsoft.com/playwright:v1.61.0-noble
-  parallel: 4
-  script:
-    - npm ci
-    - npx playwright test --shard $CI_NODE_INDEX/$CI_NODE_TOTAL --grep "$ATEST_GREP"
-  artifacts:
-    when: always
-    paths: [blob-report/, .atest/evidence/]
-    reports: { junit: test-results/junit.xml }
+- `npx aplaytest flaky report --runs .atest/runs`
+- `npx aplaytest heal --evidence .atest/evidence --runs .atest/runs --dry-run`
+- `npx aplaytest report --runs .atest/runs --evidence .atest/evidence --out report.html`
 
-analyze:
-  stage: analyze
-  image: node:22
-  when: always
-  allow_failure: true
-  variables:
-    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY     # masked, protected, this job only
-  script:
-    - npm ci --ignore-scripts
-    - npx aplaytest analyze ingest --from .
-    - npx aplaytest flaky analyze --ci
-    - npx aplaytest heal --run latest --json > heals.json || true
-    - npx aplaytest report --format markdown --ci | npx aplaytest ci comment --provider gitlab
-```
+Each command is its own process. Both the flaky report and heal ingest `.atest/runs`, so the flake gate sees this pipeline's history. A durable store is `ATEST_HISTORY_URL` on the job, the same variable the GitHub job sets.
 
-`aplaytest ci generate --provider gitlab` emits this, adapted to the detected project list.
+**policy** runs `npx aplaytest flaky expire --ci`.
 
 ---
 

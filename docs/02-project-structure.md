@@ -1,194 +1,166 @@
 # 02 — Project structure
 
-`atest` lives in its own repository as a pnpm workspace monorepo. It is **not** vendored
-into `bjjeire-tests`; that repo consumes it as a devDependency. This keeps the test
-suite's dependency surface honest and lets the framework be reused by the app repo's
-component tests later.
+`atest` is its own repository. `bjjeire-tests` consumes the published packages as
+devDependencies. The root is an npm workspace (`"workspaces": ["packages/*", "examples/*"]`),
+Node `>=22`, version `0.1.1`. Build is `tsc --build` plus `scripts/finalize-cjs.ts`
+for the CommonJS reporter. There is no pnpm workspace file and no Turborepo config.
 
 ## Monorepo layout
 
 ```
 atest/
-├── package.json                      # private root, pnpm workspaces
-├── pnpm-workspace.yaml
-├── turbo.json                        # build/test pipeline caching
-├── tsconfig.base.json                # strict; mirrors bjjeire-tests' strictness
-├── .changeset/                       # release management
+├── package.json                      # private root, npm workspaces
+├── tsconfig.json                     # project references, tsc --build
+├── tsconfig.cjs.json                 # CJS build for the reporter
+├── Dockerfile                        # cli image and playwright image
 │
 ├── packages/
-│   ├── core/                         # @aplaytest/core       — no LLM, no Playwright
+│   ├── core/                         # @aplaytest/core — no Playwright, no LLM
 │   │   └── src/
-│   │       ├── config/               #   defineAtestConfig, zod schema, resolution
-│   │       ├── evidence/             #   EvidenceBundle types, store, redaction
-│   │       ├── history/              #   HistoryStore iface, memory-index (shared query
-│   │       │                         #   semantics), url parsing, sqlite driver
-│   │       ├── taxonomy/             #   FailureKind, classify(), routing tables
-│   │       ├── locator/              #   stability ranking, candidate scoring, parsing
-│   │       ├── policy/               #   heal/quarantine policy evaluation
-│   │       ├── patch/                #   ts-morph codemods, git patch generation
-│   │       ├── audit/                #   append-only ledger, provenance
-│   │       └── index.ts
+│   │       ├── config/               #   defaults, zod schema
+│   │       ├── evidence/             #   EvidenceBundle, store, redaction
+│   │       ├── history/              #   HistoryStore, sqlite, memory index, ingest
+│   │       ├── taxonomy/             #   FailureKind, classify, routing
+│   │       ├── locator/              #   stability ranking, locator parsing
+│   │       └── version.ts
 │   │
 │   ├── store-azure/                  # @aplaytest/store-azure — optional peer of the CLI
-│   │   └── src/                      #   Split out so a Playwright run, which loads
-│   │       ├── layout.ts             #   @aplaytest/core in-process, never pays for an
-│   │       │                         #   8 MB SDK only the analyze job uses.
-│   │       ├── blob-store.ts         #   HistoryStore over an append-only object log
-│   │       ├── backend.ts            #   4-method seam; the unit tests use the memory one
-│   │       └── azure-backend.ts      #   the only file importing an Azure SDK
+│   │   └── src/
+│   │       ├── layout.ts             #   one immutable blob per run and shard
+│   │       ├── blob-store.ts         #   HistoryStore; readonly indexes and does not PUT
+│   │       ├── backend.ts            #   seam the unit tests fake
+│   │       └── azure-backend.ts      #   the only file that imports an Azure SDK
 │   │
 │   ├── runner-playwright/            # @aplaytest/runner-playwright
 │   │   └── src/
-│   │       ├── reporter.ts           #   ⚠ CJS build required (see below)
-│   │       ├── fixtures.ts           #   aria/network/console capture, bindPage wrapper
-│   │       ├── spawn.ts              #   child-process control of `playwright test`
-│   │       ├── trace-reader.ts       #   parse trace.zip → actions, network, snapshots
-│   │       └── replay.ts             #   re-run a single test with locator overrides
+│   │       ├── reporter.ts           #   CJS build required (./reporter → dist-cjs)
+│   │       ├── fixtures.ts           #   aria / network / console capture
+│   │       ├── api-fixtures.ts
+│   │       ├── assemble.ts           #   evidence bundle from a Playwright result
+│   │       ├── bind.ts               #   page-object step recording
+│   │       ├── sidecar.ts
+│   │       ├── spawn.ts              #   child-process `playwright test`
+│   │       └── steps.ts
 │   │
-│   ├── llm/                          # @aplaytest/llm
+│   ├── llm/                          # @aplaytest/llm — zod, Anthropic SDK
 │   │   └── src/
-│   │       ├── client.ts             #   LlmClient interface
-│   │       ├── providers/            #   anthropic.ts | unavailable.ts (openai/ollama not implemented)
-│   │       ├── structured.ts         #   zod → tool schema, validated decode + repair
-│   │       ├── cache.ts              #   prompt caching + on-disk response cache
-│   │       └── budget.ts             #   token/cost accounting, hard stops
+│   │       ├── client.ts
+│   │       ├── factory.ts
+│   │       ├── fake.ts
+│   │       ├── budget.ts             #   token and cost guard
+│   │       ├── pricing.ts
+│   │       ├── errors.ts
+│   │       └── providers/            #   anthropic.ts, unavailable.ts
 │   │
-│   ├── agent/                        # @aplaytest/agent
+│   ├── agent/                        # @aplaytest/agent — the model tier
 │   │   └── src/
-│   │       ├── runtime/              #   loop, budget guard, transcript, tracing
-│   │       ├── tools/                #   browser/ network/ repo/ verify/
-│   │       ├── agents/               #   repair.ts | author.ts | explore.ts
-│   │       ├── prompts/              #   *.md templates, versioned
-│   │       └── conventions.ts        #   repo-convention retrieval (exemplar selection)
+│   │       ├── repair.ts             #   ranks candidates proposeHeal already made
+│   │       └── author.ts             #   drafts a test; does not accept it
+│   │
+│   ├── author/                       # @aplaytest/author — the falsifiability gate
+│   │   └── src/
+│   │       ├── gate.ts
+│   │       ├── ground.ts
+│   │       └── mutants.ts
 │   │
 │   ├── heal/                         # @aplaytest/heal
 │   │   └── src/
-│   │       ├── candidates.ts         #   Tier-0 deterministic generation
-│   │       ├── rank.ts               #   Tier-1 LLM ranking (optional)
-│   │       ├── validate.ts           #   replay N× + collateral check
-│   │       ├── strategies/           #   selector.ts | assertion.ts | flow.ts
+│   │       ├── candidates.ts         #   generateCandidates, synchronous
+│   │       ├── propose.ts            #   gate order, including the flake score
+│   │       ├── resolve.ts
+│   │       ├── validate.ts           #   re-run the target, then the spec
+│   │       ├── patch.ts
 │   │       └── ledger.ts
 │   │
 │   ├── flaky/                        # @aplaytest/flaky
 │   │   └── src/
-│   │       ├── score.ts              #   Wilson bound, recency decay, transitions
-│   │       ├── features.ts           #   deterministic signal extraction
-│   │       ├── classify.ts           #   rules → class; LLM only for narrative
-│   │       ├── bisect.ts             #   co-scheduling / worker-count bisection
-│   │       └── quarantine.ts         #   tag codemod, expiry enforcement, budget
+│   │       ├── score.ts
+│   │       ├── features.ts
+│   │       ├── classify.ts
+│   │       ├── analyze.ts
+│   │       ├── resolve.ts
+│   │       ├── bisect.ts
+│   │       ├── quarantine.ts
+│   │       └── codemod.ts
 │   │
-│   ├── impact/                       # @aplaytest/impact
+│   ├── impact/                       # @aplaytest/impact — core only
 │   │   └── src/
-│   │       ├── graph.ts              #   ts-morph import graph, spec → deps closure
-│   │       ├── coverage.ts           #   runtime route/testid/api map from traces
-│   │       ├── select.ts             #   changed paths → test set + shard plan
-│   │       └── crossrepo.ts          #   app-repo diff → test set (LLM-assisted)
+│   │       ├── graph.ts
+│   │       ├── coverage.ts
+│   │       └── select.ts
 │   │
 │   ├── report/                       # @aplaytest/report
 │   │   └── src/
-│   │       ├── html/                 #   self-contained SPA build
-│   │       ├── insights.ts           #   run narrative generation (LLM optional)
-│   │       └── merge.ts              #   shard/blob merge → single report
+│   │       ├── args.ts
+│   │       ├── html.ts
+│   │       ├── load.ts
+│   │       ├── markdown.ts           #   pull-request comment
+│   │       └── merge.ts
 │   │
-│   ├── mcp/                          # @aplaytest/mcp
+│   ├── mcp/                          # @aplaytest/mcp — stdio
 │   │   └── src/
-│   │       ├── server.ts             #   stdio + streamable-http transports
-│   │       ├── tools/                #   one file per tool, zod-schema'd
-│   │       ├── resources/            #   atest:// URI handlers
-│   │       └── safety.ts             #   write-gating, redaction, size caps
+│   │       ├── bin.ts
+│   │       ├── server.ts
+│   │       ├── tools.ts
+│   │       └── safety.ts
 │   │
-│   └── cli/                          # aplaytest  (the published bin)
+│   └── cli/                          # @aplaytest/cli — the `aplaytest` bin
 │       └── src/
-│           ├── bin.ts
-│           ├── commands/             #   one file per command, thin over engines
-│           ├── ui/                   #   spinners, tables, diffs, TTY vs CI output
-│           └── ci/                   #   workflow generators (templates/)
+│           ├── bin.ts                #   node:util parseArgs
+│           ├── commands/             #   one file per command; ci.ts holds the workflow
+│           ├── store.ts              #   --db, then ATEST_HISTORY_URL, then :memory:
+│           ├── ledger.ts
+│           └── ui/output.ts
 │
 ├── examples/
-│   ├── playwright-basic/
-│   └── bjjeire-style/                # function-based page objects + constants
+│   ├── bjjeire-live/
+│   ├── fixture-app/
+│   ├── smoke/
+│   └── ci/atest-analyze.yml
 │
 └── docs/
 ```
 
-## Package boundaries and why
+## Package boundaries
 
-| Package               | May import                            | Rationale                                                                                 |
-| --------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `core`                | nothing internal                      | Must be testable with zero Playwright and zero network. Holds all types.                   |
-| `runner-playwright`   | `core`                                | The only package that knows Playwright exists. Swappable for a Cypress/WebDriver adapter.  |
-| `llm`                 | `core`                                | The only package that makes model calls. Everything else takes an `LlmClient` injected.    |
-| `heal`/`flaky`/`impact` | `core`, `runner-playwright`, `llm`  | Never each other.                                                                          |
-| `agent`               | `core`, `runner-playwright`, `llm`    | Tools are the only way it touches the world.                                               |
-| `report`              | `core`                                | Renders from history + evidence. Never re-runs anything.                                   |
-| `mcp` / `cli`         | everything                            | Both are thin adapters over identical engine calls — see below.                             |
+| Package | May import | Rationale |
+| --- | --- | --- |
+| `core` | nothing internal | No Playwright and no LLM. Holds the shared types. |
+| `runner-playwright` | `core` | The only package that knows Playwright. It does not depend on `llm`. |
+| `llm` | zod, the Anthropic SDK | The budget guard lives here. |
+| `heal`, `flaky` | `core`, `runner-playwright` | Engines do not import each other. |
+| `impact` | `core` | Import graph and selection. |
+| `author` | `core`, `runner-playwright` | Decides whether a drafted test is falsifiable. No model. |
+| `agent` | `core`, `llm` | Drafts a test and ranks heal candidates. It does not decide. |
+| `report` | `core` | HTML report and the pull-request comment. |
+| `mcp` | `core`, `flaky`, `heal`, `impact`, `author` | Same engines the CLI calls, over stdio. |
+| `cli` | the engines, `llm`, `agent` | The other place that calls more than one engine. Azure is a dynamic import. |
 
-**The CLI/MCP parity rule:** every CLI command body is ≤ 30 lines and does exactly
-three things — parse flags, call one engine function, format output. Every MCP tool
-calls *the same engine function*. If a capability exists in one and not the other, that
-is a bug in the adapter, not a missing feature.
+`@aplaytest/author` and `@aplaytest/agent`'s `author.ts` are different packages. The
+agent drafts. The author package's gate accepts or rejects the draft.
 
-```ts
-// packages/cli/src/commands/heal.ts
-export async function healCommand(flags: HealFlags): Promise<number> {
-  const ctx = await loadContext(flags);
-  const result = await healEngine.proposeAll(ctx, {
-    runId: flags.run ?? 'latest',
-    aggressiveness: flags.aggressiveness,
-    validationRuns: flags.validate,
-  });
-  renderHealTable(result);
-  return result.proposals.length > 0 ? 0 : EXIT.NOTHING_TO_DO;
-}
+## Packaging constraints
 
-// packages/mcp/src/tools/propose-heal.ts — same engine call, different envelope
-export const proposeHeal = defineTool({
-  name: 'atest_propose_heal',
-  inputSchema: z.object({ failureId: z.string(), aggressiveness: AggressivenessSchema.optional() }),
-  handler: async (input, ctx) => healEngine.proposeOne(ctx, input),
-});
-```
+1. **CJS reporter entry.** A CommonJS suite loads reporters with `require`.
+   `@aplaytest/runner-playwright` publishes `./reporter` as
+   `dist-cjs/reporter.js` for `require` and `dist/reporter.js` for `import`.
+   The CJS build is `tsc --build tsconfig.cjs.json` and `scripts/finalize-cjs.ts`.
 
-## Packaging constraints (real ones, from this repo)
+2. **Playwright is a peer dependency** of `@aplaytest/runner-playwright`:
+   `"@playwright/test": ">=1.55.0"`. This repo's devDependency is pinned to
+   `1.64.1`, the same version as `ARG PLAYWRIGHT_VERSION` in the Dockerfile and
+   the default image in `aplaytest ci generate`. The tag and the npm version
+   are one decision: the image ships the browser build that package expects.
 
-1. **CJS reporter entry.** `bjjeire-tests` is `"type": "commonjs"` and its
-   `activeReporters()` loads reporters by absolute path. `@aplaytest/runner-playwright`
-   must publish `reporter.cjs` alongside ESM. Everything else can be ESM-only —
-   the CLI is a bin, and the fixtures are imported by TS that compiles to CJS.
-   Build with `tsup --format cjs,esm --dts`.
+3. **No LLM SDK on the run path.** `@aplaytest/runner-playwright` does not depend
+   on `@aplaytest/llm`. The reporter runs inside the test process.
 
-2. **Playwright as a peer dependency**, never a direct one. Version drift between the
-   framework's Playwright and the suite's pinned `1.61.0` would silently change
-   snapshot rendering. Declare `"peerDependencies": { "@playwright/test": ">=1.55" }`
-   and fail fast at startup on mismatch:
-
-   ```ts
-   assertPeerVersion('@playwright/test', { min: '1.55.0', warnIfBelow: '1.61.0' });
-   ```
-
-3. **No transitive LLM SDK in the run path.** `@aplaytest/runner-playwright` must not
-   depend on `@aplaytest/llm`. The reporter runs inside the test process; pulling an HTTP
-   client and 40MB of SDK into every worker is unacceptable, and it would make a
-   credential available where it should not be.
-
-4. **Zero-install evidence reading.** The evidence format is plain JSON with a
-   `schemaVersion`. A human with `jq` can read it. Never a binary format.
+4. **Evidence is plain JSON** with a `schemaVersion`. A human can read a bundle
+   with `jq`.
 
 ## What lands in the consumer repo
 
-Deliberately small. In `bjjeire-tests`:
-
-```
-bjjeire-tests/
-├── atest.config.ts              # NEW — the only required file
-├── .atest/                      # NEW — gitignored, except heals/ and history export
-│   ├── history.sqlite
-│   ├── evidence/<runId>/
-│   └── heals/*.json             # tracked: the audit ledger belongs in git
-├── .gitignore                   # + .atest/history.sqlite, .atest/evidence/
-├── package.json                 # + devDependency: atest
-└── src/shared/config/playwright.ts   # + one reporter entry in activeReporters()
-```
-
-That is the entire Phase-0 footprint. No spec changes, no fixture changes, no project
-changes. `git revert` on that single commit fully removes the framework.
+In `bjjeire-tests` the footprint is the reporter entry, `atest.config.ts` when
+you want one, and a gitignored `.atest/` for evidence and run records. History
+across CI runs is `ATEST_HISTORY_URL` (`azblob://…`) or a SQLite path. See
+[08 — CI/CD](./08-cicd.md) and [12 — Azure history](./12-azure-history.md).

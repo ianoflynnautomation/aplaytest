@@ -246,7 +246,6 @@ describe('proposeHeal — Tier 1 cannot override Tier 0 safety', () => {
     reasoning: 'the card renders the name here',
     confidence: 0.9,
     usd: 0.01,
-    changedChoice: false,
     chosen,
     realBug,
   });
